@@ -81,7 +81,7 @@ class PinterestImageNode:
     RETURN_TYPES = ("IMAGE",)
 
     FUNCTION = "get_random_pinterest_image"
-    CATEGORY = "pinterest"
+    CATEGORY = "Dado's Nodes/Pinterest"
 
     board = {}
     critical_response = None
@@ -95,6 +95,11 @@ class PinterestImageNode:
             "metadata": None,
         }
         self.req_builder = RequestBuilder()
+        
+        # Add headers dictionary
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'
+        }
 
     @classmethod
     def update_board_name(cls, node_id, board):
@@ -159,8 +164,8 @@ class PinterestImageNode:
         
         cred_root = constants.BASE_DIR + "/.cred_root"
         if self.pinterest is None:
-            with suppress_specific_output():
-                self.pinterest = Pinterest(username=username, cred_root=cred_root)
+            self.pinterest = Pinterest(username=username, cred_root=cred_root, headers=self.headers)
+            self.pinterest.login()  # Add login here
 
         if not check_user_exists(self.pinterest, username, unique_id):
             interrupt_processing(True)
@@ -198,9 +203,8 @@ class PinterestImageNode:
         print(f"All board name: {PinterestImageNode.board}")
 
         print(f"Getting random Pinterest image from board '{board}' for user '{username}'")
-
-        with suppress_specific_output():
-            self.pinterest = Pinterest(username=username, cred_root=cred_root)
+        self.pinterest = Pinterest(username=username, cred_root=cred_root, headers=self.headers)
+        self.pinterest.login()  # Add login here
 
         pins = []
         boards = self.pinterest.boards(username=username)
@@ -307,8 +311,7 @@ async def api_pinterest_router(request):
     if operation == 'get_user_boards':
         print(f"Getting Boards from Pinterest username: {username}")
         node_id = data.get('node_id')
-        with suppress_specific_output():
-            pinterest = Pinterest(username=username, cred_root=constants.BASE_DIR + "/.cred_root")
+        pinterest = Pinterest(username=username, cred_root=constants.BASE_DIR + "/.cred_root")
         user_exists = check_user_exists(pinterest, username, node_id)
         if not user_exists:
             interrupt_processing(True)

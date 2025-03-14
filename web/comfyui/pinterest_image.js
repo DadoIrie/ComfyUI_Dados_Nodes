@@ -454,7 +454,7 @@ app.registerExtension({
     },
 
     async nodeCreated(node) {
-        console.log("(Dados.EventListeners) Node Created :", node);
+        /* console.log("(Dados.EventListeners) Node Created :", node); */
     },
 
     async beforeRegisterNodeDef(nodeType, nodeData, app) {

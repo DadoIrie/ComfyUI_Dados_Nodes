@@ -1,3 +1,5 @@
+# flake8: noqa: E402
+# pylint: disable=wrong-import-position
 import os
 from aiohttp import web
 from server import PromptServer  # type: ignore pylint: disable=import-error
@@ -12,12 +14,21 @@ class Constants:
 constants = Constants()
 
 from .nodes.pinterest_image import PinterestImageNode
+from .nodes.text_concat import TextConcatenatorNode
+from .nodes.text_dropdown import TextDropDownNode
+from .nodes.text_loader import DynamicTextLoaderNode
 
 NODE_CLASS_MAPPINGS = {
-    "PinterestImageNode": PinterestImageNode
+    "PinterestImageNode": PinterestImageNode,
+    "TextConcatenatorNode": TextConcatenatorNode,
+    "TextDropDownNode": TextDropDownNode,
+    "DynamicTextLoaderNode": DynamicTextLoaderNode
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "PinterestImageNode": "Pinterest Image"
+    "PinterestImageNode": "Pinterest Node (WIP)",
+    "TextConcatenatorNode": "Text Concatenator",
+    "TextDropDownNode": "Text DropDown",
+    "DynamicTextLoaderNode": "Dynamic Text Loader"
 }
 
 WEB_DIRECTORY = "./web/comfyui"
