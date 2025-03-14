@@ -17,20 +17,21 @@ from .nodes.pinterest_image import PinterestImageNode
 from .nodes.text_concat import TextConcatenatorNode
 from .nodes.text_dropdown import TextDropDownNode
 from .nodes.text_loader import DynamicTextLoaderNode
-
+from .nodes.smolvlm_node import SmolVLMNode
 NODE_CLASS_MAPPINGS = {
     "PinterestImageNode": PinterestImageNode,
     "TextConcatenatorNode": TextConcatenatorNode,
     "TextDropDownNode": TextDropDownNode,
-    "DynamicTextLoaderNode": DynamicTextLoaderNode
+    "DynamicTextLoaderNode": DynamicTextLoaderNode,
+    "SmolVLMNode": SmolVLMNode
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "PinterestImageNode": "Pinterest Node (WIP)",
     "TextConcatenatorNode": "Text Concatenator",
     "TextDropDownNode": "Text DropDown",
-    "DynamicTextLoaderNode": "Dynamic Text Loader"
+    "DynamicTextLoaderNode": "Dynamic Text Loader",
+    "SmolVLMNode": "SmolVLM Image Describer"
 }
-
 WEB_DIRECTORY = "./web/comfyui"
 COMMON_DIRECTORY = "./web/common"
 
