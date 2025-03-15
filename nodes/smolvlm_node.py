@@ -1,11 +1,8 @@
-import os
 import torch
 from PIL import Image
 import torch.amp.autocast_mode
 from pathlib import Path
 from huggingface_hub import snapshot_download
-import folder_paths
-import flash_attn
 from transformers import AutoProcessor, AutoModelForVision2Seq
 from .. import constants
 
@@ -49,7 +46,7 @@ class SmolVLMNode:
         return {
             "required": {
                 "image": ("IMAGE",),
-                "prompt": ("STRING", {"multiline": True, "default": "Can you describe this image?"}),
+                "prompt": ("STRING", {"multiline": True, "default": "Describe the image in great detail"}),
                 "max_tokens": ("INT", {
                     "default": 500, 
                     "min": 10,
