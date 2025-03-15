@@ -32,7 +32,8 @@ def download_smolvlm(model_size):
         local_dir=target_dir,
         force_download=False,
         local_files_only=False,
-        local_dir_use_symlinks="auto"
+        local_dir_use_symlinks="auto",
+        ignore_patterns=["**/onnx/**", "**/*.onnx"]  # Ignore ONNX files and directories
     )
     print(f"Model path: {path}")
     return path
@@ -57,7 +58,7 @@ class SmolVLMNode:
                     "display": "number"
                 }),
                 "model_size": (["256M", "500M"], {}),  # Using COMBO for model size
-                "precision": (["float32", "bfloat16"], {}),  # New combo for precision
+                "precision": (["bfloat16", "float32"], {}),  # New combo for precision
             },
         }
 

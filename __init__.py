@@ -18,19 +18,24 @@ from .nodes.text_concat import TextConcatenatorNode
 from .nodes.text_dropdown import TextDropDownNode
 from .nodes.text_loader import DynamicTextLoaderNode
 from .nodes.smolvlm_node import SmolVLMNode
+from .nodes.smolvlm_node_onnx import SmolVLMNodeOnnx  # Import the new ONNX node
+
 NODE_CLASS_MAPPINGS = {
     "PinterestImageNode": PinterestImageNode,
     "TextConcatenatorNode": TextConcatenatorNode,
     "TextDropDownNode": TextDropDownNode,
     "DynamicTextLoaderNode": DynamicTextLoaderNode,
-    "SmolVLMNode": SmolVLMNode
+    "SmolVLMNode": SmolVLMNode,
+    "SmolVLMNodeOnnx": SmolVLMNodeOnnx  # Register the new ONNX node
 }
+
 NODE_DISPLAY_NAME_MAPPINGS = {
     "PinterestImageNode": "Pinterest Node (WIP)",
     "TextConcatenatorNode": "Text Concatenator",
     "TextDropDownNode": "Text DropDown",
     "DynamicTextLoaderNode": "Dynamic Text Loader",
-    "SmolVLMNode": "SmolVLM Image Describer"
+    "SmolVLMNode": "SmolVLM Image Describer",
+    "SmolVLMNodeOnnx": "SmolVLM ONNX Image Describer"  # Display name for the new ONNX node
 }
 WEB_DIRECTORY = "./web/comfyui"
 COMMON_DIRECTORY = "./web/common"
