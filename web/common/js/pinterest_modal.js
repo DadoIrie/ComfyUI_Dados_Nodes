@@ -1,5 +1,5 @@
 import { createModal } from "./modal.js";
-import { fetchApiSend, getWidgets } from "./utils.js";
+import { fetchSend, getWidgets } from "./utils.js";
 import { getIcon } from "./svg_icons.js";
 
 export function pinterest_modal(node) {
@@ -17,7 +17,7 @@ export function pinterest_modal(node) {
 
     const customLogic = async (modal, testString) => {
       if (modal.config.nodeId) {
-        const result = await fetchApiSend("/dadoNodes/pinterestNode/", "common_test", {
+        const result = await fetchSend("/dadosNodes/inactivePinterestNode/", "common_test", {
           message: `Hello, API! from node ${modal.config.nodeId}. Test string: ${testString}`,
         });
         console.log("Reply:", result);

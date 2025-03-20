@@ -8,8 +8,9 @@ from typing import Dict, Any, ClassVar, List
 import json
 import random
 import time
-from server import PromptServer  # type: ignore pylint: disable=import-error
+# from server import PromptServer  # type: ignore pylint: disable=import-error
 from aiohttp import web
+from ..utils.api_routes import register_operation_handler
 
 class TextDropDownNode:
     """
@@ -21,7 +22,7 @@ class TextDropDownNode:
     CATEGORY = "Dado's Nodes/Text"
 
     selections: ClassVar[Dict[str, str]] = {}
-    entries_map: ClassVar[Dict[str, List[str]]] = {}  # Store available entries for each node
+    entries_map: ClassVar[Dict[str, List[str]]] = {}
     DEFAULT_SELECTION = "empty"
 
     @classmethod
@@ -34,10 +35,8 @@ class TextDropDownNode:
         }
 
     def process(self, unique_id: str) -> tuple:
-        # Get the selected dropdown value for this node instance
         selection = self.__class__.selections.get(str(unique_id), self.DEFAULT_SELECTION)
         
-        # If selection is "random", pick a random entry from available entries
         if selection == "random":
             entries = self.__class__.entries_map.get(str(unique_id), [])
             if entries:
@@ -53,46 +52,44 @@ class TextDropDownNode:
         selection_key = str(unique_id)
         current_selection = cls.selections.get(selection_key, cls.DEFAULT_SELECTION)
         
-        # For "random", add a timestamp to force re-execution each time
         if current_selection == "random":
             return f"{selection_key}:{current_selection}:{time.time()}"
         
         return f"{selection_key}:{current_selection}"
 
-# API route to handle dropdown operations
-@PromptServer.instance.routes.post('/dadoNodes/textDropdown/')
-async def text_dropdown_router(request):
+@register_operation_handler
+async def handle_text_dropdown_operations(request):
+    """Handle text dropdown operations using the common message route"""
     try:
         data = await request.json()
-        op = data.get('op')
+        operation = data.get('operation')
+        
+        # Skip if not a text_dropdown operation
+        if operation not in ['update_selection', 'remove_selection']:
+            return None
+            
+        node_id = str(data.get('id', ''))
+        payload = data.get('payload', {})
 
-        # Handle operation from older format
-        if op is None:
-            # Try to determine operation from other fields
-            if 'selection' in data:
-                op = 'update_selection'
-            elif 'node_id' in data and any(key.startswith('remove') for key in data):
-                op = 'remove_selection'
-
-        node_id = str(data.get('node_id', ''))
-
-        if op == 'update_selection':
-            selection = data.get('selection')
+        if operation == 'update_selection':
+            selection = payload.get('selection')
             if selection is not None:
                 TextDropDownNode.selections[node_id] = selection
                 
-                # If we received entries (for random selection), store them
-                entries = data.get('entries')
+                entries = payload.get('entries')
                 if selection == "random" and entries is not None:
                     TextDropDownNode.entries_map[node_id] = entries
                 
+                # Just return success without sending a message
                 return web.json_response({"status": "success"})
         
-        elif op == 'remove_selection':
+        elif operation == 'remove_selection':
             if node_id in TextDropDownNode.selections:
                 del TextDropDownNode.selections[node_id]
             if node_id in TextDropDownNode.entries_map:
                 del TextDropDownNode.entries_map[node_id]
+                
+            # Just return success without sending a message
             return web.json_response({"status": "success"})
         
         return web.json_response({"error": "Invalid operation or parameters"}, status=400)

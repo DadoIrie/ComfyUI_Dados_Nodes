@@ -3,11 +3,11 @@ import { api } from "../../scripts/api.js";
 import { ComfyDialog } from "../../scripts/ui.js";
 import { getStorageValue, setStorageValue } from "../../scripts/utils.js";
 
-const { chainCallback, getWidget, getWidgets, fetchApiSend } = await import("/extensions/ComfyUI_Dados_Nodes/common/js/utils.js");
+const { chainCallback, getWidget, getWidgets, fetchSend } = await import("/extensions/ComfyUI_Dados_Nodes/common/js/utils.js");
 const { pinterest_modal } = await import('/extensions/ComfyUI_Dados_Nodes/common/js/pinterest_modal.js');
 
 const boardDataUpdatedEvent = new Event('boardDataUpdated');
-const fetchApiPinRoute = '/dadoNodes/pinterestNode/';
+const fetchApiPinRoute = '/dadosNodes/inactivePinterestNode/';
 const baseUrl = window.location.origin + window.location.pathname.replace(/\/+$/, '');
 const scriptUrl = `${baseUrl}/extensions/ComfyUI_Dados_Nodes/web/comfyui/pinterest_image.js`;
 
@@ -182,7 +182,7 @@ async function updateBackendLegacy(node) {
 
     if (username && boardName) {
         try {
-            const result = await fetchApiSend(fetchApiPinRoute, "update_selected_board_name", {
+            const result = await fetchSend(fetchApiPinRoute, "update_selected_board_name", {
                 username: username,
                 board: boardName,
                 node_id: node.id
@@ -203,7 +203,7 @@ async function updateBackend(node) {
 
     if (username) {
         try {
-            const result = await fetchApiSend(fetchApiPinRoute, "update_backend_inputs", {
+            const result = await fetchSend(fetchApiPinRoute, "update_backend_inputs", {
                 username: username,
                 node_id: node.id
             });
@@ -223,7 +223,7 @@ async function updateBoardNamesLegacy(node) {
     const username = usernameWidget.value;
     if (username) {
         try {
-            const boardNames = await fetchApiSend(fetchApiPinRoute, "get_user_boards", {
+            const boardNames = await fetchSend(fetchApiPinRoute, "get_user_boards", {
                 username: username,
                 node_id: node.id,
             });
@@ -258,7 +258,7 @@ async function getUserBoards(node) {
     const username = widgets.username.value;
     if (username) {
         try {
-            const boardNames = await fetchApiSend(fetchApiPinRoute, "get_user_boards", {
+            const boardNames = await fetchSend(fetchApiPinRoute, "get_user_boards", {
                 username: username,
                 node_id: node.id,
             });
@@ -368,7 +368,7 @@ function setupEventListener(node) {
             console.log("python backend requesting selected board name from node ", detail["node_id"]);
 
             const widgets = await getWidgets(node, ["username"]);
-            fetchApiSend('/dadoNodes/pinterestNode/', 'critical_response', {
+            fetchSend('/dadosNodes/inactivePinterestNode/', 'critical_response', {
                 message: widgets.username.value 
                     ? widgets.username.value
                     : "No username input provided"
@@ -446,7 +446,7 @@ app.registerExtension({
         console.log("URL of pinterest_image.js:", scriptUrl);
 
         chainCallback(app.graph, 'onNodeRemoved', async function (removedNode) {
-            if (removedNode.type === "PinterestImageNode") {
+            if (removedNode.type === "inactivePinterestImageNode") {
                 /* console.log("(Dados.EventListeners) Node Removed :", removedNode.type, removedNode.id); */
                 clearSelectedBoard(removedNode);
             }
@@ -458,9 +458,9 @@ app.registerExtension({
     },
 
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
-        if (nodeData.name === "PinterestImageNode") {
+        if (nodeData.name === "inactivePinterestImageNode") {
             chainCallback(LGraphNode.prototype, "configure", function(info) {
-                if (info.type === "PinterestImageNode") {
+                if (info.type === "inactivePinterestImageNode") {
                     this.previousSize = [...this.size];
                     console.log("(Dados.EventListeners) Node Configured :", this.type, this.id, this.size);
                     console.log("(Dados.EventListeners) Node :", this);
@@ -569,11 +569,11 @@ app.registerExtension({
     }
 });
 
-api.addEventListener("executing", async ({ detail }) => {
+/* api.addEventListener("executing", async ({ detail }) => {
     const nodeId = parseInt(detail);
     if (!isNaN(nodeId)) {
         const node = app.graph.getNodeById(nodeId);
-        if (node.type === "PinterestImageNode") {
+        if (node.type === "inactivePinterestImageNode") {
             node.hasError = false;
             node.errorMessage = null;
 
@@ -587,6 +587,6 @@ api.addEventListener("executing", async ({ detail }) => {
             node.setDirtyCanvas(true);
         }
     }
-});
+}); */
 
 

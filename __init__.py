@@ -1,10 +1,12 @@
 # flake8: noqa: E402
 # pylint: disable=wrong-import-position
 import os
-from aiohttp import web
 from server import PromptServer  # type: ignore pylint: disable=import-error
 
+# Define core constants
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+EXTENSION_NAME = "ComfyUI_Dados_Nodes"
+MESSAGE_ROUTE = "/dadosNodes"
 
 class Constants:
     @property
@@ -13,41 +15,38 @@ class Constants:
 
 constants = Constants()
 
-from .nodes.pinterest_image import PinterestImageNode
+# Define web directories
+WEB_DIRECTORY = "./web/comfyui"
+COMMON_DIRECTORY = "./web/common"
+
+# Import node definitions
+from .nodes.inactive_pinterest_image import inactivePinterestImageNode
 from .nodes.text_concat import TextConcatenatorNode
 from .nodes.text_dropdown import TextDropDownNode
 from .nodes.text_loader import DynamicTextLoaderNode
 from .nodes.smolvlm_node import SmolVLMNode
+from .nodes.pinterest_fetch import PinterestFetch
 
+# Node class mappings
 NODE_CLASS_MAPPINGS = {
-    "PinterestImageNode": PinterestImageNode,
+    "inactivePinterestImageNode": inactivePinterestImageNode,
     "TextConcatenatorNode": TextConcatenatorNode,
     "TextDropDownNode": TextDropDownNode,
     "DynamicTextLoaderNode": DynamicTextLoaderNode,
     "SmolVLMNode": SmolVLMNode,
+    "PinterestFetch": PinterestFetch,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "PinterestImageNode": "Pinterest Node (WIP)",
+    "inactivePinterestImageNode": "Pinterest Node (WIP - broken)",
     "TextConcatenatorNode": "Text Concatenator",
     "TextDropDownNode": "Text DropDown",
     "DynamicTextLoaderNode": "Dynamic Text Loader",
     "SmolVLMNode": "SmolVLM Image Describer",
+    "PinterestNode": "Pinterest Node",
 }
-WEB_DIRECTORY = "./web/comfyui"
-COMMON_DIRECTORY = "./web/common"
 
-# Add routes for serving the common directory
-# might be useful later on
-def add_routes():
-    @PromptServer.instance.routes.get("/extensions/ComfyUI_Dados_Nodes/common/{path:.*}")
-    async def serve_common_file(request):
-        path = request.match_info['path']
-        file_path = os.path.join(BASE_DIR, COMMON_DIRECTORY, path)
-        if os.path.exists(file_path) and os.path.isfile(file_path):
-            return web.FileResponse(file_path)
-        return web.Response(status=404)
-
-add_routes()
+from .utils.api_routes import register_routes
+register_routes()
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]

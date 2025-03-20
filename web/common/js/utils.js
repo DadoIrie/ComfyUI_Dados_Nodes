@@ -17,13 +17,36 @@ export function chainCallback(object, property, callback) {
   }
 }
 
-export async function fetchApiSend(route, operation, data) {
-  return api.fetchApi(route, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ op: operation, ...data })
-  }).then(response => response.json());
+export async function fetchSend(route, id, operation, payload=null) {
+  let requestOptions = {
+    method: "POST",
+    headers: { "Content-Type": "application/json" }
+  };
+
+  const messageBody = {
+    id: id,
+    operation: operation
+  };
+  
+  // Add payload if provided
+  if (payload !== null) {
+    messageBody.payload = payload;
+  }
+  
+  requestOptions.body = JSON.stringify(messageBody);
+
+  try {
+    const response = await api.fetchApi(route, requestOptions);
+    if (!response.ok) {
+      throw new Error(`Error: ${response.status} - ${response.statusText}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error(`API call to ${route} failed:`, error);
+    throw error;
+  }
 }
+
 
 export async function getWidget(node, name, maxRetries = 3) {
   const checkWidget = (retries = 0) => {

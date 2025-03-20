@@ -10,5 +10,5 @@ Repository = "https://github.com/dadoirie/ComfyUI_Dados_Nodes"
 
 [tool.comfy]
 PublisherId = "dadoirie"
-DisplayName = "ComfyUI_Dados_Nodes"
+DisplayName = "ComfyUI Dados Nodes"
 Icon = ""
