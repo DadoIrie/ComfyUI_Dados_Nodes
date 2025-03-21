@@ -2,10 +2,17 @@ import os
 import time
 import json
 import base64
-import asyncio
 from aiohttp import ClientSession
 from .. import constants
 
+# Base URLs for OAuth service
+OAUTH_LOCAL_URL = "http://localhost:8085"
+OAUTH_PROD_URL = "https://vercel-pinterest-oauth.vercel.app"
+
+# Development mode toggle - set to False in production
+USE_LOCAL_OAUTH = False
+
+# For backward compatibility
 REDIRECT_URI = "https://localhost:8085/"
 OAUTH_SCOPES = "user_accounts:read,pins:read,pins:write,pins:read_secret,pins:write_secret,boards:read,boards:write,boards:read_secret,boards:write_secret"
 
@@ -14,6 +21,10 @@ CREDS_DIR = os.path.join(constants.BASE_DIR, ".cred_root")
 if not os.path.exists(CREDS_DIR):
     os.makedirs(CREDS_DIR)
 PIN_TOKEN = os.path.join(CREDS_DIR, "pinterestOauthToken.json")
+
+def get_oauth_base_url():
+    """Get the base URL for the OAuth service based on development mode"""
+    return OAUTH_LOCAL_URL if USE_LOCAL_OAUTH else OAUTH_PROD_URL
 
 def get_token_file_path():
     """Get the path to the Pinterest OAuth token file"""
@@ -137,29 +148,22 @@ async def refresh_token(node_id, app_id=None, app_secret=None):
     
     refresh_token_value = token_data['refresh_token']
     
-    # Check if we have app credentials
-    if not app_id or not app_secret:
-        print("ERROR: Pinterest App ID or Secret not provided for refresh")
-        return False
+    # Call the external OAuth service for token refresh
+    oauth_base_url = get_oauth_base_url()
+    refresh_url = f"{oauth_base_url}/api/refresh"
     
-    # Get auth header
-    auth_header = create_basic_auth_header(app_id, app_secret)
-    if not auth_header:
-        return False
+    data = {
+        "refresh_token": refresh_token_value
+    }
+    
+    # Add custom credentials if provided
+    if app_id and app_secret:
+        data["client_id"] = app_id
+        data["client_secret"] = app_secret
     
     try:
         async with ClientSession() as session:
-            async with session.post(
-                "https://api.pinterest.com/v5/oauth/token",
-                headers=auth_header,
-                data={
-                    "grant_type": "refresh_token",
-                    "refresh_token": refresh_token_value,
-                    "scope": OAUTH_SCOPES,
-                    "continuous_refresh": "true"
-                },
-                timeout=30
-            ) as response:
+            async with session.post(refresh_url, json=data, timeout=30) as response:
                 if response.status != 200:
                     print(f"Error refreshing token: {await response.text()}")
                     return False
@@ -189,20 +193,6 @@ async def refresh_token(node_id, app_id=None, app_secret=None):
     except Exception as e:
         print(f"Exception while refreshing token: {str(e)}")
         return False
-
-def refresh_token_sync(node_id, app_id=None, app_secret=None):
-    """Synchronous version of token refresh"""
-    print(f"Synchronously refreshing access token for node {node_id}")
-    
-    # Create an event loop in this thread if there isn't one already
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    
-    # Run the async function and return the result
-    return loop.run_until_complete(refresh_token(node_id, app_id, app_secret))
 
 async def on_token_received(node_id, token_data, username):
     """Callback function when OAuth token is received"""

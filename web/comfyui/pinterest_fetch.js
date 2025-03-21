@@ -58,6 +58,7 @@ async function validatePinterestToken(node) {
 async function getPinterestCredentials() {
     const app_id = await app.extensionManager.setting.get("pinterest.app_id");
     const app_secret = await app.extensionManager.setting.get("pinterest.app_secret");
+    const scope = await app.extensionManager.setting.get("pinterest.scope");
     const token_environment = await app.extensionManager.setting.get("pinterest.token_environment") || "standard";
     
     // For special environments
@@ -71,10 +72,12 @@ async function getPinterestCredentials() {
     return {
         app_id,
         app_secret,
+        scope,
         token_environment,
         accessToken
     };
 }
+
 
 /**
  * Request boards from the backend
@@ -189,7 +192,8 @@ async function authenticate() {
         "start_authentication", 
         {
             app_id: credentials.app_id,
-            app_secret: credentials.app_secret
+            app_secret: credentials.app_secret,
+            scope: credentials.scope
         }
     );
     
@@ -198,6 +202,7 @@ async function authenticate() {
     // The actual OAuth redirect will be handled by the handleNodeMessages function
     // when it receives the "oauth_started" message with the oauth_url
 }
+
 function selectPinterestImage() {
     console.log(`Selecting Image was requested on node ${this.id}`);
     // Call the existing requestBoards function with this node
@@ -274,6 +279,13 @@ const settingsList = [
         name: "App secret key",
         type: "text",
         defaultValue: "",
+    },
+    {
+        id: "scope",
+        name: "Scope",
+        type: "text",
+        defaultValue: "",
+        tooltip: "Optional custom OAuth scope (comma-separated list of permissions)"
     },
     {
         id: "token_environment",
