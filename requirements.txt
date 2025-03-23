@@ -1,3 +1,2 @@
-py3-pinterest
 dynamicprompts
 flash-attn

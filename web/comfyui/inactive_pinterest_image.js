@@ -182,11 +182,16 @@ async function updateBackendLegacy(node) {
 
     if (username && boardName) {
         try {
-            const result = await fetchSend(fetchApiPinRoute, "update_selected_board_name", {
-                username: username,
-                board: boardName,
-                node_id: node.id
-            });
+            // New fetchSend format: (route, id, operation, payload)
+            const result = await fetchSend(
+                fetchApiPinRoute,                // route
+                node.id,                         // id
+                "update_selected_board_name",    // operation
+                {                                // payload
+                    username: username,
+                    board: boardName
+                }
+            );
             console.log("Board updated successfully:", result);
         } catch (error) {
             console.error("Error updating board:", error);
@@ -203,17 +208,21 @@ async function updateBackend(node) {
 
     if (username) {
         try {
-            const result = await fetchSend(fetchApiPinRoute, "update_backend_inputs", {
-                username: username,
-                node_id: node.id
-            });
+            // New fetchSend format: (route, id, operation, payload)
+            const result = await fetchSend(
+                fetchApiPinRoute,           // route
+                node.id,                    // id
+                "update_backend_inputs",    // operation
+                {                           // payload
+                    username: username
+                }
+            );
             console.log("Backend inputs updated successfully:", result);
         } catch (error) {
             console.error("Error updating backend inputs:", error);
         }
     }
 }
-
 async function updateBoardNamesLegacy(node) {
     const { 
         username: usernameWidget, 
@@ -223,10 +232,13 @@ async function updateBoardNamesLegacy(node) {
     const username = usernameWidget.value;
     if (username) {
         try {
-            const boardNames = await fetchSend(fetchApiPinRoute, "get_user_boards", {
-                username: username,
-                node_id: node.id,
-            });
+            // New format (route, id, operation, payload):
+            const boardNames = await fetchSend(
+                fetchApiPinRoute,       // route
+                node.id,                // id
+                "get_user_boards",      // operation
+                { username: username }  // payload
+            );
 
             const storedData = JSON.parse(getStorageValue("Pinterest_username_boards")) || {};
             if (!storedData[username]) {
@@ -251,22 +263,23 @@ async function updateBoardNamesLegacy(node) {
         }
     }
 }
-
 async function getUserBoards(node) {
     const widgets = await getWidgets(node, ["username"]);
-
     const username = widgets.username.value;
+    
     if (username) {
         try {
-            const boardNames = await fetchSend(fetchApiPinRoute, "get_user_boards", {
-                username: username,
-                node_id: node.id,
-            });
+            // New fetchSend format: (route, id, operation, payload)
+            const response = await fetchSend(
+                fetchApiPinRoute,  // route
+                node.id,           // id
+                "get_user_boards", // operation
+                { username: username }  // payload
+            );
 
             document.dispatchEvent(boardDataUpdatedEvent);
-            return boardNames.board_names;
+            return response.board_names;
         } catch (error) {
-            console.log("TRIGGERED")
             console.error("Error fetching board names:", error.message);
         }
     }
@@ -363,16 +376,19 @@ function setupEventListener(node) {
             updateBackendLegacy(node)
         }
         if (detail["operation"] === "get_inputs") {
-            // console.log("python backend requesting selected board name from node ", detail["node_id"]);
-                // Send the response back to the Python backend
             console.log("python backend requesting selected board name from node ", detail["node_id"]);
 
             const widgets = await getWidgets(node, ["username"]);
-            fetchSend('/dadosNodes/inactivePinterestNode/', 'critical_response', {
-                message: widgets.username.value 
-                    ? widgets.username.value
-                    : "No username input provided"
-            });
+            fetchSend(
+                '/dadosNodes/inactivePinterestNode/',   // route
+                node.id,                               // id
+                'critical_response',                   // operation
+                {                                      // payload
+                    message: widgets.username.value 
+                        ? widgets.username.value
+                        : "No username input provided"
+                }
+            );
 
             updateBackend(node)
         }

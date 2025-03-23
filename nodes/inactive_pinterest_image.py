@@ -41,7 +41,7 @@ def suppress_specific_output():
     print(filtered_output, end='')
 
 def check_user_exists(pinterest, username, unique_id):
-    USER_RESOURCE = "https://www.pinterest.com/_ngjs/resource/UserResource/get/"
+    """ USER_RESOURCE = "https://www.pinterest.com/_ngjs/resource/UserResource/get/"
     options = {
         "isPrefetch": "false",
         "username": username,
@@ -59,7 +59,8 @@ def check_user_exists(pinterest, username, unique_id):
                 "operation": "user_not_found",
                 "message": "User not found. Please check the username."
             })
-        return False
+        return False """
+    return True
 
 class inactivePinterestImageNode:
     @classmethod
@@ -243,13 +244,12 @@ class inactivePinterestImageNode:
 
         else:
             target_board = next(
-                (board for board in boards if board['name'].lower() == board.lower()), None)
+                (board_item for board_item in boards if board_item['name'].lower() == board.lower()), None)
             if not target_board:
                 raise ValueError(
                     f"Board '{board}' not found for user '{username}'")
             pins = [pin for pin in self.pinterest.board_feed(
                 board_id=target_board['id']) if 'images' in pin and '474x' in pin['images']]
-
         if not pins:
             raise ValueError(
                 f"No pins found for the selected board(s) board: {board}")
@@ -304,11 +304,19 @@ class inactivePinterestImageNode:
 @PromptServer.instance.routes.post('/dadosNodes/inactivePinterestNode/')
 async def api_pinterest_router(request):
     data = await request.json()
-    operation, username = get_data(data, 'op', 'username')
-
+    
+    # Extract the new structure
+    id = data.get('id')
+    operation = data.get('operation')
+    payload = data.get('payload', {})
+    
+    # Extract username from payload
+    username = payload.get('username')
+    
+    # Handle operations
     if operation == 'get_user_boards':
         print(f"Getting Boards from Pinterest username: {username}")
-        node_id = data.get('node_id')
+        node_id = id  # Now using the id from the new structure
         with suppress_specific_output():
             pinterest = Pinterest(username=username, cred_root=constants.BASE_DIR + "/.cred_root")
         user_exists = check_user_exists(pinterest, username, node_id)
@@ -324,8 +332,9 @@ async def api_pinterest_router(request):
         return web.json_response({"board_names": board_names})
 
     if operation == 'update_selected_board_name':
-        board = data.get('board')
-        node_id = data.get('node_id')
+        board = payload.get('board')
+        username = payload.get('username')
+        node_id = id  # Now using the id from the new structure
         print(f"Updating board for {username}: {board} (Node ID: {node_id})")
         inactivePinterestImageNode.update_board_name(node_id, board)
         return web.json_response({"status": "success", "board": board})
@@ -343,7 +352,7 @@ async def api_pinterest_router(request):
         return web.json_response({"status": "success", "reply": "you got it"})
     
     if operation == 'critical_response':
-        message = data.get('message')
+        message = payload.get('message')
         print(f"Received message: {message}")
         inactivePinterestImageNode.critical_response = message
         return web.json_response({"status": "success", "reply": "you got it"})

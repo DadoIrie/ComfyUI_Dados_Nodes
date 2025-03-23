@@ -2,11 +2,23 @@ import random
 import json
 from typing import Any, Dict, Optional, Tuple, List
 from aiohttp import web
+import asyncio
 from ..utils.api_routes import register_operation_handler
 from ..utils.api_routes import send_message
-from ..utils.pinterest_oauth_handler import (
-    start_oauth_flow, is_authenticated, refresh_authentication,
-    get_valid_auth_header, make_pinterest_request, handle_callback
+
+# Comment out the old imports
+# from ..utils.pinterest_oauth_handler import (
+#     start_oauth_flow, is_authenticated, refresh_authentication,
+#     get_valid_auth_header, make_pinterest_request, handle_callback
+# )
+
+# Import from the new OAuth implementation
+from ..utils.pinterest_token import (
+    construct_oauth_url, load_token, is_token_expired, has_token,
+    get_token, exchange_token, create_token_request, store_token
+)
+from ..utils.pinterest_oauth import (
+    authenticate_pinterest, refresh_pinterest_token
 )
 
 # API Base URL
@@ -78,9 +90,11 @@ async def ensure_authentication(node_id: str, app_id: str = None, app_secret: st
     print(f"AUTH_DEBUG: Validating authentication for node {node_id}")
     
     # Check if token exists
-    if not is_authenticated(node_id):
+    # if not is_authenticated(node_id):
+    if not has_token():
         # No token exists, try to start the authentication flow
-        oauth_url = await start_oauth_flow(node_id, after_auth_callback, app_id, app_secret, custom_scope)
+        # oauth_url = await start_oauth_flow(node_id, after_auth_callback, app_id, app_secret, custom_scope)
+        oauth_url = construct_oauth_url(app_id)
         
         if not oauth_url:
             return False, None, {
@@ -101,7 +115,13 @@ async def ensure_authentication(node_id: str, app_id: str = None, app_secret: st
         return False, oauth_url, None
     
     # Try to refresh the token if needed
-    refresh_success = await refresh_authentication(node_id, app_id, app_secret)
+    # refresh_success = await refresh_authentication(node_id, app_id, app_secret)
+    token_data = get_token()
+    if is_token_expired(token_data):
+        refresh_success = refresh_pinterest_token(token_data.get('refresh_token'))
+    else:
+        refresh_success = True
+        
     if not refresh_success:
         return False, None, {
             "status": "error",
@@ -128,20 +148,35 @@ async def get_pinterest_items(node_id: str, item_type: str, app_id: str = None, 
         return None
     
     # Get a valid auth header
-    headers = await get_valid_auth_header(node_id, app_id, app_secret)
-    if not headers:
-        print(f"Failed to get valid auth header for node {node_id}")
+    # headers = await get_valid_auth_header(node_id, app_id, app_secret)
+    token_data = get_token()
+    if not token_data:
+        print(f"Failed to get valid token data for node {node_id}")
         return None
+        
+    # Create auth header manually
+    headers = {
+        "Authorization": f"Bearer {token_data.get('access_token')}"
+    }
     
     # Make the request to the Pinterest API
     try:
-        response = await make_pinterest_request(
-            node_id=node_id,
-            endpoint=endpoints[item_type],
-            method="GET",
-            app_id=app_id,
-            app_secret=app_secret
-        )
+        # response = await make_pinterest_request(
+        #     node_id=node_id,
+        #     endpoint=endpoints[item_type],
+        #     method="GET",
+        #     app_id=app_id,
+        #     app_secret=app_secret
+        # )
+        
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.get(endpoints[item_type], headers=headers) as response:
+                if response.status != 200:
+                    print(f"Error in Pinterest API request: {await response.text()}")
+                    return None
+                    
+                response = await response.json()
         
         if not response:
             return None
@@ -237,7 +272,8 @@ async def handle_get_token_validation(node_id: str, app_id: str = None, app_secr
     print(f"VALIDATE_DEBUG: Processing validate_token for node {node_id} with app_id present: {bool(app_id)}")
     
     # Check if token exists without starting the authentication flow
-    if not is_authenticated(node_id):
+    # if not is_authenticated(node_id):
+    if not has_token():
         return web.json_response({
             "status": "info",
             "valid": False,
@@ -257,7 +293,13 @@ async def handle_get_token_validation(node_id: str, app_id: str = None, app_secr
         })
     
     # Try to refresh the token if needed
-    refresh_success = await refresh_authentication(node_id, app_id, app_secret)
+    # refresh_success = await refresh_authentication(node_id, app_id, app_secret)
+    token_data = get_token()
+    if is_token_expired(token_data):
+        refresh_success = refresh_pinterest_token(token_data.get('refresh_token'))
+    else:
+        refresh_success = True
+        
     if not refresh_success:
         return web.json_response({
             "status": "warning",
@@ -269,13 +311,40 @@ async def handle_get_token_validation(node_id: str, app_id: str = None, app_secr
     # Token is valid, verify it with an API call
     try:
         # Make a request to get user account information
-        response = await make_pinterest_request(
-            node_id=node_id,
-            endpoint=f"{PINTEREST_API_BASE}/user_account",
-            method="GET",
-            app_id=app_id,
-            app_secret=app_secret
-        )
+        # response = await make_pinterest_request(
+        #     node_id=node_id,
+        #     endpoint=f"{PINTEREST_API_BASE}/user_account",
+        #     method="GET",
+        #     app_id=app_id,
+        #     app_secret=app_secret
+        # )
+        
+        token_data = get_token()
+        if not token_data:
+            return web.json_response({
+                "status": "warning",
+                "valid": False,
+                "token_status": "missing",
+                "message": "No authentication token found"
+            })
+            
+        # Create auth header manually
+        headers = {
+            "Authorization": f"Bearer {token_data.get('access_token')}"
+        }
+        
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"{PINTEREST_API_BASE}/user_account", headers=headers) as response:
+                if response.status != 200:
+                    return web.json_response({
+                        "status": "warning",
+                        "valid": False,
+                        "token_status": "invalid",
+                        "message": "Authentication token is invalid"
+                    })
+                    
+                response = await response.json()
         
         if response is not None:
             # Cache the validation result
@@ -307,26 +376,54 @@ async def handle_get_token_validation(node_id: str, app_id: str = None, app_secr
 
 async def handle_start_authentication(node_id: str, app_id: str = None, app_secret: str = None, custom_scope: str = None) -> web.Response:
     """Handle explicitly starting the authentication process"""
-    # This will start the auth flow and return the oauth_url
-    _, oauth_url, error = await ensure_authentication(node_id, app_id, app_secret, custom_scope)
+    # Current implementation:
+    # oauth_url = construct_oauth_url(app_id)
+    # error = None
     
-    if error:
+    # Create a callback to notify the frontend
+    def auth_success_callback(username, token_data):
+        # Use asyncio.create_task to run the async callback in a non-async context
+        asyncio.create_task(after_auth_callback(node_id, username))
+    
+    # Modified to use authenticate_pinterest with callback:
+    try:
+        success = authenticate_pinterest(callback=auth_success_callback)
+        if success:
+            return web.json_response({
+                "status": "auth_initiated",
+                "message": "Authentication process started"
+            })
+        else:
+            return web.json_response({
+                "status": "error",
+                "message": "Failed to start authentication process"
+            }, status=500)
+    except Exception as e:
         return web.json_response({
-            "status": error["status"],
-            "message": error["message"]
-        }, status=error.get("code", 400))
-    
-    # If we got here, authentication process started successfully
-    return web.json_response({
-        "status": "auth_initiated",
-        "message": "Authentication process started",
-        "oauth_url": oauth_url
-    })
+            "status": "error",
+            "message": f"Error starting authentication: {str(e)}"
+        }, status=500)
 
 async def handle_oauth_callback(node_id: str, code: str, app_id: str = None, app_secret: str = None) -> web.Response:
     """Handle OAuth callback with authorization code"""
     try:
-        success = await handle_callback(node_id, code, after_auth_callback, app_id, app_secret)
+        # success = await handle_callback(node_id, code, after_auth_callback, app_id, app_secret)
+        
+        # Using the new OAuth flow
+        token_request = create_token_request("authorization_code", code=code, app_id=app_id)
+        token_data = exchange_token(token_request)
+        
+        if token_data:
+            # Get username if available, otherwise use placeholder
+            username = token_data.get("user_id", "pinterest_user")
+            
+            # Store token
+            success = store_token(token_data, username)
+            
+            # Call the after_auth_callback with the username
+            await after_auth_callback(node_id, username)
+        else:
+            success = False
         
         if success:
             return web.json_response({
@@ -352,7 +449,6 @@ OPERATION_HANDLERS = {
     "oauth_callback": handle_oauth_callback
 }
 
-@register_operation_handler
 @register_operation_handler
 async def handle_pinterest_operations(request) -> Any:
     """Handle Pinterest-specific operations"""

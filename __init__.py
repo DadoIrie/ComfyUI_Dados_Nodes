@@ -20,7 +20,7 @@ WEB_DIRECTORY = "./web/comfyui"
 COMMON_DIRECTORY = "./web/common"
 
 # Import node definitions
-from .nodes.inactive_pinterest_image import inactivePinterestImageNode
+""" from .nodes.inactive_pinterest_image import inactivePinterestImageNode """
 from .nodes.text_concat import TextConcatenatorNode
 from .nodes.text_dropdown import TextDropDownNode
 from .nodes.text_loader import DynamicTextLoaderNode
@@ -29,7 +29,7 @@ from .nodes.pinterest_fetch import PinterestFetch
 
 # Node class mappings
 NODE_CLASS_MAPPINGS = {
-    "inactivePinterestImageNode": inactivePinterestImageNode,
+    """ "inactivePinterestImageNode": inactivePinterestImageNode, """
     "TextConcatenatorNode": TextConcatenatorNode,
     "TextDropDownNode": TextDropDownNode,
     "DynamicTextLoaderNode": DynamicTextLoaderNode,
@@ -38,7 +38,7 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "inactivePinterestImageNode": "Pinterest Node (WIP - broken)",
+    """ "inactivePinterestImageNode": "Pinterest Node (WIP - broken)", """
     "TextConcatenatorNode": "Text Concatenator",
     "TextDropDownNode": "Text DropDown",
     "DynamicTextLoaderNode": "Dynamic Text Loader",
