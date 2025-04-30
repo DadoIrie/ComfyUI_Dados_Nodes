@@ -7,20 +7,17 @@ from .pinterest_token import (
     create_auth_header, get_oauth_base_url, OAUTH_SCOPES
 )
 
-# Event identifier for consistency
 EVENT_PINTEREST_UPDATE = "/dadosNodes/PinterestNode"
 
-# Centralized function to send messages to frontend
 def send_to_frontend(node_id, operation, message, data=None):
     """Send data to frontend with consistent format"""
     payload = {
         "operation": operation,
         "node_id": node_id,
         "message": message,
-        "id": node_id  # Required for the frontend
+        "id": node_id
     }
 
-    # Add additional data if provided
     if data:
         payload.update(data)
 
@@ -28,7 +25,6 @@ def send_to_frontend(node_id, operation, message, data=None):
     PromptServer.instance.send_sync(EVENT_PINTEREST_UPDATE, payload)
     return True
 
-# Start OAuth flow
 async def start_oauth_flow(node_id, callback_function=None, app_id=None, app_secret=None, custom_scope=None):
     """Start the OAuth flow by generating a URL and opening the browser"""
     
@@ -41,18 +37,15 @@ async def start_oauth_flow(node_id, callback_function=None, app_id=None, app_sec
         )
         return None
     
-    # Notify frontend that we're starting OAuth
     send_to_frontend(
         node_id,
         "oauth_started",
         "Please authenticate with Pinterest in your browser"
     )
 
-    # Generate authentication URL directly
     try:
         oauth_base_url = get_oauth_base_url()
         
-        # Prepare auth parameters
         auth_params = {
             "client_id": app_id,
             "redirect_uri": f"{oauth_base_url}/api/callback",
@@ -61,7 +54,6 @@ async def start_oauth_flow(node_id, callback_function=None, app_id=None, app_sec
             "scope": custom_scope if custom_scope else OAUTH_SCOPES
         }
         
-        # Build the full authorization URL with parameters
         query_string = "&".join([f"{key}={value}" for key, value in auth_params.items()])
         auth_url = f"{oauth_base_url}/api/authorize?{query_string}"
         
@@ -74,13 +66,11 @@ async def start_oauth_flow(node_id, callback_function=None, app_id=None, app_sec
             )
             return None
         
-        # Store the association between node and callback function
         if node_id not in oauth_sessions:
             oauth_sessions[node_id] = {}
             
         oauth_sessions[node_id]["callback_function"] = callback_function
         
-        # Open the browser with the OAuth URL
         webbrowser.open(auth_url)
         
         print(f"OAuth flow started for node {node_id} - browser opened")
@@ -115,7 +105,6 @@ async def refresh_authentication(node_id, app_id=None, app_secret=None):
     if is_token_expired(token_data):
         print("Token is expired, needs refresh")
         try:
-            # Use the refresh_token function instead
             return await refresh_token(node_id, app_id, app_secret)
         except Exception as e:
             print(f"Error refreshing token: {e}")
@@ -130,7 +119,6 @@ async def get_valid_auth_header(node_id, app_id=None, app_secret=None):
         print("No access token available for node", node_id)
         return None
     
-    # Check if token needs refresh
     if is_token_expired(token_data):
         print("Token expired or will expire soon, refreshing...")
         success = await refresh_authentication(node_id, app_id, app_secret)
@@ -138,7 +126,6 @@ async def get_valid_auth_header(node_id, app_id=None, app_secret=None):
             print("Failed to refresh token")
             return None
         
-        # Get updated token data
         token_data = get_token_for_node(node_id)
     
     access_token = token_data.get('access_token')
@@ -182,19 +169,16 @@ async def make_pinterest_request(node_id, endpoint, method="GET", data=None, app
 async def handle_callback(node_id, code, callback_function, app_id=None, app_secret=None):
     """Handle OAuth callback with authorization code"""
     try:
-        # This should be Pinterest's token endpoint, not your callback URL
         token_endpoint = "https://api.pinterest.com/v5/oauth/token"
         oauth_base_url = get_oauth_base_url()
         redirect_uri = f"{oauth_base_url}/api/callback"
         
-        # Prepare data for token exchange
         data = {
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": redirect_uri
         }
         
-        # Add credentials
         if app_id and app_secret:
             data["client_id"] = app_id
             data["client_secret"] = app_secret
@@ -208,7 +192,6 @@ async def handle_callback(node_id, code, callback_function, app_id=None, app_sec
                 
                 token_data = await response.json()
                 
-                # New detailed logging about the received token
                 print("============= TOKEN RECEIVED =============")
                 print(f"Node ID: {node_id}")
                 if token_data:
@@ -221,7 +204,6 @@ async def handle_callback(node_id, code, callback_function, app_id=None, app_sec
                     print("WARNING: No token data received from Pinterest!")
                 print("==========================================")
                 
-                # Get the username from user_account endpoint
                 auth_header = create_auth_header(token_data.get("access_token"))
                 async with session.get(
                     "https://api.pinterest.com/v5/user_account",
@@ -235,10 +217,8 @@ async def handle_callback(node_id, code, callback_function, app_id=None, app_sec
                         user_data = await user_response.json()
                         username = user_data.get("username", "Unknown")
                 
-                # Store the token
                 await on_token_received(node_id, token_data, username)
                 
-                # Call the provided callback function if any
                 if callback_function:
                     await callback_function(node_id, username)
                 

@@ -2,7 +2,7 @@ import time
 import os
 from typing import Any, Dict, Optional, Callable, List
 from aiohttp import web
-from server import PromptServer  # type: ignore pylint: disable=import-error
+from server import PromptServer
 from .. import constants, MESSAGE_ROUTE, EXTENSION_NAME  # Import from root __init__.py
 
 class TimedOutException(Exception):

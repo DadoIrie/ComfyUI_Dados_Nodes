@@ -5,18 +5,17 @@ from .. import constants
 
 # Pinterest App credentials
 PINTEREST_APP_ID = "1502601"
-PINTEREST_SECRET_KEY = ""
 
-# Worker URL for OAuth service
-WORKER_URL = "https://pinterest-oauth.dadoirie.workers.dev"
+localWorker = True
+WORKER_URL = "http://localhost:8787" if localWorker else "https://pinterest-oauth.dadoirie.workers.dev"
 
 # Secret handshake for verification
-SECRET_HANDSHAKE = "M2M2YT9uPzA6ajMpOCdpJDI0Zjo2PD5rPmltP3cgNjg="
+SECRET_HANDSHAKE = "NGE7aGBkNjtoaTxuaio5cWFnNW4zN2poOj1udTk7OCI="
 
 # Local server configuration
 LOCAL_PORT = 8085
 CALLBACK_PATH = "/callback"
-REDIRECT_URI = f"http://localhost:{LOCAL_PORT}{CALLBACK_PATH}"
+REDIRECT_URI = f"localhost:{LOCAL_PORT}{CALLBACK_PATH}"
 
 # OAuth scopes
 OAUTH_SCOPES = "user_accounts:read,pins:read,pins:write,pins:read_secret,pins:write_secret,boards:read,boards:write,boards:read_secret,boards:write_secret"
@@ -41,10 +40,14 @@ def create_token_object(username, access_token, refresh_token, scope, expires_in
         "last_refreshed": int(time.time())
     }
 
-def construct_oauth_url(app_id=None, oauth_state=""):
+def construct_oauth_url(app_id=None, oauth_state="", redirect_uri=None):
     """Construct the Pinterest OAuth URL"""
     # Use provided app_id or default constant
-    client_id = app_id or PINTEREST_APP_ID
+    # Check for None or empty string
+    client_id = app_id if app_id else PINTEREST_APP_ID
+    
+    # Use provided redirect_uri or default
+    final_redirect_uri = redirect_uri or REDIRECT_URI
     
     if not client_id:
         print("ERROR: Pinterest App ID is not configured")
@@ -53,16 +56,15 @@ def construct_oauth_url(app_id=None, oauth_state=""):
     return (
         "https://www.pinterest.com/oauth/"
         f"?consumer_id={client_id}"
-        f"&redirect_uri={REDIRECT_URI}"
+        f"&redirect_uri={final_redirect_uri}"
         "&response_type=code"
         "&refreshable=true"
         f"&scope={OAUTH_SCOPES}"
         f"&state={oauth_state}"
     )
 
-def create_token_request(grant_type, code=None, refresh_token=None, app_id=None):
+def create_token_request(grant_type, code=None, refresh_token=None, app_id=None, app_secret=None):
     """Create a token request object based on grant type"""
-    # Use provided app_id or default constant
     client_id = app_id or PINTEREST_APP_ID
     
     request = {
@@ -70,15 +72,13 @@ def create_token_request(grant_type, code=None, refresh_token=None, app_id=None)
         "app_id": client_id
     }
     
-    # Add parameters based on grant type
     if grant_type == "authorization_code" and code:
         request["code"] = code
     elif grant_type == "refresh_token" and refresh_token:
         request["refresh_token"] = refresh_token
     
-    # Add secret key if provided in constants
-    if PINTEREST_SECRET_KEY:
-        request["secret_key"] = PINTEREST_SECRET_KEY
+    if app_secret is not None:
+        request["secret_key"] = app_secret
         
     return request
 
@@ -87,25 +87,41 @@ def exchange_token(request_data):
     import requests
     
     try:
+        print(f"\n=== SENDING TOKEN REQUEST TO {WORKER_URL} ===")
         response = requests.post(
             f"{WORKER_URL}/",
             headers={"Content-Type": "application/json", "X-Secret-Handshake": SECRET_HANDSHAKE},
             json=request_data
         )
         
+        print(f"Response status: {response.status_code}")
+        
         if response.status_code == 200:
-            return response.json()
+            response_data = response.json()
+            print(f"Token exchange successful, received access token: {response_data.get('access_token', '')[:10]}...")
+            
+            # Store the token immediately when received
+            if request_data.get("grant_type") == "authorization_code":
+                username = response_data.get("user_id", "pinterest_user")
+                store_token(response_data, username)
+                
+            return {"success": True, "data": response_data}
         else:
-            print(f"Token exchange failed: {response.status_code}")
+            error_message = f"Token exchange failed: {response.status_code}"
             try:
                 error_data = response.json()
-                print(f"Error: {error_data.get('error', 'Unknown error')}")
+                error_details = error_data.get('error', 'Unknown error')
+                error_message = error_details
             except ValueError:
-                print(f"Response: {response.text}")
-            return None
+                error_message = response.text
+            
+            print(f"ERROR: {error_message}")
+            return {"success": False, "error": error_message}
     except Exception as e:
-        print(f"Error exchanging token: {e}")
-        return None
+        error_message = f"Error exchanging token: {e}"
+        print(f"EXCEPTION: {error_message}")
+        return {"success": False, "error": error_message}
+    
 def save_token(token_data):
     """Save OAuth token to file"""
     global oauth_token

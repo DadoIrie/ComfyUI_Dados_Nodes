@@ -39,8 +39,7 @@ class PinterestOAuthServer:
 
         logger = logging.getLogger('pinterest_oauth')
         logger.setLevel(logging.INFO)
-        
-        # Clear existing handlers
+
         if logger.handlers:
             for handler in logger.handlers:
                 logger.removeHandler(handler)
@@ -71,17 +70,14 @@ class PinterestOAuthServer:
         self.setup_logging()
         self.log('info', f"Starting OAuth server for node {node_id}")
         
-        # Check if credentials are missing
         missing_credentials = []
         if not self.app_id:
             missing_credentials.append("App ID")
         if not self.app_secret:
             missing_credentials.append("App Secret")
             
-        # Generate state parameter for security
         oauth_state = secrets.token_hex()
         
-        # Store in the sessions dictionary
         if node_id not in self.oauth_sessions:
             self.oauth_sessions[node_id] = {}
             
@@ -90,13 +86,12 @@ class PinterestOAuthServer:
         
         def create_handler():
             """Create a request handler with access to our instance variables"""
-            outer_self = self  # Capture the outer self reference
+            outer_self = self
             
             class OAuthHandler(http.server.BaseHTTPRequestHandler):
                 def log_message(self, format, *args):
                     msg = format % args
                     
-                    # Mask sensitive data in logs
                     if "code=" in msg or "state=" in msg:
                         parts = msg.split()
                         if len(parts) >= 3:
@@ -111,20 +106,16 @@ class PinterestOAuthServer:
                     
                     from urllib.parse import urlparse, parse_qs
                     
-                    # Parse query parameters
                     query = parse_qs(urlparse(self.path).query)
                     code = query.get('code', [''])[0]
                     state = query.get('state', [''])[0]
                     
-                    # Validate state
                     state_valid = state == oauth_state
                     error_param = query.get('error', [''])[0]
                     error_desc = query.get('error_description', [''])[0]
                     
-                    # Check for missing credentials
                     missing_credentials = outer_self.oauth_sessions[node_id].get('missing_credentials', [])
                     
-                    # Determine status based on conditions
                     status = 'success'
                     if missing_credentials:
                         status = 'missing_credentials'
@@ -136,19 +127,14 @@ class PinterestOAuthServer:
                         status = 'pinterest_error'
                         self.send_response(400)
                     else:
-                        # Success case
-                        # Store auth code
                         outer_self.oauth_sessions[node_id]['auth_code'] = code
                         self.send_response(200)
                     
-                    # Create appropriate HTML response
                     self.send_header('Content-type', 'text/html')
                     self.end_headers()
                     
-                    # Generate dynamic content based on status
                     h1_color = '#4CAF50' if status == 'success' else '#D32F2F'
                     
-                    # Initialize title and message variables
                     title = ""
                     message = ""
                     
@@ -165,7 +151,6 @@ class PinterestOAuthServer:
                         title = "Pinterest Authentication Failed!"
                         message = f"Error: {error_param} - {error_desc}"
                     
-                    # Common HTML template
                     html = f"""
                         <html>
                         <head>
@@ -195,14 +180,12 @@ class PinterestOAuthServer:
                     
                     self.wfile.write(html.encode('utf-8'))
                     
-                    # Process token exchange and shut down server if we have a valid code
                     if status == 'success':
                         outer_self.log('info', "Starting token exchange process")
                         threading.Thread(target=lambda: process_auth_code(code)).start()
                     else:
                         outer_self.log('error', f"Authentication failed: {status}")
                     
-                    # Schedule server shutdown
                     threading.Thread(target=lambda: shutdown_after_delay()).start()            
             return OAuthHandler
         
@@ -210,7 +193,6 @@ class PinterestOAuthServer:
             """Process the auth code and exchange it for a token"""
             self.log('info', "Processing auth code")
             
-            # Set up asyncio event loop for this thread
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             
@@ -223,20 +205,17 @@ class PinterestOAuthServer:
 
         def shutdown_after_delay():
             """Shut down server after a delay"""
-            time.sleep(3)  # Wait to ensure response is sent
+            time.sleep(3)
             self.shutdown_server()
         
-        # Create and start the server
         handler_class = create_handler()
         
         try:
             self.log('info', "Creating HTTPS server")
             self.httpd = socketserver.TCPServer(("localhost", 8085), handler_class)
             
-            # Set up SSL
             self.setup_ssl()
             
-            # Start server in separate thread
             self.log('info', "Starting server thread")
             self.server_thread = threading.Thread(target=self.httpd.serve_forever)
             self.server_thread.daemon = True
@@ -244,20 +223,16 @@ class PinterestOAuthServer:
             
             self.log('info', f"OAuth server started on port 8085 for node {node_id}")
             
-            # Set up timeout timer (5 minutes)
             if self.timeout_timer:
                 self.timeout_timer.cancel()
             self.timeout_timer = threading.Timer(300, lambda: self.handle_timeout(node_id, on_token_received))
             self.timeout_timer.daemon = True
             self.timeout_timer.start()
             
-            # Check for missing credentials and handle differently
             if missing_credentials:
                 self.log('error', f"Missing credentials: {', '.join(missing_credentials)}")
-                # Return a URL that will show the error page directly
                 return f"https://localhost:8085/?missing_credentials=true&state={oauth_state}"
             
-            # Create OAuth URL using token_configs function
             oauth_url = construct_oauth_url(self.app_id, oauth_state)
             
             print(f"Generated OAuth URL: [URL with state={oauth_state[:4]}...]")
@@ -271,12 +246,10 @@ class PinterestOAuthServer:
         """Handle server timeout after 5 minutes"""
         self.log('info', f"OAuth server timeout for node {node_id}")
         
-        # Check if token was already received
         if node_id in self.oauth_sessions and 'auth_code' in self.oauth_sessions[node_id]:
             self.log('info', "Token was already received, ignoring timeout")
             return
             
-        # Signal timeout to the handler
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -286,7 +259,6 @@ class PinterestOAuthServer:
         finally:
             loop.close()
             
-        # Shut down server
         self.shutdown_server()
       
     async def exchange_code_for_token(self, code, node_id, on_token_received):
@@ -294,7 +266,6 @@ class PinterestOAuthServer:
         self.log('info', "Exchanging code for token")
 
         try:
-            # Get auth header using token_configs function
             auth_header = create_basic_auth_header(self.app_id, self.app_secret)
 
             async with ClientSession() as session:
@@ -322,7 +293,6 @@ class PinterestOAuthServer:
                     self.log('info', "Successfully received access token")
                     access_token = token_data.get("access_token")
 
-                    # Get user info using the auth header function
                     user_headers = create_auth_header(access_token)
                     async with session.get(
                         "https://api.pinterest.com/v5/user_account",
@@ -337,7 +307,6 @@ class PinterestOAuthServer:
                         username = user_data.get("username")
                         self.log('info', f"Successfully retrieved username: {self.mask_sensitive_data(username)}")
 
-                        # Call the token received callback
                         await on_token_received(node_id, token_data, username)
         except Exception as e:
             self.log('error', f"Error in token exchange: {str(e)}")
@@ -346,17 +315,14 @@ class PinterestOAuthServer:
         """Configure SSL for the server"""
         self.log('info', "Setting up SSL")
         
-        # Create directories
         creds_dir = os.path.join(constants.BASE_DIR, ".cred_root")
         cert_dir = os.path.join(creds_dir, "certs")
         os.makedirs(cert_dir, exist_ok=True)
         
-        # Check for existing certificates
         cert_file = os.path.join(cert_dir, "server.crt")
         key_file = os.path.join(cert_dir, "server.key")
         
         if not os.path.exists(cert_file) or not os.path.exists(key_file):
-            # Generate certificate
             self.log('info', "Generating self-signed SSL certificate...")
             import subprocess
             
@@ -374,7 +340,6 @@ class PinterestOAuthServer:
         else:
             self.log('info', "Using existing SSL certificates")
         
-        # Create SSL context
         try:
             context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
             context.load_cert_chain(certfile=cert_file, keyfile=key_file)
@@ -396,7 +361,6 @@ class PinterestOAuthServer:
             if self.server_thread and self.server_thread.is_alive():
                 self.server_thread.join(timeout=5)
             
-            # Clean up
             if self.timeout_timer:
                 self.timeout_timer.cancel()
                 
