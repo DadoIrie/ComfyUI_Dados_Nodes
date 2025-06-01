@@ -73,9 +73,16 @@ app.registerExtension({
                 }
                 this.updateDropdownEntries(processedEntries, dropdownWidget);
                 if (processedEntries.length > 0) {
-                    this.properties.option = processedEntries[0];
-                    this.properties.actualSelection = processedEntries[0];
-                    dropdownWidget.value = processedEntries[0];
+                    const currentSelection = this.properties.option || this.properties.actualSelection;
+                    if (currentSelection && processedEntries.includes(currentSelection)) {
+                        this.properties.option = currentSelection;
+                        this.properties.actualSelection = currentSelection;
+                        dropdownWidget.value = currentSelection;
+                    } else {
+                        this.properties.option = processedEntries[0];
+                        this.properties.actualSelection = processedEntries[0];
+                        dropdownWidget.value = processedEntries[0];
+                    }
                     this.updateBackend().catch(() => {/* Silent error handling */});
                 }
                 this.setDirtyCanvas(true, true);

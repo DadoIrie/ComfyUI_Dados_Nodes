@@ -1,15 +1,12 @@
 """
 @title: Text Concatenator
 @author: Dado
-@description: A node with dynamic text inputs for concatenation
+@description: Node with dynamic text inputs for concatenation
 """
 
 from typing import Dict, Tuple
 
 class TextConcatenatorNode:
-    """
-    A node that dynamically accepts text inputs and concatenates them.
-    """
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("text",)
     FUNCTION = "concatenate"
@@ -23,22 +20,20 @@ class TextConcatenatorNode:
                     "default": ", ",
                     "multiline": False
                 }),
+                "strip_newlines": ("BOOLEAN", {"default": False, "tooltip": "Strip newlines from the concatenated text. Useful for cleaner output."}),
             },
             "optional": {}
         }
 
-    def concatenate(self, delimiter=", ", **kwargs) -> Tuple[str]:
-        # Get all the text inputs and concatenate them
+    def concatenate(self, delimiter=", ", strip_newlines=False, **kwargs) -> Tuple[str]:
         result = ""
         
-        # Filter out non-text inputs and the delimiter parameter itself
         texts = []
         for key, value in kwargs.items():
             if isinstance(value, str) and key != "delimiter":
                 texts.append(value)
                 
-        # Join all texts with the specified delimiter
         result = delimiter.join(texts)
-                
+        if strip_newlines:
+            result = result.replace('\n', '')
         return (result,)
-
