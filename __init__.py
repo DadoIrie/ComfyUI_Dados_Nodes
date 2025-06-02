@@ -29,6 +29,7 @@ from .nodes.smolvlm_node import SmolVLMNode
 from .nodes.pinterest_fetch import PinterestFetch
 from .nodes.miaoshouai_tagger import MiaoshouAITaggerNode
 from .nodes.multiline_string import DadosMultilineString
+from .nodes.joytagger_node import JoyTaggerNode
 
 # Node class mappings
 NODE_CLASS_MAPPINGS = {
@@ -40,6 +41,7 @@ NODE_CLASS_MAPPINGS = {
     "PinterestFetch": PinterestFetch,
     "MiaoshouAITaggerNode": MiaoshouAITaggerNode,
     "DadosMultilineString": DadosMultilineString,
+    "DadosJoyTaggerNode": JoyTaggerNode,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -51,6 +53,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "PinterestNode": "Pinterest Node",
     "MiaoshouAITaggerNode": "MiaoshouAI Tagger",
     "DadosMultilineString": "Multiline String",
+    "DadosJoyTaggerNode": "JoyTagger",
 }
 
 from .utils.api_routes import register_routes

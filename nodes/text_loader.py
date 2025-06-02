@@ -17,6 +17,7 @@ class DynamicTextLoaderNode:
         return {
             "optional": {
                 "string": ("STRING", {"default": '', "multiline": True, "tooltip": "Enter text directly here. If text is provided, the file path will be ignored."}),
+                "seed": ("INT", {"default": 0, "min": 0, "max": 2000000000, "tooltip": "The seed to use for Wildcards (random_prompts)."}),
             },
             "hidden": {
                 "unique_id": "UNIQUE_ID",
@@ -29,18 +30,19 @@ class DynamicTextLoaderNode:
     FUNCTION = "process_text"
     CATEGORY = "Dado's Nodes/Text"
     
-    def process_text(self, string=None, unique_id=None):
+    def process_text(self, string=None, seed=0, unique_id=None):
         node_id = str(unique_id)
         state = self.__class__.node_state.get(node_id, {})
         
-        # Use the backend string parameter if provided, otherwise fall back to state
         text_content = string if string else state.get('string', '')
         path = state.get('path', '')
         file_selection = state.get('file_selection', '')
         use_cached_file = state.get('use_cached_file', True)
         random_prompt = state.get('random_prompt', False)
         use_attention = state.get('use_attention', False)
-        seed = state.get('seed', 0)
+        
+        # Use the seed parameter from the input, fallback to state if needed
+        seed = seed if seed != 0 else state.get('seed')
         
         text = ""
         

@@ -18,6 +18,21 @@ app.registerExtension({
         }
 
         chainCallback(nodeType.prototype, "onNodeCreated", function() {
+            // Store and remove seed-related widgets first
+            let storedSeedWidget = null;
+            let storedControlWidget = null;
+            
+            for (let i = this.widgets.length - 1; i >= 0; i--) {
+                const widget = this.widgets[i];
+                if (widget.name === "seed") {
+                    storedSeedWidget = widget;
+                    this.widgets.splice(i, 1);
+                } else if (widget.name === "control_before_generate" || widget.name === "control_after_generate") {
+                    storedControlWidget = widget;
+                    this.widgets.splice(i, 1);
+                }
+            }
+            
             this.properties = this.properties || {};
             this.properties.path = "";
             this.properties.file_selection = "";
@@ -75,12 +90,22 @@ app.registerExtension({
             });
             useAttentionWidget.tooltip = "Use attention generator for emphasis. Only works when random_prompt is enabled.";
 
-            const seedWidget = this.addWidget("INT", "seed", 0, async (value) => {
-                this.properties.seed = parseInt(value) || 0;
-                await this.updateBackend();
-                return value;
-            }, { min: 0, max: 2000000000 });
-            seedWidget.tooltip = "The seed to use for generating images. Plug returned seed(s) into sampler.";
+            // Re-add the stored seed widgets at the end
+            if (storedSeedWidget) {
+                this.widgets.push(storedSeedWidget);
+                // Update the callback to sync with your properties
+                const originalCallback = storedSeedWidget.callback;
+                storedSeedWidget.callback = async (value) => {
+                    this.properties.seed = parseInt(value) || 0;
+                    await this.updateBackend();
+                    if (originalCallback) originalCallback.call(storedSeedWidget, value);
+                    return value;
+                };
+            }
+            
+            if (storedControlWidget) {
+                this.widgets.push(storedControlWidget);
+            }
 
             this.updateFileDropdown = async function(path, widget) {
                 try {
