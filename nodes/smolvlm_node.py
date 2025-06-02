@@ -2,27 +2,46 @@ import torch
 from PIL import Image
 from pathlib import Path
 from huggingface_hub import snapshot_download
-from transformers import AutoProcessor, AutoModelForVision2Seq
+from transformers import AutoProcessor, AutoModelForVision2Seq, AutoModelForCausalLM
 from .. import constants
 
 BASE_DIR = constants.BASE_DIR
 
-MODEL_DIRS = {
-    "256M": Path(BASE_DIR) / "models" / "smolvlm-256M-instruct",
-    "500M": Path(BASE_DIR) / "models" / "smolvlm-500M-instruct"
+MODEL_CONFIGS = {
+    "256M": [
+        {"name": "SmolVLM-256M-Instruct", "repo": "HuggingFaceTB/SmolVLM-256M-Instruct"},
+        {"name": "SmolVLM2-256M-Video-Instruct", "repo": "HuggingFaceTB/SmolVLM2-256M-Video-Instruct"}
+    ],
+    "500M": [
+        {"name": "SmolVLM-500M-Instruct", "repo": "HuggingFaceTB/SmolVLM-500M-Instruct"},
+        {"name": "SmolVLM2-500M-Video-Instruct", "repo": "HuggingFaceTB/SmolVLM2-500M-Video-Instruct"}
+    ]
 }
+
+MODEL_DIRS = {}
+for size, models in MODEL_CONFIGS.items():
+    for model in models:
+        model_key = f"{size}-{model['name'].split('-')[0]}"
+        MODEL_DIRS[model_key] = Path(BASE_DIR) / "models" / model['name'].lower()
 
 for model_dir in MODEL_DIRS.values():
     model_dir.mkdir(parents=True, exist_ok=True)
 
-def download_smolvlm(model_size):
-    """Download SmolVLM model if not already present"""
-    model_name = f"SmolVLM-{model_size}-Instruct"
-    target_dir = MODEL_DIRS[model_size]
+def download_smolvlm(model_key):
+    target_dir = MODEL_DIRS[model_key]
+    
+    size = model_key.split('-')[0]
+    model_type = model_key.split('-')[1]
+    
+    for model in MODEL_CONFIGS[size]:
+        if model['name'].startswith(model_type):
+            repo_id = model['repo']
+            break
+    
     print(f"Target directory for download: {target_dir}")
     
     path = snapshot_download(
-        f"HuggingFaceTB/{model_name}",
+        repo_id,
         local_dir=target_dir,
         force_download=False,
         local_files_only=False,
@@ -40,6 +59,7 @@ class SmolVLMNode:
     
     @classmethod
     def INPUT_TYPES(cls):
+        model_options = list(MODEL_DIRS.keys())
         return {
             "required": {
                 "image": ("IMAGE",),
@@ -50,36 +70,28 @@ class SmolVLMNode:
                     "max": 2000,
                     "display": "number"
                 }),
-                "model_size": (["256M", "500M"], {}),
-                "precision": (["bfloat16", "float32"], {}),
+                "model": (model_options, {}),
             },
         }
 
     RETURN_TYPES = ("STRING",)
     FUNCTION = "describe_image"
-    CATEGORY = "Dado's Nodes/VLM Nodes/SmolVLM"
+    CATEGORY = "Dado's Nodes/VLM Nodes"
 
-    def describe_image(self, image, prompt, max_tokens, model_size, precision):
-        model_path = download_smolvlm(model_size)
+    def describe_image(self, image, prompt, max_tokens, model):
+        model_path = download_smolvlm(model)
     
         if self.model is None or self.processor is None:
-            print(f"Loading SmolVLM {model_size} model and processor...")
-        
-            dtype = torch.float32 if precision == "float32" else torch.bfloat16
-            print(f"Using data type: {dtype}")
-        
-            attn_implementation = (
-                "flash_attention_2" if self.device == "cuda" and precision != "float32" else "eager"
-            )
-            print(f"Attention implementation: {attn_implementation}")
+            print(f"Loading {model} model and processor...")
         
             self.processor = AutoProcessor.from_pretrained(model_path)
-            self.model = AutoModelForVision2Seq.from_pretrained(
-                model_path,
-                torch_dtype=dtype,
-                _attn_implementation=attn_implementation,
-            ).to(self.device)
-            print(f"SmolVLM {model_size} model loaded successfully")
+        
+            if "SmolVLM2" in model:
+                self.model = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True).to(self.device)
+            else:
+                self.model = AutoModelForVision2Seq.from_pretrained(model_path).to(self.device)
+        
+            print(f"{model} model loaded successfully")
     
         pil_image = Image.fromarray((image[0] * 255).numpy().astype('uint8'))
     

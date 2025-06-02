@@ -27,6 +27,8 @@ from .nodes.text_dropdown import TextDropDownNode
 from .nodes.text_loader import DynamicTextLoaderNode
 from .nodes.smolvlm_node import SmolVLMNode
 from .nodes.pinterest_fetch import PinterestFetch
+from .nodes.miaoshouai_tagger import MiaoshouAITaggerNode
+from .nodes.multiline_string import DadosMultilineString
 
 # Node class mappings
 NODE_CLASS_MAPPINGS = {
@@ -36,6 +38,8 @@ NODE_CLASS_MAPPINGS = {
     "DynamicTextLoaderNode": DynamicTextLoaderNode,
     "SmolVLMNode": SmolVLMNode,
     "PinterestFetch": PinterestFetch,
+    "MiaoshouAITaggerNode": MiaoshouAITaggerNode,
+    "DadosMultilineString": DadosMultilineString,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -45,6 +49,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "DynamicTextLoaderNode": "Dynamic Text Loader",
     "SmolVLMNode": "SmolVLM Image Describer",
     "PinterestNode": "Pinterest Node",
+    "MiaoshouAITaggerNode": "MiaoshouAI Tagger",
+    "DadosMultilineString": "Multiline String",
 }
 
 from .utils.api_routes import register_routes
