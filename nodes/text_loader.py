@@ -1,8 +1,8 @@
 import os
 import random
 from typing import Dict, Any, ClassVar
-from ..utils.api_routes import register_operation_handler
 from aiohttp import web
+from ..utils.api_routes import register_operation_handler
 
 class DynamicTextLoaderNode:
     file_cache: ClassVar[Dict[str, str]] = {}
@@ -70,7 +70,7 @@ async def handle_text_loader_operations(request):
         data = await request.json()
         operation = data.get('operation')
         
-        if operation not in ['update_state', 'get_txt_files', 'save_file', 'get_file_content']:
+        if operation not in ['update_state', 'get_txt_files', 'save_file', 'get_file_content', 'delete_file']:
             return None
             
         node_id = str(data.get('id', ''))
@@ -86,7 +86,7 @@ async def handle_text_loader_operations(request):
             if not path or not os.path.exists(path) or not os.path.isdir(path):
                 return web.json_response({
                     "status": "success",
-                    "files": ["no files found"],
+                    "files": ["invalid path"],
                     "valid_path": False
                 })
             
@@ -97,20 +97,21 @@ async def handle_text_loader_operations(request):
                         txt_files.append(os.path.splitext(file)[0])
                 
                 if not txt_files:
-                    txt_files = ["no txt files found"]
-                    valid_path = False
+                    return web.json_response({
+                        "status": "success",
+                        "files": ["no files"],
+                        "valid_path": True
+                    })
                 else:
-                    valid_path = True
-                
-                return web.json_response({
-                    "status": "success", 
-                    "files": txt_files,
-                    "valid_path": valid_path
-                })
+                    return web.json_response({
+                        "status": "success", 
+                        "files": txt_files,
+                        "valid_path": True
+                    })
             except Exception:
                 return web.json_response({
                     "status": "success",
-                    "files": ["error reading directory"],
+                    "files": ["invalid path"],
                     "valid_path": False
                 })
         
@@ -148,15 +149,20 @@ async def handle_text_loader_operations(request):
                 }, status=500)
         
         if operation == 'save_file':
-            state = DynamicTextLoaderNode.node_state.get(node_id, {})
-            path = state.get('path', '')
-            file_selection = state.get('file_selection', '')
             content = payload.get('content', '')
+            path = payload.get('path', '')
+            file_selection = payload.get('file_selection', '')
             
             if not path or not file_selection:
                 return web.json_response({
                     "status": "error",
                     "message": "No file selected"
+                }, status=400)
+            
+            if not content.strip():
+                return web.json_response({
+                    "status": "error",
+                    "message": "Empty files are not allowed"
                 }, status=400)
             
             file_path = os.path.join(path, f"{file_selection}.txt")
@@ -166,8 +172,7 @@ async def handle_text_loader_operations(request):
                     file.write(content)
                 
                 cache_key = f"{node_id}_{file_path}"
-                if cache_key in DynamicTextLoaderNode.file_cache:
-                    DynamicTextLoaderNode.file_cache[cache_key] = content
+                DynamicTextLoaderNode.file_cache[cache_key] = content
                 
                 print(f"Saved file for node {node_id}: {file_path}")
                 return web.json_response({
@@ -179,6 +184,44 @@ async def handle_text_loader_operations(request):
                 return web.json_response({
                     "status": "error",
                     "message": f"Error saving file: {str(e)}"
+                }, status=500)
+        
+        if operation == 'delete_file':
+            path = payload.get('path', '')
+            file_selection = payload.get('file_selection', '')
+            
+            if not path or not file_selection:
+                return web.json_response({
+                    "status": "error",
+                    "message": "No file selected"
+                }, status=400)
+            
+            file_path = os.path.join(path, f"{file_selection}.txt")
+            
+            if not os.path.exists(file_path):
+                return web.json_response({
+                    "status": "error",
+                    "message": "File does not exist"
+                }, status=404)
+            
+            try:
+                os.remove(file_path)
+                
+                # Remove from cache if it exists
+                cache_key = f"{node_id}_{file_path}"
+                if cache_key in DynamicTextLoaderNode.file_cache:
+                    del DynamicTextLoaderNode.file_cache[cache_key]
+                
+                print(f"Deleted file for node {node_id}: {file_path}")
+                return web.json_response({
+                    "status": "success",
+                    "message": "File deleted successfully"
+                })
+            except Exception as e:
+                print(f"Error deleting file: {e}")
+                return web.json_response({
+                    "status": "error",
+                    "message": f"Error deleting file: {str(e)}"
                 }, status=500)
         
         return web.json_response({"error": "Invalid operation"}, status=400)

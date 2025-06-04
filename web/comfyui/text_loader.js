@@ -86,6 +86,110 @@ app.registerExtension({
             });
             editFileButton.tooltip = "Edit the selected text file";
 
+            const manageNewFileButton = (action) => {
+                const buttonName = "new_file";
+                const existingButton = this.widgets.find(w => w.name === buttonName);
+                
+                switch (action) {
+                    case "add":
+                        if (!existingButton) {
+                            const newButton = this.addWidget("button", buttonName, null, async () => {
+                                if (!this.properties.path) {
+                                    alert("Please enter a valid path first");
+                                    return;
+                                }
+                                
+                                if (this.properties.file_selection === "error" || 
+                                    this.properties.file_selection === "invalid path") {
+                                    alert("Please enter a valid path first");
+                                    return;
+                                }
+                                
+                                const filename = prompt("Enter filename (with or without .txt extension):");
+                                if (filename && filename.trim()) {
+                                    let processedFilename = filename.trim();
+                                    
+                                    if (!processedFilename.toLowerCase().endsWith('.txt')) {
+                                        processedFilename += '.txt';
+                                    }
+                                    
+                                    const filenameWithoutExt = processedFilename.slice(0, -4);
+                                    
+                                    const constants = {
+                                        EXTENSION_NAME: EXTENSION_NAME,
+                                        MESSAGE_ROUTE: MESSAGE_ROUTE
+                                    };
+
+                                    const { createTextEditorModal } = await import(`/extensions/${EXTENSION_NAME}/common/js/text_editor_modal.js`);
+                                    createTextEditorModal(this, "", constants, this.properties.path, filenameWithoutExt, true);
+                                }
+                            });
+                            newButton.tooltip = "Create a new text file";
+                        }
+                        break;
+                    case "remove":
+                        if (existingButton) {
+                            const index = this.widgets.indexOf(existingButton);
+                            if (index > -1) {
+                                this.widgets.splice(index, 1);
+                            }
+                        }
+                        break;
+                }
+                this.setDirtyCanvas(true);
+            };
+
+            const manageDeleteFileButton = (action) => {
+                const buttonName = "delete_file";
+                const existingButton = this.widgets.find(w => w.name === buttonName);
+                
+                switch (action) {
+                    case "add":
+                        if (!existingButton) {
+                            const deleteButton = this.addWidget("button", buttonName, null, async () => {
+                                const confirmDelete = confirm(`Are you sure you want to delete "${this.properties.file_selection}.txt"?`);
+                                if (!confirmDelete) return;
+
+                                try {
+                                    const response = await fetchSend(MESSAGE_ROUTE, this.id, "delete_file", {
+                                        path: this.properties.path,
+                                        file_selection: this.properties.file_selection
+                                    });
+
+                                    if (response && response.status === "success") {
+                                        console.log('File deleted successfully');
+                                        
+                                        const fileSelectionWidget = this.widgets.find(w => w.name === "file_selection");
+                                        if (fileSelectionWidget) {
+                                            await this.updateFileDropdown(this.properties.path, fileSelectionWidget);
+                                        }
+                                        
+                                        await this.updateBackend();
+                                        alert('File deleted successfully');
+                                    } else {
+                                        console.error('Failed to delete file:', response);
+                                        alert('Failed to delete file');
+                                    }
+                                } catch (error) {
+                                    console.error("Error deleting file:", error);
+                                    alert("Error deleting file");
+                                }
+                            });
+                            deleteButton.tooltip = "Delete the selected text file";
+                        }
+                        break;
+                    case "remove":
+                        if (existingButton) {
+                            const index = this.widgets.indexOf(existingButton);
+                            if (index > -1) {
+                                this.widgets.splice(index, 1);
+                            }
+                        }
+                        break;
+                }
+                this.setDirtyCanvas(true);
+            };
+
             this.updateFileDropdown = async function(path, widget) {
                 try {
                     const response = await fetchSend(MESSAGE_ROUTE, this.id, "get_txt_files", { path });
@@ -93,7 +197,8 @@ app.registerExtension({
                     if (response && response.files) {
                         widget.options.values = response.files;
                         
-                        if (response.valid_path && response.files.length > 0) {
+                        if (response.valid_path && response.files.length > 0 && 
+                            !["no files", "invalid path", "error"].includes(response.files[0])) {
                             const currentSelection = this.properties.file_selection;
                             if (currentSelection && response.files.includes(currentSelection)) {
                                 widget.value = currentSelection;
@@ -101,9 +206,18 @@ app.registerExtension({
                                 this.properties.file_selection = response.files[0];
                                 widget.value = response.files[0];
                             }
+                            manageNewFileButton("add");
+                            manageDeleteFileButton("add");
+                        } else if (response.valid_path && response.files[0] === "no files") {
+                            this.properties.file_selection = response.files[0];
+                            widget.value = response.files[0];
+                            manageNewFileButton("add");
+                            manageDeleteFileButton("remove");
                         } else {
                             this.properties.file_selection = response.files[0];
                             widget.value = response.files[0];
+                            manageNewFileButton("remove");
+                            manageDeleteFileButton("remove");
                         }
                         
                         this.setDirtyCanvas(true, true);
@@ -113,6 +227,8 @@ app.registerExtension({
                     widget.options.values = ["error"];
                     widget.value = "error";
                     this.properties.file_selection = "error";
+                    manageNewFileButton("remove");
+                    manageDeleteFileButton("remove");
                 }
             };
 
