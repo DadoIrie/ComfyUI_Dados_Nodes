@@ -1,5 +1,6 @@
 import { createModal } from "./modal.js";
 import { fetchSend } from "./utils.js";
+import { getIcon } from "./svg_icons.js";
 
 export function createTextEditorModal(node, textContent, constants, filePath, fileName, isNewFile = false) {
     const loadCSS = () => {
@@ -15,6 +16,10 @@ export function createTextEditorModal(node, textContent, constants, filePath, fi
 
     const contentDiv = document.createElement('div');
     contentDiv.className = 'text-editor-modal';
+
+    // Main section (left side)
+    const mainSection = document.createElement('div');
+    mainSection.className = 'text-editor-main-section';
 
     const filePathDiv = document.createElement('div');
     filePathDiv.className = 'text-editor-file-path';
@@ -67,7 +72,6 @@ export function createTextEditorModal(node, textContent, constants, filePath, fi
                 if (response && response.status === "success") {
                     console.log('File deleted successfully');
                     
-                    // Refresh the dropdown
                     const fileSelectionWidget = node.widgets.find(w => w.name === "file_selection");
                     if (fileSelectionWidget) {
                         await node.updateFileDropdown(filePath, fileSelectionWidget);
@@ -77,7 +81,6 @@ export function createTextEditorModal(node, textContent, constants, filePath, fi
                     
                     alert('File deleted successfully');
                     
-                    // Close the modal
                     if (modal && modal.closeModal) {
                         modal.closeModal();
                     }
@@ -160,8 +163,8 @@ export function createTextEditorModal(node, textContent, constants, filePath, fi
         }
     };
 
-    contentDiv.appendChild(filePathDiv);
-    contentDiv.appendChild(textarea);
+    mainSection.appendChild(filePathDiv);
+    mainSection.appendChild(textarea);
 
     const buttonContainer = document.createElement('div');
     buttonContainer.style.display = 'flex';
@@ -170,14 +173,36 @@ export function createTextEditorModal(node, textContent, constants, filePath, fi
     if (!isNewFile) {
         buttonContainer.appendChild(deleteButton);
     } else {
-        // Add empty div to maintain spacing when no delete button
         const spacer = document.createElement('div');
         buttonContainer.appendChild(spacer);
     }
 
     buttonContainer.appendChild(saveButton);
+    mainSection.appendChild(buttonContainer);
 
-    contentDiv.appendChild(buttonContainer);
+    // Sidebar section (right side)
+    const sidebar = document.createElement('div');
+    sidebar.className = 'text-editor-sidebar';
+
+    const sidebarToggle = document.createElement('button');
+    sidebarToggle.className = 'text-editor-sidebar-toggle';
+    sidebarToggle.innerHTML = getIcon('chevron_right');
+    
+    sidebarToggle.onclick = () => {
+        sidebar.classList.toggle('expanded');
+        sidebarToggle.innerHTML = sidebar.classList.contains('expanded') ? getIcon('chevron_left') : getIcon('chevron_right');
+    };
+
+    const sidebarContent = document.createElement('div');
+    sidebarContent.className = 'text-editor-sidebar-content';
+    sidebarContent.textContent = 'This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.This repository contains a quantized version of Stable Diffusion XL in the GGUF format. The model has been converted to different quantization levels, including Q4_K_S, Q5_K_S, and Q8, allowing for flexible deployment based on hardware capabilities. The UNet, VAE, and CLIP components are provided separately for better optimization and compatibility.';
+
+    sidebar.appendChild(sidebarToggle);
+    sidebar.appendChild(sidebarContent);
+
+    // Assemble the modal
+    contentDiv.appendChild(mainSection);
+    contentDiv.appendChild(sidebar);
 
     const modalConfig = {
         content: contentDiv,
