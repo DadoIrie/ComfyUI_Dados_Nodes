@@ -33,6 +33,8 @@ app.registerExtension({
                 });
             };
 
+            /* const wildcardSelectionsWidget = this.widgets.find(w => w.name === "wildcard_selections"); */
+
             const pathWidget = this.addWidget("STRING", "path", "", async (value) => {
                 this.properties.path = value;
                 await this.updateFileDropdown(value, fileSelectionWidget);
