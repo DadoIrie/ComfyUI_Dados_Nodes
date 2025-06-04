@@ -1,7 +1,6 @@
 import os
+import random
 from typing import Dict, Any, ClassVar
-from dynamicprompts.generators import RandomPromptGenerator
-from dynamicprompts.generators.attentiongenerator import AttentionGenerator
 from ..utils.api_routes import register_operation_handler
 from aiohttp import web
 
@@ -15,88 +14,53 @@ class DynamicTextLoaderNode:
     @classmethod
     def INPUT_TYPES(cls):
         return {
-            "optional": {
-                "string": ("STRING", {"default": '', "multiline": True, "tooltip": "Enter text directly here. If text is provided, the file path will be ignored."}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 2000000000, "tooltip": "The seed to use for Wildcards (random_prompts)."}),
-            },
             "hidden": {
                 "unique_id": "UNIQUE_ID",
             }
         }
     
-    RETURN_TYPES = ("STRING", "INT",)
-    RETURN_NAMES = ("text", "seed",)
-    OUTPUT_IS_LIST = (True, True,)
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("text",)
     FUNCTION = "process_text"
     CATEGORY = "Dado's Nodes/Text"
     
-    def process_text(self, string=None, seed=0, unique_id=None):
+    def process_text(self, unique_id=None):
         node_id = str(unique_id)
         state = self.__class__.node_state.get(node_id, {})
         
-        text_content = string if string else state.get('string', '')
         path = state.get('path', '')
         file_selection = state.get('file_selection', '')
         use_cached_file = state.get('use_cached_file', True)
-        random_prompt = state.get('random_prompt', False)
-        use_attention = state.get('use_attention', False)
         
-        # Use the seed parameter from the input, fallback to state if needed
-        seed = seed if seed != 0 else state.get('seed')
+        if not path or not file_selection:
+            return ('',)
         
-        text = ""
+        file_path = os.path.join(path, f"{file_selection}.txt")
+        cache_key = f"{node_id}_{file_path}"
         
-        if text_content:
-            text = text_content
-        elif path and file_selection:
-            file_path = os.path.join(path, f"{file_selection}.txt")
-            cache_key = f"{node_id}_{file_path}"
+        if cache_key not in self.__class__.file_cache or not use_cached_file:
+            if not os.path.exists(file_path):
+                print(f"Error: The file '{file_path}' does not exist.")
+                return ('',)
             
-            if cache_key not in self.__class__.file_cache or not use_cached_file:
-                if not os.path.exists(file_path):
-                    print(f"Error: The file '{file_path}' does not exist.")
-                    return ([''], [seed])
-                
-                try:
-                    with open(file_path, 'r', encoding="utf-8") as file:
-                        self.__class__.file_cache[cache_key] = file.read()
-                        print(f"Loaded file for node {unique_id}: {file_path}")
-                except Exception as e:
-                    print(f"Error reading file: {e}")
-                    return ([''], [seed])
-            
-            text = self.__class__.file_cache[cache_key]
-        else:
-            return ([''], [seed])
+            try:
+                with open(file_path, 'r', encoding="utf-8") as file:
+                    self.__class__.file_cache[cache_key] = file.read()
+                    print(f"Loaded file for node {unique_id}: {file_path}")
+            except Exception as e:
+                print(f"Error reading file: {e}")
+                return ('',)
         
-        if random_prompt:
-            generator = RandomPromptGenerator()
-            
-            if use_attention:
-                attention_generator = AttentionGenerator(generator)
-                prompts = attention_generator.generate(text, num_prompts=1, seeds=seed)
-                
-                fixed_prompts = []
-                for prompt in prompts:
-                    import re
-                    fixed_prompt = re.sub(r'\((,\s*)', r'\1(', prompt)
-                    fixed_prompts.append(fixed_prompt)
-                prompts = fixed_prompts
-            else:
-                prompts = generator.generate(text, num_images=1, seeds=seed)
-                
-            seeds = [seed]
-            return (prompts, seeds)
-        
-        return ([text], [seed])
+        text = self.__class__.file_cache[cache_key]
+        return (text,)
     
     @classmethod
     def IS_CHANGED(cls, unique_id=None):
         node_id = str(unique_id)
         state = cls.node_state.get(node_id, {})
         
-        if state.get('random_prompt', False):
-            return state.get('seed', 0)
+        if not state.get('use_cached_file', True):
+            return random.randint(1, 1000000)
         
         return None
 
@@ -106,7 +70,7 @@ async def handle_text_loader_operations(request):
         data = await request.json()
         operation = data.get('operation')
         
-        if operation not in ['update_state', 'get_txt_files']:
+        if operation not in ['update_state', 'get_txt_files', 'save_file', 'get_file_content']:
             return None
             
         node_id = str(data.get('id', ''))
@@ -116,7 +80,7 @@ async def handle_text_loader_operations(request):
             DynamicTextLoaderNode.node_state[node_id] = payload
             return web.json_response({"status": "success"})
         
-        elif operation == 'get_txt_files':
+        if operation == 'get_txt_files':
             path = payload.get('path', '')
             
             if not path or not os.path.exists(path) or not os.path.isdir(path):
@@ -149,6 +113,73 @@ async def handle_text_loader_operations(request):
                     "files": ["error reading directory"],
                     "valid_path": False
                 })
+        
+        if operation == 'get_file_content':
+            path = payload.get('path', '')
+            file_selection = payload.get('file_selection', '')
+            
+            if not path or not file_selection:
+                return web.json_response({
+                    "status": "error",
+                    "message": "No file selected"
+                }, status=400)
+            
+            file_path = os.path.join(path, f"{file_selection}.txt")
+            
+            if not os.path.exists(file_path):
+                return web.json_response({
+                    "status": "error",
+                    "message": "File does not exist"
+                }, status=404)
+            
+            try:
+                with open(file_path, 'r', encoding="utf-8") as file:
+                    content = file.read()
+                
+                return web.json_response({
+                    "status": "success",
+                    "content": content
+                })
+            except Exception as e:
+                print(f"Error reading file: {e}")
+                return web.json_response({
+                    "status": "error",
+                    "message": f"Error reading file: {str(e)}"
+                }, status=500)
+        
+        if operation == 'save_file':
+            state = DynamicTextLoaderNode.node_state.get(node_id, {})
+            path = state.get('path', '')
+            file_selection = state.get('file_selection', '')
+            content = payload.get('content', '')
+            
+            if not path or not file_selection:
+                return web.json_response({
+                    "status": "error",
+                    "message": "No file selected"
+                }, status=400)
+            
+            file_path = os.path.join(path, f"{file_selection}.txt")
+            
+            try:
+                with open(file_path, 'w', encoding="utf-8") as file:
+                    file.write(content)
+                
+                cache_key = f"{node_id}_{file_path}"
+                if cache_key in DynamicTextLoaderNode.file_cache:
+                    DynamicTextLoaderNode.file_cache[cache_key] = content
+                
+                print(f"Saved file for node {node_id}: {file_path}")
+                return web.json_response({
+                    "status": "success",
+                    "message": "File saved successfully"
+                })
+            except Exception as e:
+                print(f"Error saving file: {e}")
+                return web.json_response({
+                    "status": "error",
+                    "message": f"Error saving file: {str(e)}"
+                }, status=500)
         
         return web.json_response({"error": "Invalid operation"}, status=400)
     

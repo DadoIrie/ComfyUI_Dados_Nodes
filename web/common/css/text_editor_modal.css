@@ -1,0 +1,76 @@
+.text-editor-modal {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    min-width: 600px;
+    min-height: 500px;
+}
+
+.text-editor-file-path {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    color: #ffffff;
+    margin-bottom: 5px;
+    padding: 5px 0;
+}
+
+.text-editor-path {
+    color: #888;
+}
+
+.text-editor-filename {
+    color: #ffffff;
+}
+
+.text-editor-textarea {
+    width: 100%;
+    height: calc(75vh);
+    font-family: 'Courier New', monospace;
+    font-size: 0.8em;
+    border: 1px solid #555;
+    padding: 10px;
+    resize: none;
+    background-color: #222222;
+    color: #ffffff;
+    line-height: 1.4;
+}
+
+.text-editor-textarea:focus {
+    outline: none;
+    border-color: #656565;
+    box-shadow: 0 0 5px rgba(92, 92, 92, 0.3);
+}
+
+.text-editor-save-button {
+    padding: 10px 20px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    align-self: flex-end;
+    font-size: 1em;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 100px;
+}
+
+.text-editor-save-button:hover {
+    background-color: #45a049;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+}
+
+.text-editor-save-button:active {
+    background-color: #3d8b40;
+    transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(76, 175, 80, 0.3);
+}
+
+.text-editor-save-button:disabled {
+    background-color: #666;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}

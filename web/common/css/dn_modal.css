@@ -45,7 +45,7 @@
   z-index: 1;
 }
 
-/* .dn_close_button {
+.dn_close_button {
   position: absolute;
   top: 10px;
   right: 10px;
@@ -70,8 +70,8 @@
     color: #9b9b9b;
     transition: transform 0.3s ease, color 0.5s ease;
   }
-} */
-.dn_close_button {
+}
+/* .dn_close_button {
   position: absolute;
   top: 10px;
   right: 10px;
@@ -92,12 +92,12 @@
       transform: scale(1.2);
     }
   }
-}
+} */
 
 
 
 .dn_modal button {
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4), inset 0 2px 4px rgba(80, 80, 80, 0.5);
+  /* box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4), inset 0 2px 4px rgba(80, 80, 80, 0.5); */
   background-color: #191919;
   border: none;
   appearance: none;
@@ -110,13 +110,13 @@
     padding: 5px 30px 7px 30px;
   }
 
-  &:hover {
+  /* &:hover {
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4), inset 0 2px 4px rgba(80, 80, 80, 0.6);
     background-color: #202020;
-  }
+  } 
 
   &:active {
     box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.8);
-  }
+  } */
 }
 

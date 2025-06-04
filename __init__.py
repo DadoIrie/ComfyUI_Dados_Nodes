@@ -30,6 +30,8 @@ from .nodes.pinterest_fetch import PinterestFetch
 from .nodes.miaoshouai_tagger import MiaoshouAITaggerNode
 from .nodes.multiline_string import DadosMultilineString
 from .nodes.joytagger_node import JoyTaggerNode
+from .nodes.wildcard_selector import WildcardSelectorNode
+from .nodes.dn_wildcards_processor import DN_wildcards_processor
 
 # Node class mappings
 NODE_CLASS_MAPPINGS = {
@@ -42,6 +44,8 @@ NODE_CLASS_MAPPINGS = {
     "MiaoshouAITaggerNode": MiaoshouAITaggerNode,
     "DadosMultilineString": DadosMultilineString,
     "DadosJoyTaggerNode": JoyTaggerNode,
+    "WildcardSelectorNode": WildcardSelectorNode,
+    "DN_wildcards_processor": DN_wildcards_processor,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -54,6 +58,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "MiaoshouAITaggerNode": "MiaoshouAI Tagger",
     "DadosMultilineString": "Multiline String",
     "DadosJoyTaggerNode": "JoyTagger",
+    "WildcardSelectorNode": "Wildcard Selector",
+    "DN_wildcards_processor": "Wildcards Processor",
 }
 
 from .utils.api_routes import register_routes
