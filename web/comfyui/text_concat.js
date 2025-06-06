@@ -40,6 +40,10 @@ app.registerExtension({
         nodeType.prototype.onConnectionsChange = function (slotType, slot_idx, event, link_info, node_slot) {
             const result = onConnectionsChange?.apply(this, arguments);
 
+            if (!this.graph || !this.isLive) {
+                return result;
+            }
+
             if (slotType === TypeSlot.Input) {
                 if (link_info && event === TypeSlotEvent.Connect) {
                     const fromNode = this.graph._nodes.find(
