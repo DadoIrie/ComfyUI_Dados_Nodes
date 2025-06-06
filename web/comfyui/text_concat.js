@@ -50,55 +50,58 @@ app.registerExtension({
                         const parent_link = fromNode.outputs[link_info.origin_slot];
                         if (parent_link) {
                             node_slot.type = parent_link.type;
-                            node_slot.name = `${_PREFIX}_`;
+                            // If connecting to the unnumbered "text" slot, give it the next number
+                            if (node_slot.name === _PREFIX) {
+                                // Find the highest numbered slot
+                                let maxNumber = 0;
+                                for(const slot of this.inputs) {
+                                    if (slot.name.startsWith(_PREFIX)) {
+                                        const match = slot.name.match(/text_(\d+)/);
+                                        if (match) {
+                                            maxNumber = Math.max(maxNumber, parseInt(match[1]));
+                                        }
+                                    }
+                                }
+                                node_slot.name = `${_PREFIX}_${maxNumber + 1}`;
+                            }
                         }
                     }
                 } else if (event === TypeSlotEvent.Disconnect) {
-                    this.removeInput(slot_idx);
+                    // Don't remove the slot, just leave it empty to preserve numbering
+                    // Only remove if it's the unnumbered "text" slot
+                    if (this.inputs[slot_idx].name === _PREFIX) {
+                        this.removeInput(slot_idx);
+                    }
                 }
 
-                // Separate connected and empty text slots
-                let connectedSlots = [];
-                let emptySlots = [];
+                // Clean up: remove excess unnumbered empty slots, keep only one at the end
+                let unnumberedSlots = [];
                 
-                for(let i = 0; i < this.inputs.length; i++) {
+                for(let i = this.inputs.length - 1; i >= 0; i--) {
                     const slot = this.inputs[i];
                     
-                    // Skip non-dynamic inputs
-                    if (slot.name === 'delimiter' || slot.name === 'strip_newlines') {
-                        continue;
-                    }
-                    
-                    if (slot.link !== null && slot.name.startsWith(_PREFIX)) {
-                        connectedSlots.push({slot: slot, index: i});
-                    } else if (slot.link === null && slot.name.startsWith(_PREFIX)) {
-                        emptySlots.push(i);
+                    if (slot.name === _PREFIX && slot.link === null) {
+                        unnumberedSlots.push(i);
                     }
                 }
 
-                // Remove excess empty slots (keep only one)
-                while (emptySlots.length > 1) {
-                    this.removeInput(emptySlots.pop()); // Remove from end
+                // Remove excess unnumbered slots (keep only one)
+                while (unnumberedSlots.length > 1) {
+                    this.removeInput(unnumberedSlots.shift());
                 }
 
-                // Renumber connected slots in order (1, 2, 3...)
-                connectedSlots.forEach((item, index) => {
-                    item.slot.name = `${_PREFIX}_${index + 1}`;
-                });
-
-                // Ensure exactly one empty slot exists at the end
-                if (emptySlots.length === 0) {
+                // Ensure exactly one unnumbered empty slot exists at the end
+                if (unnumberedSlots.length === 0) {
                     this.addInput(_PREFIX, _TYPE);
                     const last = this.inputs[this.inputs.length - 1];
                     if (last) {
                         last.color_off = "#666";
                     }
                 } else {
-                    // Move empty slot to the end if it's not already there
-                    const emptySlotIndex = emptySlots[0];
-                    if (emptySlotIndex !== this.inputs.length - 1) {
-                        const emptySlot = this.inputs[emptySlotIndex];
-                        this.removeInput(emptySlotIndex);
+                    // Move the unnumbered slot to the end if it's not already there
+                    const unnumberedIndex = unnumberedSlots[0];
+                    if (unnumberedIndex !== this.inputs.length - 1) {
+                        this.removeInput(unnumberedIndex);
                         this.addInput(_PREFIX, _TYPE);
                         const newEmpty = this.inputs[this.inputs.length - 1];
                         if (newEmpty) {
