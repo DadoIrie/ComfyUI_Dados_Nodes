@@ -29,14 +29,14 @@ class ModalView {
     this.overlay.className = 'dn_overlay';
     this.modal.className = 'dn_modal';
     this.contentWrapper.className = 'dn_content_wrapper';
-    this.resizeHandle.className = 'dn_resize_handle';
+    /* this.resizeHandle.className = 'dn_resize_handle'; */
     this.closeButton.className = 'dn_close_button';
     this.closeButton.innerHTML = getIcon('x');
 
     const commonTransition = 'opacity 0.2s ease-out';
     this.overlay.style.transition = commonTransition;
     this.modal.style.transition = 'transform 0.2s ease-out, ' + commonTransition;
-    this.contentWrapper.style.transition = 'opacity 0.05s ease-out';
+    this.contentWrapper.style.transition = 'opacity 0.1s ease-out';
     // this.closeButton.style.transition = 'all 0.5s ease-out';
 
     this.modal.tabIndex = -1;
@@ -97,11 +97,11 @@ class ModalModel {
     this.view.closeButton.onclick = () => this.closeModal();
     this.view.overlay.onclick = () => this.closeModal();
     document.addEventListener('keydown', (event) => this.handleEscapeKey(event));
-    this.view.modal.onclick = (event) => event.stopPropagation();
-    this.setupResize();
+    /* this.view.modal.onclick = (event) => event.stopPropagation(); */
+    /* this.setupResize(); */
   }
 
-  setupResize() {
+/*   setupResize() {
     let isResizing = false;
   
     const initResize = (e) => {
@@ -138,7 +138,7 @@ class ModalModel {
     this.view.resizeHandle.addEventListener('mousedown', initResize, false);
   }
     
-  
+   */
   
   
   
@@ -149,13 +149,17 @@ class ModalModel {
   }
 
   closeModal() {
-    this.view.close();
+    let delay = 0;
+    if (typeof this.config.onClose === 'function') {
+        delay = this.config.onClose() || 0;
+    }
+    
     setTimeout(() => {
-      this.view.remove();
-      if (typeof this.config.onClose === 'function') {
-        this.config.onClose();
-      }
-    }, 150);
+        this.view.close();
+        setTimeout(() => {
+            this.view.remove();
+        }, 200);
+    }, delay);
   }
 
   render() {

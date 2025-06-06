@@ -1,10 +1,36 @@
+:root {
+    --modal-bg: #222222;
+    --modal-border: #444444;
+    --modal-text: #ffffff;
+    --modal-text-muted: #888888;
+    --modal-text-secondary: #cccccc;
+    --modal-input-bg: #222222;
+    --modal-input-border: #555555;
+    --modal-input-focus: #656565;
+    --modal-button-primary: #4CAF50;
+    --modal-button-primary-hover: #45a049;
+    --modal-button-primary-active: #3d8b40;
+    --modal-button-danger: #8b0000;
+    --modal-button-danger-hover: #dc3545;
+    --modal-button-danger-active: #721c24;
+    --modal-button-secondary: #666666;
+    --modal-button-secondary-hover: #777777;
+    --modal-shadow: rgba(0, 0, 0, 0.3);
+    --modal-shadow-strong: rgba(0, 0, 0, 0.7);
+    --modal-transition: 0.2s ease-out;
+    --modal-spacing: 20px;
+    --modal-spacing-sm: 10px;
+    --modal-spacing-xs: 5px;
+    --modal-border-radius: 4px;
+}
+
 .dn_modal {
-  width: 50% !important;
-  overflow: visible !important;
+    width: 50% !important;
+    overflow: visible !important;
 }
 
 .text-editor-modal {
-    padding: 20px;
+    padding: var(--modal-spacing);
     display: flex;
     flex-direction: column;
     gap: 15px;
@@ -33,72 +59,78 @@
     height: 26px;
     stroke-width: 1;
     color: #9b9b9b;
-    transition: transform 0.2s ease-out, color 0.2s ease-out;
+    transition: transform var(--modal-transition), color var(--modal-transition);
     transform: scale(1);
 }
 
 .dn_modal .dn_close_button:hover svg {
     transform: scale(1.2);
-    color: #FFFFFF;
+    color: var(--modal-text);
 }
 
 .text-editor-sidebar {
     position: absolute;
-    top: 20px;
+    top: var(--modal-spacing);
     left: 100%;
-    width: 16px;
-    height: calc(100% - 20px);
-    background-color: transparent;
-    overflow: hidden;
-    transition: width 0.3s ease-out, background-color 0.3s ease-out;
+    width: 0;
+    height: calc(100% - var(--modal-spacing));
+    background-color: var(--modal-bg);
+    transition: width 0.15s ease-out;
     z-index: 1;
     padding: 0;
     margin: 0;
     pointer-events: none;
+    overflow: hidden;
 }
 
 .text-editor-sidebar-content {
     position: absolute;
-    left: 16px;
-    top: 10px;
-    width: 300px;
-    padding: 20px;
-    height: calc(100% - 20px);
+    left: 0;
+    top: var(--modal-spacing-sm);
+    width: 320px;
+    padding: var(--modal-spacing);
+    height: calc(100% - var(--modal-spacing));
     box-sizing: border-box;
     overflow-y: auto;
     opacity: 0;
-    transition: opacity 0.2s ease-out;
+    transition: opacity 0.15s ease-out;
+    transition-delay: 0s;
 }
 
 .text-editor-sidebar.expanded {
     width: 320px;
-    background-color: #222222;
-    border-left: 1px solid #444;
     pointer-events: auto;
-    overflow: hidden;
 }
-
+/* 
 .text-editor-sidebar.expanded::before,
-.text-editor-sidebar.expanded::after {
+.text-editor-sidebar.expanded::after,
+.text-editor-sidebar.expanded::left {
     content: '';
     position: absolute;
-    left: 0;
-    width: 100%;
-    height: 20px;
     pointer-events: none;
     z-index: 10;
 }
 
 .text-editor-sidebar.expanded::before {
     top: 0;
+    left: 0;
+    width: 100%;
+    height: var(--modal-spacing);
     background: linear-gradient(to bottom, rgba(34, 34, 34, 0.9) 0%, transparent 100%);
-    box-shadow: inset 0 20px 20px -20px rgba(0, 0, 0, 0.7);
+    box-shadow: inset 0 var(--modal-spacing) var(--modal-spacing) calc(-1 * var(--modal-spacing)) var(--modal-shadow-strong);
 }
 
 .text-editor-sidebar.expanded::after {
     bottom: 0;
+    left: 0;
+    width: 100%;
+    height: var(--modal-spacing);
     background: linear-gradient(to top, rgba(34, 34, 34, 0.9) 0%, transparent 100%);
-    box-shadow: inset 0 -20px 20px -20px rgba(0, 0, 0, 0.7);
+    box-shadow: inset 0 calc(-1 * var(--modal-spacing)) var(--modal-spacing) calc(-1 * var(--modal-spacing)) var(--modal-shadow-strong);
+} */
+
+.text-editor-sidebar.expanded {
+    box-shadow: inset var(--modal-spacing) 0 var(--modal-spacing) calc(-1 * var(--modal-spacing)) var(--modal-shadow-strong);
 }
 
 .text-editor-sidebar.expanded .text-editor-sidebar-content {
@@ -106,64 +138,20 @@
     transition-delay: 0.1s;
 }
 
-.text-editor-sidebar-toggle {
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 16px;
-    height: 60px;
-    background-color: #333;
-    border: none;
-    border-radius: 5px 0 0 5px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    font-size: 14px;
-    transition: background-color 0.2s ease;
-    z-index: 10;
-    pointer-events: auto;
-}
-
-/* .text-editor-sidebar-toggle:hover {
-    background-color: #444;
-} */
-
-.text-editor-sidebar-toggle svg {
-    width: 26px;
-    height: 26px;
-    stroke-width: 1;
-    color: #9b9b9b;
-    transition: transform 0.3s ease;
-    transform: scale(1);
-}
-
-.text-editor-sidebar-toggle:hover svg {
-    transform: scale(1.2);
-    color: #FFFFFF;
-}
-
-.dn_modal .text-editor-sidebar-toggle {
-    padding: 0;
-    background-color: transparent !important;
-}
-
 .text-editor-file-path {
     font-family: 'Courier New', monospace;
     font-size: 0.9em;
-    color: #ffffff;
-    margin-bottom: 5px;
-    padding: 5px 0;
+    color: var(--modal-text);
+    margin-bottom: var(--modal-spacing-xs);
+    padding: var(--modal-spacing-xs) 0;
 }
 
 .text-editor-path {
-    color: #888;
+    color: var(--modal-text-muted);
 }
 
 .text-editor-filename {
-    color: #ffffff;
+    color: var(--modal-text);
 }
 
 .text-editor-textarea {
@@ -171,120 +159,121 @@
     height: calc(75vh);
     font-family: 'Courier New', monospace;
     font-size: 0.8em;
-    border: 1px solid #555;
-    padding: 10px;
+    border: 1px solid var(--modal-input-border);
+    padding: var(--modal-spacing-sm);
     resize: none;
-    background-color: #222222;
-    color: #ffffff;
+    background-color: var(--modal-input-bg);
+    color: var(--modal-text);
     line-height: 1.4;
+    transition: border-color var(--modal-transition), box-shadow var(--modal-transition);
 }
 
 .text-editor-textarea:focus {
     outline: none;
-    border-color: #656565;
-    box-shadow: 0 0 5px rgba(92, 92, 92, 0.3);
+    border-color: var(--modal-input-focus);
+    box-shadow: 0 0 var(--modal-spacing-xs) var(--modal-shadow);
 }
 
 .text-editor-save-button {
-    padding: 10px 20px;
-    background-color: #4CAF50;
+    padding: var(--modal-spacing-sm) var(--modal-spacing);
+    background-color: var(--modal-button-primary);
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--modal-border-radius);
     cursor: pointer;
     align-self: flex-end;
     font-size: 1em;
     font-weight: 500;
-    transition: all 0.2s ease;
+    transition: all var(--modal-transition);
     min-width: 100px;
 }
 
 .text-editor-save-button:hover {
-    background-color: #45a049;
+    background-color: var(--modal-button-primary-hover);
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
 }
 
 .text-editor-save-button:active {
-    background-color: #3d8b40;
+    background-color: var(--modal-button-primary-active);
     transform: translateY(0);
     box-shadow: 0 1px 4px rgba(76, 175, 80, 0.3);
 }
 
 .text-editor-save-button:disabled {
-    background-color: #666;
+    background-color: var(--modal-button-secondary);
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
 }
 
 .dn_modal .text-editor-delete-button {
-    padding: 10px 20px;
-    background-color: #8b0000 !important;
+    padding: var(--modal-spacing-sm) var(--modal-spacing);
+    background-color: var(--modal-button-danger) !important;
     color: white;
     border: none;
     cursor: pointer;
     font-size: 1em;
     font-weight: 500;
-    transition: all 0.2s ease;
+    transition: all var(--modal-transition);
     min-width: 100px;
 }
 
 .dn_modal .text-editor-delete-button:hover {
-    background-color: #dc3545 !important;
+    background-color: var(--modal-button-danger-hover) !important;
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
 }
 
 .dn_modal .text-editor-delete-button:active {
-    background-color: #721c24 !important;
+    background-color: var(--modal-button-danger-active) !important;
     transform: translateY(0);
     box-shadow: 0 1px 4px rgba(220, 53, 69, 0.3);
 }
 
 .dn_modal .text-editor-delete-button:disabled {
-    background-color: #666 !important;
+    background-color: var(--modal-button-secondary) !important;
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
 }
 
 .wildcard-controls {
-    padding: 10px 0;
+    padding: var(--modal-spacing-sm) 0;
 }
 
 .wildcard-reset-button {
     width: 100%;
     padding: 8px 12px;
-    background-color: #666;
+    background-color: var(--modal-button-secondary);
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--modal-border-radius);
     cursor: pointer;
     margin-bottom: 15px;
     font-size: 0.9em;
 }
 
 .wildcard-reset-button:hover {
-    background-color: #777;
+    background-color: var(--modal-button-secondary-hover);
 }
 
 .wildcard-dropdowns {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--modal-spacing-sm);
 }
 
 .wildcard-dropdown-container {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: var(--modal-spacing-xs);
 }
 
 .wildcard-label {
     font-family: 'Courier New', monospace;
     font-size: 0.8em;
-    color: #ccc;
+    color: var(--modal-text-secondary);
     background-color: #333;
     padding: 4px 8px;
     border-radius: 3px;
@@ -295,37 +284,50 @@
     padding: 6px 8px;
     background-color: #444;
     color: white;
-    border: 1px solid #666;
-    border-radius: 4px;
+    border: 1px solid var(--modal-input-border);
+    border-radius: var(--modal-border-radius);
     font-size: 0.9em;
+    transition: border-color var(--modal-transition);
 }
 
 .wildcard-dropdown:focus {
     outline: none;
-    border-color: #888;
+    border-color: var(--modal-text-muted);
 }
 
 .no-wildcards-message {
-    color: #888;
+    color: var(--modal-text-muted);
     font-style: italic;
     text-align: center;
-    padding: 20px;
+    padding: var(--modal-spacing);
 }
 
 .wildcard-update-notification {
-    background-color: #4CAF50;
+    background-color: var(--modal-button-primary);
     color: white;
     padding: 8px 12px;
-    border-radius: 4px;
-    margin-bottom: 10px;
+    border-radius: var(--modal-border-radius);
+    margin-bottom: var(--modal-spacing-sm);
     font-size: 0.9em;
     text-align: center;
     animation: fadeInOut 3s ease-in-out;
 }
 
 @keyframes fadeInOut {
-    0% { opacity: 0; transform: translateY(-10px); }
-    10% { opacity: 1; transform: translateY(0); }
-    90% { opacity: 1; transform: translateY(0); }
-    100% { opacity: 0; transform: translateY(-10px); }
+    0% { 
+        opacity: 0; 
+        transform: translateY(-10px); 
+    }
+    10% { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
+    90% { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
+    100% { 
+        opacity: 0; 
+        transform: translateY(-10px); 
+    }
 }

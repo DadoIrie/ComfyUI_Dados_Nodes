@@ -1,122 +1,73 @@
 import { createModal } from "./modal.js";
 import { fetchSend } from "./utils.js";
+import { getIcon } from "./svg_icons.js";
 
-// Helper functions
-function updateWildcardDropdowns(node, constants, container, wildcards) {
-    console.log('Updating wildcard dropdowns with new data:', wildcards);
-    
-    // Store current scroll position
-    const scrollTop = container.scrollTop;
-    
-    // Get current selections before destroying dropdowns
-    const currentSelections = {};
-    const existingDropdowns = container.querySelectorAll('.wildcard-dropdown');
-    existingDropdowns.forEach(dropdown => {
-        const index = dropdown.dataset.wildcardIndex;
-        const value = dropdown.value;
-        if (value) {
-            currentSelections[index] = value;
+class WildcardManager {
+    constructor(node, constants) {
+        this.node = node;
+        this.constants = constants;
+    }
+
+    async loadWildcards(container) {
+        try {
+            const response = await fetchSend(
+                this.constants.MESSAGE_ROUTE,
+                this.node.id,
+                "get_file_content",
+                {
+                    path: this.node.properties.path,
+                    file_selection: this.node.properties.file_selection
+                }
+            );
+
+            if (response?.status === "success" && response.wildcards) {
+                this.createDropdowns(container, response.wildcards);
+                return response.wildcards.length;
+            }
+            return 0;
+        } catch (error) {
+            console.error('Error loading wildcards:', error);
+            return 0;
         }
-    });
-    
-    console.log('Preserved current selections:', currentSelections);
-    
-    // Recreate dropdowns with backend data (which should already have preserved selections)
-    createWildcardDropdowns(node, constants, container, wildcards);
-    
-    // Restore scroll position
-    container.scrollTop = scrollTop;
-    
-    // Show notification
-    showWildcardChangeNotification(container, wildcards);
-    
-    return wildcards.length;
-}
-
-// Better yet, let's make it even smarter - only update if wildcards actually changed
-function smartUpdateWildcards(node, constants, container, newWildcards) {
-    console.log('Smart updating wildcards...');
-    
-    // Get current wildcard structure
-    const existingDropdowns = container.querySelectorAll('.wildcard-dropdown');
-    const currentWildcards = Array.from(existingDropdowns).map(dropdown => {
-        const label = dropdown.parentNode.querySelector('.wildcard-label');
-        return {
-            index: dropdown.dataset.wildcardIndex,
-            original: label ? label.textContent : '',
-            selected: dropdown.value
-        };
-    });
-    
-    // Compare structures - only update if wildcards actually changed
-    const wildcardsChanged = !arraysEqual(currentWildcards, newWildcards);
-    
-    if (wildcardsChanged) {
-        console.log('Wildcards structure changed, updating...');
-        updateWildcardDropdowns(node, constants, container, newWildcards);
-    } else {
-        console.log('Wildcards structure unchanged, preserving current state');
-        // Just show a subtle notification that save was successful
-        showWildcardChangeNotification(container, newWildcards, 'Saved - wildcards preserved');
     }
-    
-    return newWildcards.length;
-}
 
-function arraysEqual(a, b) {
-    if (a.length !== b.length) return false;
-    
-    for (let i = 0; i < a.length; i++) {
-        if (a[i].original !== b[i].original) return false;
-    }
-    
-    return true;
-}
+    createDropdowns(container, wildcards) {
+        container.innerHTML = '';
 
-function showWildcardChangeNotification(container, wildcards, customMessage = null) {
-    // Create temporary notification
-    const notification = document.createElement('div');
-    notification.className = 'wildcard-update-notification';
-    notification.textContent = customMessage || `Wildcards updated (${wildcards.length} found)`;
-    
-    // Insert at top of container
-    container.insertBefore(notification, container.firstChild);
-    
-    // Remove after 3 seconds
-    setTimeout(() => {
-        if (notification.parentNode) {
-            notification.parentNode.removeChild(notification);
+        if (wildcards.length === 0) {
+            const noWildcards = document.createElement('div');
+            noWildcards.className = 'no-wildcards-message';
+            noWildcards.textContent = 'No wildcards found in text';
+            container.appendChild(noWildcards);
+            return;
         }
-    }, 3000);
-}
 
-function createWildcardDropdowns(node, constants, container, wildcards) {
-    console.log('Creating wildcard dropdowns with data:', wildcards);
-    
-    // Clear existing dropdowns
-    container.innerHTML = '';
-
-    if (wildcards.length === 0) {
-        const noWildcards = document.createElement('div');
-        noWildcards.className = 'no-wildcards-message';
-        noWildcards.textContent = 'No wildcards found in text';
-        container.appendChild(noWildcards);
-        return;
+        wildcards.forEach(wildcard => {
+            const dropdownContainer = this.createDropdownContainer(wildcard);
+            container.appendChild(dropdownContainer);
+        });
     }
 
-    wildcards.forEach((wildcard, index) => {
-        const dropdownContainer = document.createElement('div');
-        dropdownContainer.className = 'wildcard-dropdown-container';
+    createDropdownContainer(wildcard) {
+        const container = document.createElement('div');
+        container.className = 'wildcard-dropdown-container';
 
         const label = document.createElement('div');
         label.className = 'wildcard-label';
         label.textContent = wildcard.original;
 
+        const dropdown = this.createDropdown(wildcard);
+
+        container.appendChild(label);
+        container.appendChild(dropdown);
+        return container;
+    }
+
+    createDropdown(wildcard) {
         const dropdown = document.createElement('select');
         dropdown.className = 'wildcard-dropdown';
         dropdown.dataset.wildcardIndex = wildcard.index;
 
-        // Add options
         wildcard.options.forEach(option => {
             const optionElement = document.createElement('option');
             optionElement.value = option;
@@ -124,103 +75,327 @@ function createWildcardDropdowns(node, constants, container, wildcards) {
             dropdown.appendChild(optionElement);
         });
 
-        // Set the selected value from backend (already preserved by content matching)
         dropdown.value = wildcard.selected || '';
-        console.log(`Set wildcard ${wildcard.index} (${wildcard.original}) to: "${dropdown.value}"`);
+        dropdown.onchange = () => this.handleSelectionChange(wildcard, dropdown.value);
 
-        // Handle selection change
-        dropdown.onchange = async () => {
-            console.log(`Wildcard ${wildcard.index} selection changed to: "${dropdown.value}"`);
-            await updateWildcardSelection(
-                node, 
-                constants, 
-                wildcard.index, 
-                dropdown.value, 
-                wildcard.original
+        return dropdown;
+    }
+
+    async handleSelectionChange(wildcard, selectedValue) {
+        try {
+            await fetchSend(
+                this.constants.MESSAGE_ROUTE,
+                this.node.id,
+                "update_wildcard_selection",
+                {
+                    wildcard_index: wildcard.index,
+                    selected_value: selectedValue,
+                    original_wildcard: wildcard.original
+                }
             );
-        };
+        } catch (error) {
+            console.error('Error updating wildcard selection:', error);
+        }
+    }
 
-        dropdownContainer.appendChild(label);
-        dropdownContainer.appendChild(dropdown);
-        container.appendChild(dropdownContainer);
-    });
+    async resetAll(container) {
+        try {
+            const response = await fetchSend(
+                this.constants.MESSAGE_ROUTE,
+                this.node.id,
+                "reset_wildcards",
+                {}
+            );
+
+            if (response?.status === "success") {
+                await this.loadWildcards(container);
+            }
+        } catch (error) {
+            console.error('Error resetting wildcards:', error);
+        }
+    }
+
+    updateFromSave(container, wildcards) {
+        if (wildcards) {
+            this.createDropdowns(container, wildcards);
+            this.showNotification(container, `Wildcards updated (${wildcards.length} found)`);
+            return wildcards.length;
+        }
+        return 0;
+    }
+
+    showNotification(container, message) {
+        const notification = document.createElement('div');
+        notification.className = 'wildcard-update-notification';
+        notification.textContent = message;
+        
+        container.insertBefore(notification, container.firstChild);
+        
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 3000);
+    }
 }
 
-async function loadWildcards(node, constants, container, textContent) {
-    try {
-        console.log('Loading wildcards for file:', node.properties.file_selection);
-        
+class FileOperations {
+    constructor(node, constants) {
+        this.node = node;
+        this.constants = constants;
+    }
+
+    async saveFile(content, filePath, fileName, isNewFile) {
         const response = await fetchSend(
-            constants.MESSAGE_ROUTE,
-            node.id,
-            "get_file_content",
+            this.constants.MESSAGE_ROUTE,
+            this.node.id,
+            "save_file",
             {
-                path: node.properties.path,
-                file_selection: node.properties.file_selection
+                content,
+                path: filePath,
+                file_selection: fileName,
+                is_new_file: isNewFile
             }
         );
 
-        if (response && response.status === "success" && response.wildcards) {
-            console.log('Loaded wildcards from JSON persistence:', response.wildcards);
-            createWildcardDropdowns(node, constants, container, response.wildcards);
-            return response.wildcards.length;
+        if (response?.status !== "success") {
+            throw new Error('Failed to save file');
         }
-        return 0;
-    } catch (error) {
-        console.error('Error loading wildcards:', error);
-        return 0;
-    }
-}
 
-async function updateWildcardSelection(node, constants, wildcardIndex, selectedValue, originalWildcard) {
-    try {
-        console.log(`Updating wildcard ${wildcardIndex} to "${selectedValue}"`);
-        
+        return response;
+    }
+
+    async deleteFile(filePath, fileName) {
         const response = await fetchSend(
-            constants.MESSAGE_ROUTE,
-            node.id,
-            "update_wildcard_selection",
+            this.constants.MESSAGE_ROUTE,
+            this.node.id,
+            "delete_file",
             {
-                wildcard_index: wildcardIndex,
-                selected_value: selectedValue,
-                original_wildcard: originalWildcard
+                path: filePath,
+                file_selection: fileName
             }
         );
 
-        if (response && response.status === "success") {
-            console.log('Wildcard selection saved to JSON file');
-        } else {
-            console.error('Failed to save wildcard selection:', response);
+        if (response?.status !== "success") {
+            throw new Error('Failed to delete file');
         }
-    } catch (error) {
-        console.error('Error updating wildcard selection:', error);
-    }
-}
 
-async function resetAllWildcards(node, constants, container) {
-    try {
-        console.log('Resetting all wildcards');
+        return response;
+    }
+
+    async updateNodeFileList(filePath, fileName) {
+        this.node.properties.file_selection = fileName;
         
-        const response = await fetchSend(
-            constants.MESSAGE_ROUTE,
-            node.id,
-            "reset_wildcards",
-            {}
-        );
-
-        if (response && response.status === "success") {
-            console.log('All wildcards reset');
-            // Reload wildcards to refresh UI
-            await loadWildcards(node, constants, container);
-        } else {
-            console.error('Failed to reset wildcards:', response);
+        if (this.node.textLoader) {
+            await this.node.textLoader.updateFileDropdown(filePath);
+            await this.node.textLoader.updateBackend();
+            
+            const fileSelectionWidget = this.node.textLoader.getWidget("file_selection");
+            if (fileSelectionWidget) {
+                fileSelectionWidget.value = fileName;
+                this.node.properties.file_selection = fileName;
+                this.node.setDirtyCanvas(true, true);
+            }
         }
-    } catch (error) {
-        console.error('Error resetting wildcards:', error);
     }
 }
 
-// Main modal creation function
+class ModalElements {
+    constructor() {
+        this.elements = {};
+    }
+
+    createFilePathDisplay(filePath, fileName) {
+        const container = document.createElement('div');
+        container.className = 'text-editor-file-path';
+
+        const pathSpan = document.createElement('span');
+        pathSpan.className = 'text-editor-path';
+        pathSpan.textContent = `${filePath}${filePath.endsWith('/') ? '' : '/'}`;
+
+        const filenameSpan = document.createElement('span');
+        filenameSpan.className = 'text-editor-filename';
+        filenameSpan.textContent = `${fileName}.txt`;
+
+        container.appendChild(pathSpan);
+        container.appendChild(filenameSpan);
+        return container;
+    }
+
+    createTextarea(textContent) {
+        const textarea = document.createElement('textarea');
+        textarea.className = 'text-editor-textarea';
+        textarea.value = textContent || '';
+        textarea.placeholder = 'Enter your text here...';
+        textarea.spellcheck = false;
+        this.elements.textarea = textarea;
+        return textarea;
+    }
+
+    createButton(className, text, handler) {
+        const button = document.createElement('button');
+        button.className = className;
+        button.textContent = text;
+        button.onclick = handler;
+        return button;
+    }
+
+    createSidebar() {
+        const sidebar = document.createElement('div');
+        sidebar.className = 'text-editor-sidebar';
+
+        const content = document.createElement('div');
+        content.className = 'text-editor-sidebar-content';
+
+        sidebar.appendChild(content);
+
+        this.elements.sidebar = sidebar;
+        this.elements.sidebarContent = content;
+        return sidebar;
+    }
+
+    createWildcardControls() {
+        const controls = document.createElement('div');
+        controls.className = 'wildcard-controls';
+
+        const dropdowns = document.createElement('div');
+        dropdowns.className = 'wildcard-dropdowns';
+
+        controls.appendChild(dropdowns);
+        this.elements.wildcardDropdowns = dropdowns;
+        return controls;
+    }
+
+    autoExpandSidebar(wildcardCount) {
+        if (this.elements.sidebar) {
+            if (wildcardCount > 0) {
+                setTimeout(() => {
+                    this.elements.sidebar.classList.add('expanded');
+                }, 150);
+            } else {
+                this.elements.sidebar.classList.remove('expanded');
+            }
+        }
+    }
+}
+
+class ButtonManager {
+    constructor(elements, fileOps, wildcardManager, modal) {
+        this.elements = elements;
+        this.fileOps = fileOps;
+        this.wildcardManager = wildcardManager;
+        this.modal = modal;
+    }
+
+    createSaveButton(filePath, fileName, isNewFile) {
+        return this.elements.createButton(
+            'text-editor-save-button',
+            'Save File',
+            () => this.handleSave(filePath, fileName, isNewFile)
+        );
+    }
+
+    createDeleteButton(filePath, fileName) {
+        return this.elements.createButton(
+            'text-editor-delete-button',
+            'Delete File',
+            () => this.handleDelete(filePath, fileName)
+        );
+    }
+
+    createResetButton() {
+        return this.elements.createButton(
+            'wildcard-reset-button',
+            'Reset All Wildcards',
+            () => this.handleReset()
+        );
+    }
+
+    async handleSave(filePath, fileName, isNewFile) {
+        const textarea = this.elements.elements.textarea;
+        const saveButton = document.querySelector('.text-editor-save-button');
+        
+        if (!textarea.value.trim()) {
+            alert('Empty files are not allowed');
+            return;
+        }
+
+        this.setButtonState(saveButton, 'Saving...', true);
+
+        try {
+            const response = await this.fileOps.saveFile(
+                textarea.value, 
+                filePath, 
+                fileName, 
+                isNewFile
+            );
+
+            this.setButtonState(saveButton, 'Saved!', false);
+
+            if (response.wildcards) {
+                const wildcardCount = this.wildcardManager.updateFromSave(
+                    this.elements.elements.wildcardDropdowns, 
+                    response.wildcards
+                );
+                this.elements.autoExpandSidebar(wildcardCount);
+            }
+
+            if (isNewFile) {
+                await this.fileOps.updateNodeFileList(filePath, fileName);
+            }
+
+            setTimeout(() => this.setButtonState(saveButton, 'Save File', false), 1000);
+        } catch (error) {
+            console.error('Error saving file:', error);
+            alert('Error saving file');
+            this.setButtonState(saveButton, 'Save File', false);
+        }
+    }
+
+    async handleDelete(filePath, fileName) {
+        const confirmDelete = confirm(
+            `Are you sure you want to delete "${fileName}.txt"?\n\nThis will also delete any associated wildcard selections.`
+        );
+        if (!confirmDelete) return;
+
+        const deleteButton = document.querySelector('.text-editor-delete-button');
+        this.setButtonState(deleteButton, 'Deleting...', true);
+
+        try {
+            await this.fileOps.deleteFile(filePath, fileName);
+            
+            if (this.fileOps.node.textLoader) {
+                await this.fileOps.node.textLoader.updateFileDropdown(filePath);
+                await this.fileOps.node.textLoader.updateBackend();
+            }
+            
+            alert('File deleted successfully');
+            
+            if (this.modal?.closeModal) {
+                this.modal.closeModal();
+            }
+        } catch (error) {
+            console.error('Error deleting file:', error);
+            alert('Error deleting file');
+            this.setButtonState(deleteButton, 'Delete File', false);
+        }
+    }
+
+    async handleReset() {
+        const confirm = window.confirm('Are you sure you want to reset all wildcard selections?');
+        if (confirm) {
+            await this.wildcardManager.resetAll(this.elements.elements.wildcardDropdowns);
+        }
+    }
+
+    setButtonState(button, text, disabled) {
+        if (button) {
+            button.textContent = text;
+            button.disabled = disabled;
+        }
+    }
+}
+
 export function createTextEditorModal(node, textContent, constants, filePath, fileName, isNewFile = false) {
     const loadCSS = () => {
         if (!document.querySelector('link[href$="/text_editor_modal.css"]')) {
@@ -233,247 +408,67 @@ export function createTextEditorModal(node, textContent, constants, filePath, fi
 
     loadCSS();
 
+    const wildcardManager = new WildcardManager(node, constants);
+    const fileOps = new FileOperations(node, constants);
+    const elements = new ModalElements();
+
     const contentDiv = document.createElement('div');
     contentDiv.className = 'text-editor-modal';
 
     const mainSection = document.createElement('div');
     mainSection.className = 'text-editor-main-section';
 
-    const filePathDiv = document.createElement('div');
-    filePathDiv.className = 'text-editor-file-path';
-
-    const pathSpan = document.createElement('span');
-    pathSpan.className = 'text-editor-path';
-    pathSpan.textContent = `${filePath}${filePath.endsWith('/') ? '' : '/'}`;
-
-    const filenameSpan = document.createElement('span');
-    filenameSpan.className = 'text-editor-filename';
-    filenameSpan.textContent = `${fileName}.txt`;
-
-    filePathDiv.appendChild(pathSpan);
-    filePathDiv.appendChild(filenameSpan);
-
-    const textarea = document.createElement('textarea');
-    textarea.className = 'text-editor-textarea';
-    textarea.value = textContent || '';
-    textarea.placeholder = 'Enter your text here...';
-    textarea.spellcheck = false;
-
-    const saveButton = document.createElement('button');
-    saveButton.className = 'text-editor-save-button';
-    saveButton.textContent = 'Save File';
-
-    const deleteButton = document.createElement('button');
-    deleteButton.className = 'text-editor-delete-button';
-    deleteButton.textContent = 'Delete File';
-
-    // Sidebar section
-    const sidebar = document.createElement('div');
-    sidebar.className = 'text-editor-sidebar';
-
-    const sidebarToggle = document.createElement('button');
-    sidebarToggle.className = 'text-editor-sidebar-toggle';
-    sidebarToggle.textContent = '>';
-    
-    const sidebarContent = document.createElement('div');
-    sidebarContent.className = 'text-editor-sidebar-content';
-
-    // Wildcard controls container
-    const wildcardControls = document.createElement('div');
-    wildcardControls.className = 'wildcard-controls';
-
-    const resetButton = document.createElement('button');
-    resetButton.className = 'wildcard-reset-button';
-    resetButton.textContent = 'Reset All Wildcards';
-    resetButton.onclick = async () => {
-        const confirm = window.confirm('Are you sure you want to reset all wildcard selections?');
-        if (confirm) {
-            await resetAllWildcards(node, constants, wildcardDropdowns);
-        }
-    };
-
-    const wildcardDropdowns = document.createElement('div');
-    wildcardDropdowns.className = 'wildcard-dropdowns';
-
-    wildcardControls.appendChild(resetButton);
-    wildcardControls.appendChild(wildcardDropdowns);
-    sidebarContent.appendChild(wildcardControls);
-
-    // Auto-expand logic function
-    const autoExpandSidebar = (wildcardCount) => {
-        if (wildcardCount > 0) {
-            sidebar.classList.add('expanded');
-            sidebarToggle.textContent = '<';
-            console.log(`Auto-expanded sidebar: ${wildcardCount} wildcards found`);
-        }
-    };
-
-    // Load wildcards if not a new file
-    if (!isNewFile) {
-        loadWildcards(node, constants, wildcardDropdowns, textContent).then(wildcardCount => {
-            autoExpandSidebar(wildcardCount);
-        });
-    }
-
-    sidebarToggle.onclick = () => {
-        sidebar.classList.toggle('expanded');
-        sidebarToggle.textContent = sidebar.classList.contains('expanded') ? '<' : '>';
-    };
-
-    // Save button logic
-    saveButton.onclick = async () => {
-        if (!textarea.value.trim()) {
-            alert('Empty files are not allowed');
-            return;
-        }
-
-        saveButton.disabled = true;
-        saveButton.textContent = 'Saving...';
-
-        try {
-            const response = await fetchSend(
-                constants.MESSAGE_ROUTE,
-                node.id,
-                "save_file",
-                {
-                    content: textarea.value,
-                    path: filePath,
-                    file_selection: fileName,
-                    is_new_file: isNewFile
-                }
-            );
-
-            if (response && response.status === "success") {
-                console.log('File saved successfully');
-                saveButton.textContent = 'Saved!';
-
-                // Use smart update instead of always recreating
-                if (response.wildcards) {
-                    const wildcardCount = smartUpdateWildcards(node, constants, wildcardDropdowns, response.wildcards);
-                    // Auto-expand if wildcards are present after save
-                    autoExpandSidebar(wildcardCount);
-                }
-
-                if (isNewFile) {
-                    console.log('Updating dropdown for new file:', fileName);
-                    
-                    node.properties.file_selection = fileName;
-                    
-                    const fileSelectionWidget = node.widgets.find(w => w.name === "file_selection");
-                    if (fileSelectionWidget) {
-                        await node.updateFileDropdown(filePath, fileSelectionWidget);
-                        
-                        fileSelectionWidget.value = fileName;
-                        node.properties.file_selection = fileName;
-                        
-                        node.setDirtyCanvas(true, true);
-                        
-                        console.log('Dropdown updated with new file:', fileName);
-                    }
-                    
-                    await node.updateBackend();
-                }
-
-                setTimeout(() => {
-                    saveButton.textContent = 'Save File';
-                    saveButton.disabled = false;
-                }, 1000);
-            } else {
-                console.error('Failed to save file:', response);
-                alert('Failed to save file');
-                saveButton.textContent = 'Save File';
-                saveButton.disabled = false;
-            }
-        } catch (error) {
-            console.error('Error saving file:', error);
-            alert('Error saving file');
-            saveButton.textContent = 'Save File';
-            saveButton.disabled = false;
-        }
-    };
-
-    // Delete button logic (only for existing files)
-    if (!isNewFile) {
-        deleteButton.onclick = async () => {
-            const confirmDelete = confirm(`Are you sure you want to delete "${fileName}.txt"?\n\nThis will also delete any associated wildcard selections.`);
-            if (!confirmDelete) return;
-
-            deleteButton.disabled = true;
-            deleteButton.textContent = 'Deleting...';
-
-            try {
-                const response = await fetchSend(
-                    constants.MESSAGE_ROUTE,
-                    node.id,
-                    "delete_file",
-                    {
-                        path: filePath,
-                        file_selection: fileName
-                    }
-                );
-
-                if (response && response.status === "success") {
-                    console.log('File and wildcard selections deleted successfully');
-                    
-                    const fileSelectionWidget = node.widgets.find(w => w.name === "file_selection");
-                    if (fileSelectionWidget) {
-                        await node.updateFileDropdown(filePath, fileSelectionWidget);
-                    }
-                    
-                    await node.updateBackend();
-                    
-                    alert('File deleted successfully');
-                    
-                    // Close modal
-                    if (modal && modal.closeModal) {
-                        modal.closeModal();
-                    }
-                } else {
-                    console.error('Failed to delete file:', response);
-                    alert('Failed to delete file');
-                    deleteButton.textContent = 'Delete File';
-                    deleteButton.disabled = false;
-                }
-            } catch (error) {
-                console.error('Error deleting file:', error);
-                alert('Error deleting file');
-                deleteButton.textContent = 'Delete File';
-                deleteButton.disabled = false;
-            }
-        };
-    }
-
-    // Assemble main section
-    mainSection.appendChild(filePathDiv);
-    mainSection.appendChild(textarea);
+    mainSection.appendChild(elements.createFilePathDisplay(filePath, fileName));
+    mainSection.appendChild(elements.createTextarea(textContent));
 
     const buttonContainer = document.createElement('div');
     buttonContainer.style.display = 'flex';
     buttonContainer.style.justifyContent = 'space-between';
 
+    const sidebar = elements.createSidebar();
+    const wildcardControls = elements.createWildcardControls();
+    
+    let modal;
+    const buttonManager = new ButtonManager(elements, fileOps, wildcardManager, modal);
+
+    const resetButton = buttonManager.createResetButton();
+    wildcardControls.insertBefore(resetButton, elements.elements.wildcardDropdowns);
+    elements.elements.sidebarContent.appendChild(wildcardControls);
+
     if (!isNewFile) {
+        const deleteButton = buttonManager.createDeleteButton(filePath, fileName);
         buttonContainer.appendChild(deleteButton);
     } else {
         const spacer = document.createElement('div');
         buttonContainer.appendChild(spacer);
     }
 
+    const saveButton = buttonManager.createSaveButton(filePath, fileName, isNewFile);
     buttonContainer.appendChild(saveButton);
+
     mainSection.appendChild(buttonContainer);
-
-    // Assemble sidebar
-    sidebar.appendChild(sidebarToggle);
-    sidebar.appendChild(sidebarContent);
-
-    // Assemble modal
     contentDiv.appendChild(mainSection);
     contentDiv.appendChild(sidebar);
 
+    if (!isNewFile) {
+        wildcardManager.loadWildcards(elements.elements.wildcardDropdowns).then(wildcardCount => {
+            elements.autoExpandSidebar(wildcardCount);
+        });
+    }
+
     const modalConfig = {
         content: contentDiv,
-        onClose: () => console.log('Text editor modal closed'),
+        onClose: () => {
+            const sidebar = contentDiv.querySelector('.text-editor-sidebar.expanded');
+            if (sidebar) {
+                sidebar.classList.remove('expanded');
+                return 150;
+            }
+            return 0;
+        },
     };
 
-    const modal = createModal(modalConfig);
+    modal = createModal(modalConfig);
+    buttonManager.modal = modal;
     return modal;
 }
