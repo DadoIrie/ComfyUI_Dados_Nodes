@@ -88,42 +88,133 @@ class DynamicTextLoaderNode:
             return ["invalid path"], False
     
     def parse_wildcards(self, text: str) -> list:
-        wildcard_pattern = r'\{([^}]+)\}'
+        return self._parse_wildcards_recursive(text, "")
+
+    def _parse_wildcards_recursive(self, text: str, parent_index: str) -> list:
+        wildcards = []
+        wildcard_pattern = r'\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}'
         matches = list(re.finditer(wildcard_pattern, text))
         
-        return [{
-            'index': i,
-            'original': match.group(0),
-            'position': match.start(),
-            'options': [''] + [opt.strip() for opt in match.group(1).split('|')],
-            'selected': ''
-        } for i, match in enumerate(matches)]
+        for i, match in enumerate(matches):
+            current_index = f"{parent_index}.{i + 1}" if parent_index else str(i + 1)
+            content = match.group(1)
+            
+            if self._has_nested_structure(content):
+                options = self._split_top_level_options(content)
+                wildcard = {
+                    'index': current_index,
+                    'original': match.group(0),
+                    'position': match.start(),
+                    'options': [''] + options,
+                    'selected': '',
+                    'children': {}
+                }
+                
+                for j, option in enumerate(options):
+                    if self._contains_wildcards(option):
+                        child_index = f"{current_index}.{j + 1}"
+                        wildcard['children'][str(j + 1)] = self._parse_wildcards_recursive(
+                            option, child_index
+                        )
+                
+                wildcards.append(wildcard)
+            else:
+                wildcards.append({
+                    'index': current_index,
+                    'original': match.group(0),
+                    'position': match.start(),
+                    'options': [''] + [opt.strip() for opt in content.split('|')],
+                    'selected': ''
+                })
+        
+        return wildcards
+
+    def _has_nested_structure(self, content: str) -> bool:
+        return '{' in content and '}' in content
+
+    def _split_top_level_options(self, content: str) -> list:
+        options = []
+        current_option = ""
+        brace_count = 0
+        
+        for char in content:
+            if char == '{':
+                brace_count += 1
+            elif char == '}':
+                brace_count -= 1
+            elif char == '|' and brace_count == 0:
+                options.append(current_option.strip())
+                current_option = ""
+                continue
+            
+            current_option += char
+        
+        if current_option.strip():
+            options.append(current_option.strip())
+        
+        return options
+
+    def _contains_wildcards(self, text: str) -> bool:
+        return '{' in text and '}' in text
     
     def apply_selections_to_wildcards(self, wildcards: list, selections: Dict) -> list:
+        return self._apply_selections_recursive(wildcards, selections)
+
+    def _apply_selections_recursive(self, wildcards: list, selections: Dict) -> list:
         for wildcard in wildcards:
-            wildcard_content = wildcard['original']
-            
-            for selection_data in selections.values():
-                if (isinstance(selection_data, dict) and selection_data.get('original') == wildcard_content):
-                    selected_value = selection_data.get('selected', '')
-                    if selected_value in wildcard['options']:
-                        wildcard['selected'] = selected_value
-                    break
-        
+            selection_data = selections.get(wildcard['index'])
+            if selection_data and isinstance(selection_data, dict):
+                selected_value = selection_data.get('selected', '')
+                if selected_value in wildcard['options']:
+                    wildcard['selected'] = selected_value
+                    
+                    if 'children' in wildcard and wildcard['children']:
+                        selected_index = wildcard['options'].index(selected_value)
+                        if selected_index > 0:
+                            child_key = str(selected_index)
+                            if child_key in wildcard['children']:
+                                wildcard['children'][child_key] = self._apply_selections_recursive(
+                                    wildcard['children'][child_key], selections
+                                )
         return wildcards
     
     def apply_wildcards_to_text(self, text: str, selections: Dict) -> str:
-        wildcard_pattern = r'\{([^}]+)\}'
+        processed_selections = self._flatten_selections_for_processing(selections)
+        return self._apply_wildcards_to_text_recursive(text, processed_selections, "")
+
+    def _flatten_selections_for_processing(self, selections: Dict) -> Dict:
+        flattened = {}
+        for key, value in selections.items():
+            if isinstance(value, dict) and 'selected' in value:
+                flattened[key] = value['selected']
+        return flattened
+
+    def _apply_wildcards_to_text_recursive(self, text: str, selections: Dict, parent_index: str) -> str:
+        wildcard_pattern = r'\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}'
         matches = list(re.finditer(wildcard_pattern, text))
         
         modified_text = text
-        for i, match in enumerate(reversed(matches)):
-            wildcard_index = len(matches) - 1 - i
-            selection_data = selections.get(str(wildcard_index))
+        
+        for match in reversed(matches):
+            i = len([m for m in matches if m.start() <= match.start()]) - 1
+            current_index = f"{parent_index}.{i+1}" if parent_index else str(i+1)
+            content = match.group(1)
             
-            if selection_data and selection_data.get('selected'):
+            selected_value = selections.get(current_index)
+            if selected_value:
+                if self._has_nested_structure(content):
+                    options = self._split_top_level_options(content)
+                    if selected_value in options:
+                        selected_option_index = options.index(selected_value) + 1
+                        child_index = f"{current_index}.{selected_option_index}"
+                        replacement = self._apply_wildcards_to_text_recursive(selected_value, selections, child_index)
+                    else:
+                        replacement = match.group(0)
+                else:
+                    replacement = selected_value
+            
                 start, end = match.span()
-                modified_text = (modified_text[:start] + selection_data['selected'] + modified_text[end:])
+                modified_text = modified_text[:start] + replacement + modified_text[end:]
         
         return modified_text
     
