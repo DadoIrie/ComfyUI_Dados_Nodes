@@ -42,13 +42,11 @@ app.registerExtension({
 
             if (slotType === TypeSlot.Input) {
                 if (link_info && event === TypeSlotEvent.Connect) {
-                    // Get the parent (left side node) from the link
                     const fromNode = this.graph._nodes.find(
                         (otherNode) => otherNode.id == link_info.origin_id
                     )
 
                     if (fromNode) {
-                        // Make sure there is a parent for the link
                         const parent_link = fromNode.outputs[link_info.origin_slot];
                         if (parent_link) {
                             node_slot.type = parent_link.type;
@@ -59,37 +57,56 @@ app.registerExtension({
                     this.removeInput(slot_idx);
                 }
 
-                // Track each slot name so we can index the uniques
-                let idx = 0;
-                let slot_tracker = {};
-                for(const slot of this.inputs) {
-                    if (slot.link === null) {
-                        this.removeInput(idx);
+                // Separate connected and empty text slots
+                let connectedSlots = [];
+                let emptySlots = [];
+                
+                for(let i = 0; i < this.inputs.length; i++) {
+                    const slot = this.inputs[i];
+                    
+                    // Skip non-dynamic inputs
+                    if (slot.name === 'delimiter' || slot.name === 'strip_newlines') {
                         continue;
                     }
-                    idx += 1;
-                    const name = slot.name.split('_')[0];
-
-                    // Correctly increment the count in slot_tracker
-                    let count = (slot_tracker[name] || 0) + 1;
-                    slot_tracker[name] = count;
-
-                    // Update the slot name with the count if greater than 1
-                    slot.name = `${name}_${count}`;
+                    
+                    if (slot.link !== null && slot.name.startsWith(_PREFIX)) {
+                        connectedSlots.push({slot: slot, index: i});
+                    } else if (slot.link === null && slot.name.startsWith(_PREFIX)) {
+                        emptySlots.push(i);
+                    }
                 }
 
-                // Check that the last slot is a dynamic entry
-                let last = this.inputs[this.inputs.length - 1];
-                if (last === undefined || (last.name != _PREFIX || last.type != _TYPE)) {
+                // Remove excess empty slots (keep only one)
+                while (emptySlots.length > 1) {
+                    this.removeInput(emptySlots.pop()); // Remove from end
+                }
+
+                // Renumber connected slots in order (1, 2, 3...)
+                connectedSlots.forEach((item, index) => {
+                    item.slot.name = `${_PREFIX}_${index + 1}`;
+                });
+
+                // Ensure exactly one empty slot exists at the end
+                if (emptySlots.length === 0) {
                     this.addInput(_PREFIX, _TYPE);
-                    // Set the unconnected slot to appear gray
-                    last = this.inputs[this.inputs.length - 1];
+                    const last = this.inputs[this.inputs.length - 1];
                     if (last) {
                         last.color_off = "#666";
                     }
+                } else {
+                    // Move empty slot to the end if it's not already there
+                    const emptySlotIndex = emptySlots[0];
+                    if (emptySlotIndex !== this.inputs.length - 1) {
+                        const emptySlot = this.inputs[emptySlotIndex];
+                        this.removeInput(emptySlotIndex);
+                        this.addInput(_PREFIX, _TYPE);
+                        const newEmpty = this.inputs[this.inputs.length - 1];
+                        if (newEmpty) {
+                            newEmpty.color_off = "#666";
+                        }
+                    }
                 }
 
-                // Force the node to resize itself for the new/deleted connections
                 this?.graph?.setDirtyCanvas(true);
                 return result;
             }

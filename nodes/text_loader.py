@@ -157,12 +157,6 @@ class DynamicTextLoaderNode:
     
     @classmethod
     def IS_CHANGED(cls, unique_id=None):
-        node_id = str(unique_id)
-        state = cls.node_state.get(node_id, {})
-        
-        if not state.get('use_cached_file', True):
-            return random.randint(1, 1000000)
-        
         return random.randint(1, 1000000)
 
 class TextLoaderOperations:
