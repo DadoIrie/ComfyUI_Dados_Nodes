@@ -26,7 +26,7 @@ from .nodes.text_concat import TextConcatenatorNode
 from .nodes.text_dropdown import TextDropDownNode
 from .nodes.text_loader import DynamicTextLoaderNode
 from .nodes.smolvlm_node import SmolVLMNode
-from .nodes.pinterest_fetch import PinterestFetch
+# from .nodes.pinterest_fetch import PinterestFetch
 from .nodes.miaoshouai_tagger import MiaoshouAITaggerNode
 from .nodes.multiline_string import DadosMultilineString
 from .nodes.joytagger_node import JoyTaggerNode
@@ -40,7 +40,7 @@ NODE_CLASS_MAPPINGS = {
     "TextDropDownNode": TextDropDownNode,
     "DynamicTextLoaderNode": DynamicTextLoaderNode,
     "SmolVLMNode": SmolVLMNode,
-    "PinterestFetch": PinterestFetch,
+    # "PinterestFetch": PinterestFetch,
     "MiaoshouAITaggerNode": MiaoshouAITaggerNode,
     "DadosMultilineString": DadosMultilineString,
     "DadosJoyTaggerNode": JoyTaggerNode,
@@ -54,7 +54,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TextDropDownNode": "Text DropDown",
     "DynamicTextLoaderNode": "Dynamic Text Loader",
     "SmolVLMNode": "SmolVLM Image Describer",
-    "PinterestNode": "Pinterest Node",
+    # "PinterestNode": "Pinterest Node",
     "MiaoshouAITaggerNode": "MiaoshouAI Tagger",
     "DadosMultilineString": "Multiline String",
     "DadosJoyTaggerNode": "JoyTagger",
