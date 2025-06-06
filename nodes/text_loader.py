@@ -97,7 +97,7 @@ class DynamicTextLoaderNode:
         
         for i, match in enumerate(matches):
             entry_wildcard = {
-                'index': f"{parent_child_index}.{i + 1}",
+                'index': f"{parent_child_index}.e{i + 1}",
                 'original': match.group(0),
                 'position': match.start(),
                 'options': [''] + [opt.strip() for opt in match.group(1).split('|')],
@@ -110,20 +110,19 @@ class DynamicTextLoaderNode:
     
     def _parse_wildcards_recursive(self, text: str, parent_index: str) -> list:
         wildcards = []
-        wildcard_pattern = r'\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}'
-        matches = list(re.finditer(wildcard_pattern, text))
+        matches = self._find_wildcard_matches(text)
         
-        for i, match in enumerate(matches):
+        for i, (start, end, content) in enumerate(matches):
             current_index = f"{parent_index}.{i + 1}" if parent_index else str(i + 1)
-            content = match.group(1)
             
             wildcard = {
                 'index': current_index,
-                'original': match.group(0),
-                'position': match.start(),
+                'original': text[start:end],
+                'position': start,
                 'options': [''],
                 'selected': '',
-                'children': {}
+                'children': {},
+                'entry_wildcards': {}
             }
             
             if self._has_top_level_pipes(content):
@@ -133,16 +132,53 @@ class DynamicTextLoaderNode:
                 for j, option in enumerate(options):
                     if self._contains_wildcards(option):
                         child_index = f"{current_index}.{j + 1}"
-                        entry_wildcards = self._extract_entry_wildcards(option, child_index)
-                        if entry_wildcards:
-                            wildcard['children'][str(j + 1)] = entry_wildcards
+                        child_wildcards = self._parse_wildcards_recursive(option, child_index)
+                        if child_wildcards:
+                            wildcard['children'][str(j + 1)] = child_wildcards
+                
+                    entry_wildcards = self._extract_entry_wildcards(option, f"{current_index}.{j + 1}")
+                    if entry_wildcards:
+                        wildcard['entry_wildcards'][str(j + 1)] = entry_wildcards
             else:
                 simple_options = [opt.strip() for opt in content.split('|')]
                 wildcard['options'].extend(simple_options)
+                
+                for j, option in enumerate(simple_options):
+                    if j > 0:  # Skip the empty first option
+                        entry_wildcards = self._extract_entry_wildcards(option, f"{current_index}.{j + 1}")
+                        if entry_wildcards:
+                            wildcard['entry_wildcards'][str(j + 1)] = entry_wildcards
             
             wildcards.append(wildcard)
         
         return wildcards
+
+    def _find_wildcard_matches(self, text: str) -> list:
+        matches = []
+        i = 0
+        while i < len(text):
+            if text[i] == '{':
+                start = i
+                brace_count = 1
+                i += 1
+                
+                while i < len(text) and brace_count > 0:
+                    if text[i] == '{':
+                        brace_count += 1
+                    elif text[i] == '}':
+                        brace_count -= 1
+                    i += 1
+                
+                if brace_count == 0:
+                    end = i
+                    content = text[start + 1:end - 1]
+                    matches.append((start, end, content))
+                else:
+                    break
+            else:
+                i += 1
+        
+        return matches
     
     def _has_top_level_pipes(self, content: str) -> bool:
         brace_count = 0
@@ -202,6 +238,15 @@ class DynamicTextLoaderNode:
                                 wildcard['children'][child_key] = self._apply_selections_recursive(
                                     wildcard['children'][child_key], selections
                                 )
+                    
+                    if 'entry_wildcards' in wildcard and wildcard['entry_wildcards']:
+                        selected_index = wildcard['options'].index(selected_value)
+                        if selected_index > 0:
+                            entry_key = str(selected_index)
+                            if entry_key in wildcard['entry_wildcards']:
+                                wildcard['entry_wildcards'][entry_key] = self._apply_selections_recursive(
+                                    wildcard['entry_wildcards'][entry_key], selections
+                                )
         return wildcards
     
     def apply_wildcards_to_text(self, text: str, selections: Dict) -> str:
@@ -216,31 +261,54 @@ class DynamicTextLoaderNode:
         return flattened
     
     def _apply_wildcards_to_text_recursive(self, text: str, selections: Dict, parent_index: str) -> str:
-        wildcard_pattern = r'\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}'
-        matches = list(re.finditer(wildcard_pattern, text))
+        matches = self._find_wildcard_matches(text)
         
         modified_text = text
+        offset = 0
         
-        for match in reversed(matches):
-            i = len([m for m in matches if m.start() <= match.start()]) - 1
+        for i, (start, end, content) in enumerate(matches):
             current_index = f"{parent_index}.{i + 1}" if parent_index else str(i + 1)
-            content = match.group(1)
             
             selected_value = selections.get(current_index)
             if selected_value:
-                if self._has_nested_structure(content):
+                if self._has_top_level_pipes(content):
                     options = self._split_top_level_options(content)
                     if selected_value in options:
                         selected_option_index = options.index(selected_value) + 1
                         child_index = f"{current_index}.{selected_option_index}"
+                        
+                        # First apply any structural child wildcards
                         replacement = self._apply_wildcards_to_text_recursive(selected_value, selections, child_index)
+                        
+                        # Then apply any entry wildcards within this option
+                        replacement = self._apply_entry_wildcards_to_text(replacement, selections, child_index)
                     else:
-                        replacement = match.group(0)
+                        replacement = text[start:end]
                 else:
-                    replacement = selected_value
+                    # For simple wildcards, also check for entry wildcards
+                    replacement = self._apply_entry_wildcards_to_text(selected_value, selections, current_index + ".1")
                 
+                # Apply the replacement
+                adjusted_start = start + offset
+                adjusted_end = end + offset
+                modified_text = modified_text[:adjusted_start] + replacement + modified_text[adjusted_end:]
+                offset += len(replacement) - (end - start)
+        
+        return modified_text
+    
+    def _apply_entry_wildcards_to_text(self, text: str, selections: Dict, base_index: str) -> str:
+        """Apply entry wildcard selections to text"""
+        modified_text = text
+        entry_matches = list(re.finditer(r'\{([^{}]+)\}', text))
+        
+        # Process matches in reverse order to maintain positions
+        for i, match in enumerate(reversed(entry_matches)):
+            entry_index = f"{base_index}.e{len(entry_matches) - i}"
+            selected_value = selections.get(entry_index)
+            
+            if selected_value:
                 start, end = match.span()
-                modified_text = modified_text[:start] + replacement + modified_text[end:]
+                modified_text = modified_text[:start] + selected_value + modified_text[end:]
         
         return modified_text
     
@@ -364,12 +432,8 @@ class TextLoaderOperations:
         wildcards = self.node.parse_wildcards(content)
         wildcards = self.node.apply_selections_to_wildcards(wildcards, existing_selections)
         
-        new_selections = {
-            str(w['index']): {
-                'selected': w['selected'],
-                'original': w['original']
-            } for w in wildcards if w['selected']
-        }
+        new_selections = {}
+        self._collect_wildcard_selections(wildcards, new_selections)
         
         self.node.save_json_file(selections_file, new_selections)
         
@@ -379,6 +443,22 @@ class TextLoaderOperations:
             "content_changed": content_changed,
             "is_new_file": is_new_file
         })
+
+    def _collect_wildcard_selections(self, wildcards: list, selections: Dict):
+        for wildcard in wildcards:
+            if wildcard.get('selected'):
+                selections[wildcard['index']] = {
+                    'selected': wildcard['selected'],
+                    'original': wildcard['original']
+                }
+            
+            if wildcard.get('children'):
+                for child_wildcards in wildcard['children'].values():
+                    self._collect_wildcard_selections(child_wildcards, selections)
+            
+            if wildcard.get('entry_wildcards'):
+                for entry_wildcards in wildcard['entry_wildcards'].values():
+                    self._collect_wildcard_selections(entry_wildcards, selections)
     
     async def delete_file(self, node_id: str, payload: Dict):
         path, file_selection = self.validate_file_selection(payload)

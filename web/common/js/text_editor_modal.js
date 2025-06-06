@@ -139,64 +139,86 @@ class WildcardManager {
         const childrenContainer = section?.querySelector('.wildcard-children');
         
         if (!childrenContainer) return;
-
+        
         childrenContainer.innerHTML = '';
-
-        if (selectedIndex === 0 || !wildcard.children) {
+        
+        if (selectedIndex === 0) {
             childrenContainer.style.display = 'none';
             return;
         }
-
-        const selectedOptionIndex = selectedIndex.toString();
-        const childWildcards = wildcard.children[selectedOptionIndex];
         
+        const selectedOptionIndex = selectedIndex.toString();
+        let hasContent = false;
+        
+        // Handle structural child wildcards (complex nested wildcards)
+        const childWildcards = wildcard.children?.[selectedOptionIndex];
         if (childWildcards && childWildcards.length > 0) {
             childWildcards.forEach(childWildcard => {
-                if (childWildcard.is_entry_wildcard) {
-                    const entryDropdown = this.createEntryWildcardDropdown(childWildcard, wildcard.index);
-                    childrenContainer.appendChild(entryDropdown);
-                } else {
-                    const childSection = this.createWildcardSection(childWildcard);
-                    childrenContainer.appendChild(childSection);
-                }
+                const childSection = this.createWildcardSection(childWildcard);
+                childrenContainer.appendChild(childSection);
             });
+            hasContent = true;
+        }
+        
+        // Handle entry wildcards (simple wildcards within options) - only if no structural children
+        if (!childWildcards || childWildcards.length === 0) {
+            const entryWildcards = wildcard.entry_wildcards?.[selectedOptionIndex];
+            if (entryWildcards && entryWildcards.length > 0) {
+                entryWildcards.forEach(entryWildcard => {
+                    const entryDropdown = this.createEntryWildcardDropdown(entryWildcard);
+                    childrenContainer.appendChild(entryDropdown);
+                });
+                hasContent = true;
+            }
+        }
+        
+        if (hasContent) {
             childrenContainer.style.display = 'block';
         
             setTimeout(() => {
-                childWildcards.forEach(childWildcard => {
-                    this.restoreWildcardState(childWildcard);
-                });
+                if (childWildcards) {
+                    childWildcards.forEach(childWildcard => {
+                        this.restoreWildcardState(childWildcard);
+                    });
+                } else {
+                    const entryWildcards = wildcard.entry_wildcards?.[selectedOptionIndex];
+                    if (entryWildcards) {
+                        entryWildcards.forEach(entryWildcard => {
+                            this.restoreWildcardState(entryWildcard);
+                        });
+                    }
+                }
             }, 50);
         } else {
             childrenContainer.style.display = 'none';
         }
     }
 
-    createEntryWildcardDropdown(entryWildcard, parentIndex) {
+    createEntryWildcardDropdown(entryWildcard) {
         const container = document.createElement('div');
         container.className = 'wildcard-dropdown-container entry-wildcard';
         container.dataset.wildcardIndex = entryWildcard.index;
         
         const label = document.createElement('div');
-        label.className = 'wildcard-label';
-        label.textContent = `Entry ${entryWildcard.index}`;
-
+        label.className = 'wildcard-label entry-label';
+        label.textContent = `${entryWildcard.original}`;
+        
         const dropdown = document.createElement('select');
-        dropdown.className = 'wildcard-dropdown';
+        dropdown.className = 'wildcard-dropdown entry-dropdown';
         dropdown.dataset.wildcardIndex = entryWildcard.index;
-
+        
         entryWildcard.options.forEach((option, index) => {
             const optionElement = document.createElement('option');
             optionElement.value = index === 0 ? '' : option;
             optionElement.textContent = index === 0 ? '(not selected)' : option;
             dropdown.appendChild(optionElement);
         });
-
+        
         dropdown.value = entryWildcard.selected || '';
         dropdown.onchange = async () => {
-            await this.handleSelectionChange(entryWildcard, dropdown.value, dropdown.selectedIndex);
+            await this.handleEntryWildcardChange(entryWildcard.index, dropdown.value, entryWildcard.original);
         };
-
+        
         container.appendChild(label);
         container.appendChild(dropdown);
         return container;
@@ -231,6 +253,11 @@ class WildcardManager {
             if (wildcard.children) {
                 Object.values(wildcard.children).forEach(childArray => {
                     count += this.countTotalWildcards(childArray);
+                });
+            }
+            if (wildcard.entry_wildcards) {
+                Object.values(wildcard.entry_wildcards).forEach(entryArray => {
+                    count += entryArray.length;
                 });
             }
         });
