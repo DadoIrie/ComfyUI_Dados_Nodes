@@ -38,12 +38,10 @@ app.registerExtension({
 
         const onConnectionsChange = nodeType.prototype.onConnectionsChange
         nodeType.prototype.onConnectionsChange = function (slotType, slot_idx, event, link_info, node_slot) {
+            
             const result = onConnectionsChange?.apply(this, arguments);
-
-            if (!this.graph || !this.isLive) {
-                return result;
-            }
-
+            
+            
             if (slotType === TypeSlot.Input) {
                 if (link_info && event === TypeSlotEvent.Connect) {
                     const fromNode = this.graph._nodes.find(
@@ -71,30 +69,58 @@ app.registerExtension({
                         }
                     }
                 } else if (event === TypeSlotEvent.Disconnect) {
-                    // Don't remove the slot, just leave it empty to preserve numbering
-                    // Only remove if it's the unnumbered "text" slot
                     if (this.inputs[slot_idx].name === _PREFIX) {
                         this.removeInput(slot_idx);
                     }
+                    
+                    // Count trailing empty numbered slots
+                    let trailingEmpty = 0;
+                    for(let i = this.inputs.length - 1; i >= 0; i--) {
+                        const slot = this.inputs[i];
+                        if (slot.name.startsWith(_PREFIX + '_') && slot.link === null) {
+                            trailingEmpty++;
+                        } else if (slot.name.startsWith(_PREFIX + '_')) {
+                            break; // Stop at first connected numbered slot
+                        }
+                    }
+                    
+                    // Only clean up if we have more than 1 trailing empty slot
+                    if (trailingEmpty > 1) {
+                        let lastConnectedIndex = -1;
+                        for(let i = 0; i < this.inputs.length; i++) {
+                            const slot = this.inputs[i];
+                            if (slot.name.startsWith(_PREFIX + '_') && slot.link !== null) {
+                                lastConnectedIndex = i;
+                            }
+                        }
+                        
+                        if (lastConnectedIndex !== -1) {
+                            // Remove excess trailing slots, keep only 1
+                            for(let i = this.inputs.length - 1; i > lastConnectedIndex; i--) {
+                                const slot = this.inputs[i];
+                                if (slot.name.startsWith(_PREFIX + '_') && slot.link === null) {
+                                    this.removeInput(i);
+                                    trailingEmpty--;
+                                    if (trailingEmpty <= 1) break; // Stop when we have only 1 left
+                                }
+                            }
+                        }
+                    }
                 }
 
-                // Clean up: remove excess unnumbered empty slots, keep only one at the end
+                // Handle unnumbered slots (always runs)
                 let unnumberedSlots = [];
-                
                 for(let i = this.inputs.length - 1; i >= 0; i--) {
                     const slot = this.inputs[i];
-                    
                     if (slot.name === _PREFIX && slot.link === null) {
                         unnumberedSlots.push(i);
                     }
                 }
 
-                // Remove excess unnumbered slots (keep only one)
                 while (unnumberedSlots.length > 1) {
                     this.removeInput(unnumberedSlots.shift());
                 }
 
-                // Ensure exactly one unnumbered empty slot exists at the end
                 if (unnumberedSlots.length === 0) {
                     this.addInput(_PREFIX, _TYPE);
                     const last = this.inputs[this.inputs.length - 1];
