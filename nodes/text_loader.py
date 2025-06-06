@@ -89,7 +89,25 @@ class DynamicTextLoaderNode:
     
     def parse_wildcards(self, text: str) -> list:
         return self._parse_wildcards_recursive(text, "")
-
+    
+    def _extract_entry_wildcards(self, option_text: str, parent_child_index: str) -> list:
+        entry_wildcards = []
+        wildcard_pattern = r'\{([^{}]+)\}'
+        matches = list(re.finditer(wildcard_pattern, option_text))
+        
+        for i, match in enumerate(matches):
+            entry_wildcard = {
+                'index': f"{parent_child_index}.{i + 1}",
+                'original': match.group(0),
+                'position': match.start(),
+                'options': [''] + [opt.strip() for opt in match.group(1).split('|')],
+                'selected': '',
+                'is_entry_wildcard': True
+            }
+            entry_wildcards.append(entry_wildcard)
+        
+        return entry_wildcards
+    
     def _parse_wildcards_recursive(self, text: str, parent_index: str) -> list:
         wildcards = []
         wildcard_pattern = r'\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}'
@@ -99,39 +117,44 @@ class DynamicTextLoaderNode:
             current_index = f"{parent_index}.{i + 1}" if parent_index else str(i + 1)
             content = match.group(1)
             
-            if self._has_nested_structure(content):
+            wildcard = {
+                'index': current_index,
+                'original': match.group(0),
+                'position': match.start(),
+                'options': [''],
+                'selected': '',
+                'children': {}
+            }
+            
+            if self._has_top_level_pipes(content):
                 options = self._split_top_level_options(content)
-                wildcard = {
-                    'index': current_index,
-                    'original': match.group(0),
-                    'position': match.start(),
-                    'options': [''] + options,
-                    'selected': '',
-                    'children': {}
-                }
+                wildcard['options'].extend(options)
                 
                 for j, option in enumerate(options):
                     if self._contains_wildcards(option):
                         child_index = f"{current_index}.{j + 1}"
-                        wildcard['children'][str(j + 1)] = self._parse_wildcards_recursive(
-                            option, child_index
-                        )
-                
-                wildcards.append(wildcard)
+                        entry_wildcards = self._extract_entry_wildcards(option, child_index)
+                        if entry_wildcards:
+                            wildcard['children'][str(j + 1)] = entry_wildcards
             else:
-                wildcards.append({
-                    'index': current_index,
-                    'original': match.group(0),
-                    'position': match.start(),
-                    'options': [''] + [opt.strip() for opt in content.split('|')],
-                    'selected': ''
-                })
+                simple_options = [opt.strip() for opt in content.split('|')]
+                wildcard['options'].extend(simple_options)
+            
+            wildcards.append(wildcard)
         
         return wildcards
-
-    def _has_nested_structure(self, content: str) -> bool:
-        return '{' in content and '}' in content
-
+    
+    def _has_top_level_pipes(self, content: str) -> bool:
+        brace_count = 0
+        for char in content:
+            if char == '{':
+                brace_count += 1
+            elif char == '}':
+                brace_count -= 1
+            elif char == '|' and brace_count == 0:
+                return True
+        return False
+    
     def _split_top_level_options(self, content: str) -> list:
         options = []
         current_option = ""
@@ -153,13 +176,16 @@ class DynamicTextLoaderNode:
             options.append(current_option.strip())
         
         return options
-
+    
     def _contains_wildcards(self, text: str) -> bool:
         return '{' in text and '}' in text
     
+    def _has_nested_structure(self, content: str) -> bool:
+        return self._has_top_level_pipes(content)
+    
     def apply_selections_to_wildcards(self, wildcards: list, selections: Dict) -> list:
         return self._apply_selections_recursive(wildcards, selections)
-
+    
     def _apply_selections_recursive(self, wildcards: list, selections: Dict) -> list:
         for wildcard in wildcards:
             selection_data = selections.get(wildcard['index'])
@@ -181,14 +207,14 @@ class DynamicTextLoaderNode:
     def apply_wildcards_to_text(self, text: str, selections: Dict) -> str:
         processed_selections = self._flatten_selections_for_processing(selections)
         return self._apply_wildcards_to_text_recursive(text, processed_selections, "")
-
+    
     def _flatten_selections_for_processing(self, selections: Dict) -> Dict:
         flattened = {}
         for key, value in selections.items():
             if isinstance(value, dict) and 'selected' in value:
                 flattened[key] = value['selected']
         return flattened
-
+    
     def _apply_wildcards_to_text_recursive(self, text: str, selections: Dict, parent_index: str) -> str:
         wildcard_pattern = r'\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}'
         matches = list(re.finditer(wildcard_pattern, text))
@@ -197,7 +223,7 @@ class DynamicTextLoaderNode:
         
         for match in reversed(matches):
             i = len([m for m in matches if m.start() <= match.start()]) - 1
-            current_index = f"{parent_index}.{i+1}" if parent_index else str(i+1)
+            current_index = f"{parent_index}.{i + 1}" if parent_index else str(i + 1)
             content = match.group(1)
             
             selected_value = selections.get(current_index)
@@ -212,7 +238,7 @@ class DynamicTextLoaderNode:
                         replacement = match.group(0)
                 else:
                     replacement = selected_value
-            
+                
                 start, end = match.span()
                 modified_text = modified_text[:start] + replacement + modified_text[end:]
         
@@ -404,6 +430,11 @@ class TextLoaderOperations:
             return self.error_response("Failed to save wildcard selection", 500)
         
         return self.success_response({"message": "Wildcard selection updated"})
+
+    def _clear_wildcard_branch(self, selections: Dict, wildcard_index: str):
+        keys_to_remove = [key for key in selections.keys() if key == wildcard_index or key.startswith(wildcard_index + '.')]
+        for key in keys_to_remove:
+            selections.pop(key, None)
     
     async def reset_wildcards(self, node_id: str):
         state = DynamicTextLoaderNode.node_state.get(node_id, {})
