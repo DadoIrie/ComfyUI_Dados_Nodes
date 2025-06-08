@@ -1,12 +1,10 @@
 import { getIcon } from "./svg_icons.js";
 
-let EXTENSION_NAME, MESSAGE_ROUTE;
+let EXTENSION_NAME
 
-(async () => {
-  const constants = await fetch('/dadosConstants').then(response => response.json());
+const constantsPromise = fetch('/dadosConstants').then(response => response.json()).then(constants => {
   EXTENSION_NAME = constants.EXTENSION_NAME;
-  MESSAGE_ROUTE = constants.MESSAGE_ROUTE;
-})().catch(error => console.error("Failed:", error));
+}).catch(error => console.error("Failed:", error));
 
 class ModalView {
   constructor() {
@@ -16,7 +14,8 @@ class ModalView {
     this.assembleModal();
   }
 
-  loadCSS() {
+  async loadCSS() {
+    await constantsPromise;
     if (!document.querySelector('link[href$="/dn_modal.css"]')) {
       const cssLink = document.createElement('link');
       cssLink.rel = 'stylesheet';
