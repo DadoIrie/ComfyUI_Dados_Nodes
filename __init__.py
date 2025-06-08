@@ -5,7 +5,7 @@ from server import PromptServer  # type: ignore pylint: disable=import-error
 
 # Define core constants
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-EXTENSION_NAME = "ComfyUI_Dados_Nodes"
+EXTENSION_NAME = "Dados_Nodes"
 MESSAGE_ROUTE = "/dadosNodes"
 
 class Constants:

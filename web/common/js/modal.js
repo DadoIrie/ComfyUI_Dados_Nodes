@@ -1,5 +1,13 @@
 import { getIcon } from "./svg_icons.js";
 
+let EXTENSION_NAME, MESSAGE_ROUTE;
+
+(async () => {
+  const constants = await fetch('/dadosConstants').then(response => response.json());
+  EXTENSION_NAME = constants.EXTENSION_NAME;
+  MESSAGE_ROUTE = constants.MESSAGE_ROUTE;
+})().catch(error => console.error("Failed:", error));
+
 class ModalView {
   constructor() {
     this.loadCSS();
@@ -12,7 +20,7 @@ class ModalView {
     if (!document.querySelector('link[href$="/dn_modal.css"]')) {
       const cssLink = document.createElement('link');
       cssLink.rel = 'stylesheet';
-      cssLink.href = '/extensions/ComfyUI_Dados_Nodes/common/css/dn_modal.css';
+      cssLink.href = `/extensions/${EXTENSION_NAME}/common/css/dn_modal.css`;
       document.head.appendChild(cssLink);
     }
   }
