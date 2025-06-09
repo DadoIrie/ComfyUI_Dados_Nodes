@@ -86,15 +86,42 @@
 .text-editor-sidebar-content {
     position: absolute;
     left: 0;
-    top: var(--modal-spacing-sm);
+    top: 0;
     width: 320px;
-    padding: var(--modal-spacing);
-    height: calc(100% - var(--modal-spacing));
+    padding: 0;
+    height: 100%;
     box-sizing: border-box;
-    overflow-y: auto;
+    overflow: hidden;
     opacity: 0;
     transition: opacity 0.15s ease-out;
     transition-delay: 0s;
+    display: flex;
+    flex-direction: column;
+}
+
+.wildcard-controls {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    margin: 0;
+}
+
+.sidebar-buttons-container {
+    background-color: #1a1a1a;
+    padding: var(--modal-spacing-sm) var(--modal-spacing) var(--modal-spacing-sm) var(--modal-spacing);
+    box-shadow: 0 var(--modal-spacing-xs) var(--modal-spacing-sm) calc(-1 * var(--modal-spacing-xs)) var(--modal-shadow-strong);
+    flex-shrink: 0;
+    margin: 0;
+}
+
+.wildcard-dropdowns {
+    display: flex;
+    flex-direction: column;
+    gap: var(--modal-spacing-sm);
+    padding: var(--modal-spacing-sm) var(--modal-spacing) var(--modal-spacing) var(--modal-spacing);
+    overflow-y: auto;
+    flex: 1;
 }
 
 .text-editor-sidebar.expanded {
@@ -200,46 +227,14 @@
     box-shadow: 0 1px 4px rgba(76, 175, 80, 0.3);
 }
 
-.text-editor-save-button:disabled {
-    background-color: var(--modal-button-secondary);
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-}
-
-.dn_modal .text-editor-delete-button {
-    padding: var(--modal-spacing-sm) var(--modal-spacing);
-    background-color: var(--modal-button-danger) !important;
-    color: white;
-    border: none;
-    cursor: pointer;
-    font-size: 1em;
-    font-weight: 500;
-    transition: all var(--modal-transition);
-    min-width: 100px;
-}
-
-.dn_modal .text-editor-delete-button:hover {
-    background-color: var(--modal-button-danger-hover) !important;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
-}
-
-.dn_modal .text-editor-delete-button:active {
-    background-color: var(--modal-button-danger-active) !important;
-    transform: translateY(0);
-    box-shadow: 0 1px 4px rgba(220, 53, 69, 0.3);
-}
-
-.dn_modal .text-editor-delete-button:disabled {
+.text-editor-save-button:disabled,
+.text-editor-save-button:disabled:hover,
+.text-editor-save-button:disabled:active {
     background-color: var(--modal-button-secondary) !important;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-}
-
-.wildcard-controls {
-    padding: var(--modal-spacing-sm) 0;
+    cursor: not-allowed !important;
+    transform: none !important;
+    box-shadow: none !important;
+    pointer-events: none !important;
 }
 
 .sidebar-buttons-container .wildcard-reset-button,

@@ -24,7 +24,7 @@ COMMON_DIRECTORY = "./web/common"
 # from .nodes.inactive_pinterest_image import inactivePinterestImageNode
 from .nodes.text_concat import TextConcatenatorNode
 from .nodes.text_dropdown import TextDropDownNode
-from .nodes.text_loader import DynamicTextLoaderNode
+from .nodes.DN_WildcardPromptEditorNode import DN_WildcardPromptEditorNode
 from .nodes.smolvlm_node import SmolVLMNode
 # from .nodes.pinterest_fetch import PinterestFetch
 from .nodes.miaoshouai_tagger import MiaoshouAITaggerNode
@@ -38,7 +38,7 @@ NODE_CLASS_MAPPINGS = {
     # "inactivePinterestImageNode": inactivePinterestImageNode,
     "TextConcatenatorNode": TextConcatenatorNode,
     "TextDropDownNode": TextDropDownNode,
-    "DynamicTextLoaderNode": DynamicTextLoaderNode,
+    "DN_WildcardPromptEditorNode": DN_WildcardPromptEditorNode,
     "SmolVLMNode": SmolVLMNode,
     # "PinterestFetch": PinterestFetch,
     "MiaoshouAITaggerNode": MiaoshouAITaggerNode,
@@ -52,7 +52,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     # "inactivePinterestImageNode": "Pinterest Node (WIP - broken)",
     "TextConcatenatorNode": "Text Concatenator",
     "TextDropDownNode": "Text DropDown",
-    "DynamicTextLoaderNode": "Dynamic Text Loader",
+    "DN_WildcardPromptEditorNode": "Wildcard Prompt Editor",
     "SmolVLMNode": "SmolVLM Image Describer",
     # "PinterestNode": "Pinterest Node",
     "MiaoshouAITaggerNode": "MiaoshouAI Tagger",

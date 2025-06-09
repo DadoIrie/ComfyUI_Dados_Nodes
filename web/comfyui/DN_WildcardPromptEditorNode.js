@@ -10,7 +10,7 @@ let EXTENSION_NAME, MESSAGE_ROUTE, chainCallback, fetchSend;
    await import(`/extensions/${EXTENSION_NAME}/common/js/utils.js`));
 })().catch(error => console.error("Failed to load utilities:", error));
 
-class TextLoaderNode {
+class DN_WildcardPromptEditorNode {
     constructor(node) {
         this.node = node;
         this.initializeHiddenInputs();
@@ -67,7 +67,7 @@ class TextLoaderNode {
             const textContent = response?.status === "success" ? response.content || '' : wildcards_prompt;
             const constants = { EXTENSION_NAME, MESSAGE_ROUTE };
             
-            const { createTextEditorModal } = await import(`/extensions/${EXTENSION_NAME}/common/js/text_editor_modal.js`);
+            const { createTextEditorModal } = await import(`/extensions/${EXTENSION_NAME}/common/js/wildcard_text_editor_modal.js`);
             createTextEditorModal(
                 this.node, 
                 textContent, 
@@ -81,14 +81,14 @@ class TextLoaderNode {
 }
 
 app.registerExtension({
-    name: "DynamicTextLoaderNode",
+    name: "DN_WildcardPromptEditorNode",
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
-        if (nodeData.name !== "DynamicTextLoaderNode") {
+        if (nodeData.name !== "DN_WildcardPromptEditorNode") {
             return;
         }
 
         chainCallback(nodeType.prototype, "onNodeCreated", function() {
-            const textLoader = new TextLoaderNode(this);
+            const textLoader = new DN_WildcardPromptEditorNode(this);
             this.textLoader = textLoader;
             textLoader.createEditContentButton();
             
@@ -106,7 +106,7 @@ app.registerExtension({
         const onConnectionsChange = nodeType.prototype.onConnectionsChange;
         nodeType.prototype.onConnectionsChange = function(slotType, slot_idx, event, link_info, node_slot) {
             if (slotType === 1 && event === true) {
-                console.log("Input connections are not allowed on DynamicTextLoaderNode");
+                console.log("Input connections are not allowed on DN_WildcardPromptEditorNode");
                 
                 if (link_info) {
                     const linkId = link_info.id;

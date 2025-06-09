@@ -14,13 +14,22 @@ class ModalView {
     this.assembleModal();
   }
 
-  async loadCSS() {
+  async loadCSS(config) {
     await constantsPromise;
     if (!document.querySelector('link[href$="/dn_modal.css"]')) {
-      const cssLink = document.createElement('link');
-      cssLink.rel = 'stylesheet';
-      cssLink.href = `/extensions/${EXTENSION_NAME}/common/css/dn_modal.css`;
-      document.head.appendChild(cssLink);
+        const cssLink = document.createElement('link');
+        cssLink.rel = 'stylesheet';
+        cssLink.href = `/extensions/${EXTENSION_NAME}/common/css/dn_modal.css`;
+        
+        await new Promise((resolve, reject) => {
+            cssLink.onload = () => resolve();
+            cssLink.onerror = () => reject(new Error('Failed to load CSS'));
+            document.head.appendChild(cssLink);
+        });
+    }
+    
+    if (config?.loadAdditionalCSS) {
+        await config.loadAdditionalCSS();
     }
   }
 
@@ -94,8 +103,8 @@ class ModalView {
 
 class ModalModel {
   constructor(config) {
-    this.view = new ModalView();
     this.config = config;
+    this.view = new ModalView();
     this.customLogic = config.customLogic || (() => {});
     this.setupEventListeners();
   }
@@ -151,14 +160,14 @@ class ModalModel {
   
   handleEscapeKey(event) {
     if (event.key === 'Escape') {
-      this.closeModal();
+        this.closeModal();
     }
   }
 
-  closeModal() {
+  async closeModal() {
     let delay = 0;
     if (typeof this.config.onClose === 'function') {
-        delay = this.config.onClose() || 0;
+        delay = await this.config.onClose() || 0;
     }
     
     setTimeout(() => {
@@ -169,8 +178,9 @@ class ModalModel {
     }, delay);
   }
 
-  render() {
-    this.processContent();
+  async render() {
+    await this.processContent();
+    await this.view.loadCSS(this.config);
     this.view.render();
     setTimeout(() => this.view.show(), 10);
   }

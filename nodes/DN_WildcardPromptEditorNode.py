@@ -5,7 +5,7 @@ from typing import Dict, Any, ClassVar, Optional, Tuple
 from aiohttp import web
 from ..utils.api_routes import register_operation_handler
 
-class DynamicTextLoaderNode:
+class DN_WildcardPromptEditorNode:
     file_cache: ClassVar[Dict[str, str]] = {}
     node_state: ClassVar[Dict[str, Dict[str, Any]]] = {}
     
@@ -263,7 +263,7 @@ class DynamicTextLoaderNode:
         return random.randint(1, 1000000)
 
 class TextLoaderOperations:
-    def __init__(self, node_instance: DynamicTextLoaderNode):
+    def __init__(self, node_instance: DN_WildcardPromptEditorNode):
         self.node = node_instance
     
     def error_response(self, message: str, status: int = 400):
@@ -285,7 +285,7 @@ class TextLoaderOperations:
         return path, file_selection
     
     async def update_state(self, node_id: str, payload: Dict):
-        DynamicTextLoaderNode.node_state[node_id] = payload
+        DN_WildcardPromptEditorNode.node_state[node_id] = payload
         return self.success_response()
     
     async def get_txt_files(self, payload: Dict):
@@ -394,12 +394,10 @@ class TextLoaderOperations:
         })
 
 @register_operation_handler
-async def handle_text_loader_operations(request):
+async def handle_wildcard_prompt_editor_operations(request):
     try:
         data = await request.json()
         operation = data.get('operation')
-        
-        print(f"[DEBUG] Received operation: {operation}")
         
         valid_operations = [
             'update_state', 'update_content', 'get_content',
@@ -407,18 +405,15 @@ async def handle_text_loader_operations(request):
         ]
         
         if operation not in valid_operations:
-            print(f"[DEBUG] Operation '{operation}' not valid, returning error")
             return web.json_response(
                 {"status": "error", "message": f"Unknown operation: {operation}"}, 
                 status=400
             )
         
-        print(f"[DEBUG] Processing valid operation: {operation}")
-        
         node_id = str(data.get('id', ''))
         payload = data.get('payload', {})
         
-        node_instance = DynamicTextLoaderNode()
+        node_instance = DN_WildcardPromptEditorNode()
         operations = TextLoaderOperations(node_instance)
         
         handler = getattr(operations, operation)
@@ -429,11 +424,9 @@ async def handle_text_loader_operations(request):
         else:
             result = await handler(node_id, payload)
         
-        print(f"[DEBUG] Operation result: {result}")
         return result
         
     except Exception as e:
-        print(f"[DEBUG] Error in handle_text_loader_operations: {e}")
         return web.json_response(
             {"status": "error", "message": str(e)},
             status=500

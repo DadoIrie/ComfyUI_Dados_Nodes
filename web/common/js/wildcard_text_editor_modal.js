@@ -142,7 +142,7 @@ class WildcardManager {
             label.textContent = `Wildcard ${wildcardIndex}`;
             label.classList.toggle('unsaved-selection', !isSaved);
         } else {
-            label.innerHTML = `Wildcard ${wildcardIndex} ${getIcon("chevron_right")} Option ${selectedIndex}`;
+            label.innerHTML = `Wildcard ${wildcardIndex}${getIcon("chevron_right")}${selectedIndex}`;
             
             if (isSaved) {
                 label.classList.add('flash-update');
@@ -502,15 +502,15 @@ class ButtonManager {
     }
 
     createSaveButton() {
-        return this.elements.createButton('text-editor-save-button', 'Save Content', () => this.handleSave());
+        return this.elements.createButton('text-editor-save-button', 'Save', () => this.handleSave());
     }
 
     createResetButton() {
-        return this.elements.createButton('wildcard-reset-button', 'Reset All Wildcards', () => this.handleReset());
+        return this.elements.createButton('wildcard-reset-button', 'Reset', () => this.handleReset());
     }
 
     createSaveSelectionsButton() {
-        return this.elements.createButton('wildcard-save-button', 'Save Selections', () => this.handleSaveSelections());
+        return this.elements.createButton('wildcard-save-button', 'Apply', () => this.handleSaveSelections());
     }
 
     async handleSave() {
@@ -526,7 +526,7 @@ class ButtonManager {
 
         try {
             const response = await this.operations.saveContent(textarea.value);
-            this.setButtonState(saveButton, 'Saved!', false);
+            this.setButtonState(saveButton, 'Saved!', true);
 
             if (response.wildcards) {
                 const wildcardCount = this.wildcardManager.updateFromSave(
@@ -537,13 +537,13 @@ class ButtonManager {
             }
 
             setTimeout(() => {
-                this.setButtonState(saveButton, 'Save Content', false);
+                this.setButtonState(saveButton, 'Save', false);
                 this.modal?.close?.();
             }, 1000);
         } catch (error) {
             console.error('Error saving content:', error);
             alert('Error saving content');
-            this.setButtonState(saveButton, 'Save Content', false);
+            this.setButtonState(saveButton, 'Save', false);
         }
     }
 
@@ -564,8 +564,8 @@ class ButtonManager {
     async handleModalClose() {
         if (this.operations.hasUnsavedChanges()) {
             const message = this.operations.hasUnsavedTextChanges 
-                ? 'You have unsaved text changes. Do you want to save before closing?'
-                : 'You have unsaved selection changes. Do you want to save before closing?';
+                ? 'You have unsaved prompt changes. Do you want to save before closing?'
+                : 'You have not applied selection changes. Do you want to apply those before closing?';
                 
             const result = window.confirm(message);
             if (result) {
@@ -583,24 +583,29 @@ class ButtonManager {
 
     setButtonState(button, text, disabled) {
         if (button) {
-            Object.assign(button, { textContent: text, disabled });
+            button.textContent = text;
+            button.disabled = disabled;
         }
     }
 }
 
 export function createTextEditorModal(node, textContent, constants, textLoaderInstance) {
-    const loadCSS = () => {
+    const loadTextEditorCSS = async () => {
         if (!document.querySelector('link[href$="/text_editor_modal.css"]')) {
             const cssLink = document.createElement('link');
             Object.assign(cssLink, {
                 rel: 'stylesheet',
                 href: `/extensions/${constants.EXTENSION_NAME}/common/css/text_editor_modal.css`
             });
-            document.head.appendChild(cssLink);
+            
+            return new Promise((resolve) => {
+                cssLink.onload = () => resolve();
+                cssLink.onerror = () => resolve();
+                document.head.appendChild(cssLink);
+            });
         }
+        return Promise.resolve();
     };
-
-    loadCSS();
 
     const operations = new Operations(node, constants, textLoaderInstance);
     operations.initialize(textContent);
@@ -655,21 +660,22 @@ export function createTextEditorModal(node, textContent, constants, textLoaderIn
     contentDiv.appendChild(mainSection);
     contentDiv.appendChild(sidebar);
 
-    wildcardManager.loadWildcards(elements.elements.wildcardDropdowns).then(wildcardCount => {
-        elements.autoExpandSidebar(wildcardCount);
-    });
-
     const modalConfig = {
         content: contentDiv,
+        loadAdditionalCSS: loadTextEditorCSS,
         onClose: async () => {
             await buttonManager.handleModalClose();
-            const sidebar = contentDiv.querySelector('.text-editor-sidebar.expanded');
-            if (sidebar) {
+            const sidebar = contentDiv.querySelector('.text-editor-sidebar');
+            if (sidebar && sidebar.classList.contains('expanded')) {
                 sidebar.classList.remove('expanded');
                 return 150;
             }
             return 0;
         },
+        customLogic: async () => {
+            const wildcardCount = await wildcardManager.loadWildcards(elements.elements.wildcardDropdowns);
+            elements.autoExpandSidebar(wildcardCount);
+        }
     };
 
     modal = createModal(modalConfig);
