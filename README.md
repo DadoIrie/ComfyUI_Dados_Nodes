@@ -68,7 +68,7 @@ Simply search for "Dados Nodes" in ComfyUI Manager and install.
 - Seed-based randomization
 - Attention generator support
 - Compatible with dynamic prompts syntax
-- Handles random wildcard selection from Prompt Editor output
+- Handles random wildcard selection from Wildcard Prompt Editor output or any other text/string source
 
 ### Wildcard Prompt Editor
 - Interactive web-based editor
