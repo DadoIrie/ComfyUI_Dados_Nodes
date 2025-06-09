@@ -28,7 +28,6 @@ export async function fetchSend(route, id, operation, payload=null) {
     operation: operation
   };
   
-  // Add payload if provided
   if (payload !== null) {
     messageBody.payload = payload;
   }
@@ -40,7 +39,9 @@ export async function fetchSend(route, id, operation, payload=null) {
     if (!response.ok) {
       throw new Error(`Error: ${response.status} - ${response.statusText}`);
     }
-    return await response.json();
+    
+    const jsonResponse = await response.json();
+    return jsonResponse;
   } catch (error) {
     console.error(`API call to ${route} failed:`, error);
     throw error;

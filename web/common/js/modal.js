@@ -28,7 +28,7 @@ class ModalView {
     this.overlay = document.createElement('div');
     this.modal = document.createElement('div');
     this.contentWrapper = document.createElement('div');
-    this.resizeHandle = document.createElement('div');
+    /* this.resizeHandle = document.createElement('div'); */
     this.closeButton = document.createElement('button');
   }
 
@@ -51,7 +51,7 @@ class ModalView {
   }
 
   assembleModal() {
-    this.modal.appendChild(this.resizeHandle);
+    /* this.modal.appendChild(this.resizeHandle); */
     this.modal.appendChild(this.closeButton);
     this.modal.appendChild(this.contentWrapper);
   }

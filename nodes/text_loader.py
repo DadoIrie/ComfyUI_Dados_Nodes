@@ -1,4 +1,3 @@
-import os
 import re
 import json
 import random
@@ -12,7 +11,11 @@ class DynamicTextLoaderNode:
     
     @classmethod
     def INPUT_TYPES(cls):
-        return {
+        return {            
+            "optional": {
+                "wildcards_prompt": ("STRING",),
+                "wildcards_selections": ("STRING",),
+            },
             "hidden": {
                 "unique_id": "UNIQUE_ID",
             }
@@ -22,70 +25,6 @@ class DynamicTextLoaderNode:
     RETURN_NAMES = ("text",)
     FUNCTION = "process_text"
     CATEGORY = "Dado's Nodes/Text"
-    
-    def get_file_path(self, path: str, file_selection: str) -> str:
-        return os.path.join(path, f"{file_selection}.txt")
-    
-    def get_selections_file_path(self, txt_file_path: str) -> str:
-        base_path = os.path.splitext(txt_file_path)[0]
-        return f"{base_path}_selections.json"
-    
-    def load_json_file(self, file_path: str) -> Dict:
-        if not os.path.exists(file_path):
-            return {}
-        
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (IOError, json.JSONDecodeError, OSError):
-            return {}
-    
-    def save_json_file(self, file_path: str, data: Dict) -> bool:
-        try:
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-            return True
-        except (IOError, OSError):
-            return False
-    
-    def load_text_file(self, file_path: str) -> Optional[str]:
-        if not os.path.exists(file_path):
-            return None
-        
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                return f.read()
-        except (IOError, OSError, UnicodeDecodeError):
-            return None
-    
-    def save_text_file(self, file_path: str, content: str) -> bool:
-        try:
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(content)
-            return True
-        except (IOError, OSError, UnicodeDecodeError):
-            return False
-    
-    def delete_file(self, file_path: str) -> bool:
-        if not os.path.exists(file_path):
-            return True
-        
-        try:
-            os.remove(file_path)
-            return True
-        except (IOError, OSError):
-            return False
-    
-    def get_txt_files(self, path: str) -> Tuple[list, bool]:
-        if not path or not os.path.exists(path) or not os.path.isdir(path):
-            return ["invalid path"], False
-        
-        try:
-            txt_files = [os.path.splitext(f)[0] for f in os.listdir(path) if f.lower().endswith('.txt')]
-            return txt_files if txt_files else ["no files"], True
-        except (IOError, OSError):
-            return ["invalid path"], False
     
     def parse_wildcards(self, text: str) -> list:
         return self._parse_wildcards_recursive(text, "")
@@ -277,18 +216,14 @@ class DynamicTextLoaderNode:
                         selected_option_index = options.index(selected_value) + 1
                         child_index = f"{current_index}.{selected_option_index}"
                         
-                        # First apply any structural child wildcards
                         replacement = self._apply_wildcards_to_text_recursive(selected_value, selections, child_index)
                         
-                        # Then apply any entry wildcards within this option
                         replacement = self._apply_entry_wildcards_to_text(replacement, selections, child_index)
                     else:
                         replacement = text[start:end]
                 else:
-                    # For simple wildcards, also check for entry wildcards
                     replacement = self._apply_entry_wildcards_to_text(selected_value, selections, current_index + ".1")
                 
-                # Apply the replacement
                 adjusted_start = start + offset
                 adjusted_end = end + offset
                 modified_text = modified_text[:adjusted_start] + replacement + modified_text[adjusted_end:]
@@ -301,7 +236,6 @@ class DynamicTextLoaderNode:
         modified_text = text
         entry_matches = list(re.finditer(r'\{([^{}]+)\}', text))
         
-        # Process matches in reverse order to maintain positions
         for i, match in enumerate(reversed(entry_matches)):
             entry_index = f"{base_index}.e{len(entry_matches) - i}"
             selected_value = selections.get(entry_index)
@@ -312,33 +246,17 @@ class DynamicTextLoaderNode:
         
         return modified_text
     
-    def process_text(self, unique_id=None):
-        node_id = str(unique_id)
-        state = self.__class__.node_state.get(node_id, {})
-        
-        path = state.get('path', '')
-        file_selection = state.get('file_selection', '')
-        use_cached_file = state.get('use_cached_file', True)
-        
-        if not path or not file_selection:
+    def process_text(self, wildcards_prompt="", wildcards_selections="", unique_id=None):
+        if not wildcards_prompt.strip():
             return ('',)
         
-        file_path = self.get_file_path(path, file_selection)
-        cache_key = f"{node_id}_{file_path}"
+        try:
+            selections = json.loads(wildcards_selections) if wildcards_selections.strip() else {}
+        except json.JSONDecodeError:
+            selections = {}
         
-        if cache_key not in self.__class__.file_cache or not use_cached_file:
-            content = self.load_text_file(file_path)
-            print(content)
-            if content is None:
-                return ('',)
-            
-            self.__class__.file_cache[cache_key] = content
-        
-        text = self.__class__.file_cache[cache_key]
-        selections_file = self.get_selections_file_path(file_path)
-        selections = self.load_json_file(selections_file)
-        
-        return (self.apply_wildcards_to_text(text, selections),)
+        processed_text = self.apply_wildcards_to_text(wildcards_prompt, selections)
+        return (processed_text,)
     
     @classmethod
     def IS_CHANGED(cls, unique_id=None):
@@ -379,69 +297,49 @@ class TextLoaderOperations:
             "valid_path": valid_path
         })
     
-    async def get_file_content(self, node_id: str, payload: Dict):
-        path, file_selection = self.validate_file_selection(payload)
-        if not path:
-            return self.error_response("No file selected")
+    async def get_content(self, node_id: str, payload: Dict):
+        wildcards_prompt = payload.get('wildcards_prompt', '')
+        wildcards_selections = payload.get('wildcards_selections', '')
         
-        file_path = self.node.get_file_path(path, file_selection)
-        cache_key = f"{node_id}_{file_path}"
+        try:
+            selections = json.loads(wildcards_selections) if wildcards_selections.strip() else {}
+        except json.JSONDecodeError:
+            selections = {}
         
-        if cache_key in DynamicTextLoaderNode.file_cache:
-            content = DynamicTextLoaderNode.file_cache[cache_key]
-        else:
-            content = self.node.load_text_file(file_path)
-            if content is None:
-                return self.error_response("File does not exist", 404)
-            
-            DynamicTextLoaderNode.file_cache[cache_key] = content
-        
-        selections_file = self.node.get_selections_file_path(file_path)
-        selections = self.node.load_json_file(selections_file)
-        wildcards = self.node.parse_wildcards(content)
+        wildcards = self.node.parse_wildcards(wildcards_prompt) if wildcards_prompt.strip() else []
         wildcards = self.node.apply_selections_to_wildcards(wildcards, selections)
         
         return self.success_response({
-            "content": content,
+            "content": wildcards_prompt,
             "wildcards": wildcards
         })
     
-    async def save_file(self, node_id: str, payload: Dict):
+    async def update_content(self, node_id: str, payload: Dict):
         content = payload.get('content', '')
-        path, file_selection = self.validate_file_selection(payload)
-        is_new_file = payload.get('is_new_file', False)
-        
-        if not path:
-            return self.error_response("No file selected")
+        wildcards_selections = payload.get('wildcards_selections', '')
         
         if not content.strip():
             return self.error_response("Empty files are not allowed")
         
-        file_path = self.node.get_file_path(path, file_selection)
-        old_content = self.node.load_text_file(file_path) or ""
-        content_changed = old_content != content
-        
-        if not self.node.save_text_file(file_path, content):
-            return self.error_response("Error saving file", 500)
-        
-        cache_key = f"{node_id}_{file_path}"
-        DynamicTextLoaderNode.file_cache[cache_key] = content
-        
-        selections_file = self.node.get_selections_file_path(file_path)
-        existing_selections = self.node.load_json_file(selections_file)
+        # Parse wildcards from the new content
         wildcards = self.node.parse_wildcards(content)
+        
+        # Apply existing selections if any
+        try:
+            existing_selections = json.loads(wildcards_selections) if wildcards_selections.strip() else {}
+        except json.JSONDecodeError:
+            existing_selections = {}
+        
         wildcards = self.node.apply_selections_to_wildcards(wildcards, existing_selections)
         
+        # Collect selections for return
         new_selections = {}
         self._collect_wildcard_selections(wildcards, new_selections)
         
-        self.node.save_json_file(selections_file, new_selections)
-        
         return self.success_response({
-            "message": "File saved successfully",
+            "message": "Content saved successfully",
             "wildcards": wildcards,
-            "content_changed": content_changed,
-            "is_new_file": is_new_file
+            "selections_json": json.dumps(new_selections, ensure_ascii=False)
         })
 
     def _collect_wildcard_selections(self, wildcards: list, selections: Dict):
@@ -460,56 +358,29 @@ class TextLoaderOperations:
                 for entry_wildcards in wildcard['entry_wildcards'].values():
                     self._collect_wildcard_selections(entry_wildcards, selections)
     
-    async def delete_file(self, node_id: str, payload: Dict):
-        path, file_selection = self.validate_file_selection(payload)
-        if not path:
-            return self.error_response("No file selected")
-        
-        file_path = self.node.get_file_path(path, file_selection)
-        
-        if not os.path.exists(file_path):
-            return self.error_response("File does not exist", 404)
-        
-        if not self.node.delete_file(file_path):
-            return self.error_response("Error deleting file", 500)
-        
-        selections_file = self.node.get_selections_file_path(file_path)
-        self.node.delete_file(selections_file)
-        
-        cache_key = f"{node_id}_{file_path}"
-        DynamicTextLoaderNode.file_cache.pop(cache_key, None)
-        
-        return self.success_response({
-            "message": "File and associated selections deleted successfully"
-        })
-    
     async def update_wildcard_selection(self, node_id: str, payload: Dict):
         wildcard_index = str(payload.get('wildcard_index', ''))
         selected_value = payload.get('selected_value', '')
         original_wildcard = payload.get('original_wildcard', '')
+        wildcards_selections = payload.get('wildcards_selections', '')
         
-        state = DynamicTextLoaderNode.node_state.get(node_id, {})
-        path, file_selection = state.get('path', ''), state.get('file_selection', '')
-        
-        if not path or not file_selection:
-            return self.error_response("No file selected")
-        
-        file_path = self.node.get_file_path(path, file_selection)
-        selections_file = self.node.get_selections_file_path(file_path)
-        wildcard_selections = self.node.load_json_file(selections_file)
+        try:
+            selections = json.loads(wildcards_selections) if wildcards_selections.strip() else {}
+        except json.JSONDecodeError:
+            selections = {}
         
         if selected_value:
-            wildcard_selections[wildcard_index] = {
+            selections[wildcard_index] = {
                 'selected': selected_value,
                 'original': original_wildcard
             }
         else:
-            wildcard_selections.pop(wildcard_index, None)
+            selections.pop(wildcard_index, None)
         
-        if not self.node.save_json_file(selections_file, wildcard_selections):
-            return self.error_response("Failed to save wildcard selection", 500)
-        
-        return self.success_response({"message": "Wildcard selection updated"})
+        return self.success_response({
+            "message": "Wildcard selection updated",
+            "selections_json": json.dumps(selections, ensure_ascii=False)
+        })
 
     def _clear_wildcard_branch(self, selections: Dict, wildcard_index: str):
         keys_to_remove = [key for key in selections.keys() if key == wildcard_index or key.startswith(wildcard_index + '.')]
@@ -517,19 +388,10 @@ class TextLoaderOperations:
             selections.pop(key, None)
     
     async def reset_wildcards(self, node_id: str):
-        state = DynamicTextLoaderNode.node_state.get(node_id, {})
-        path, file_selection = state.get('path', ''), state.get('file_selection', '')
-        
-        if not path or not file_selection:
-            return self.error_response("No file selected")
-        
-        file_path = self.node.get_file_path(path, file_selection)
-        selections_file = self.node.get_selections_file_path(file_path)
-        
-        if not self.node.delete_file(selections_file):
-            return self.error_response("Failed to reset wildcard selections", 500)
-        
-        return self.success_response({"message": "All wildcard selections reset"})
+        return self.success_response({
+            "message": "All wildcard selections reset",
+            "selections_json": "{}"
+        })
 
 @register_operation_handler
 async def handle_text_loader_operations(request):
@@ -537,13 +399,21 @@ async def handle_text_loader_operations(request):
         data = await request.json()
         operation = data.get('operation')
         
+        print(f"[DEBUG] Received operation: {operation}")
+        
         valid_operations = [
-            'update_state', 'get_txt_files', 'save_file', 'get_file_content', 
-            'delete_file', 'update_wildcard_selection', 'reset_wildcards'
+            'update_state', 'update_content', 'get_content',
+            'update_wildcard_selection', 'reset_wildcards'
         ]
         
         if operation not in valid_operations:
-            return None
+            print(f"[DEBUG] Operation '{operation}' not valid, returning error")
+            return web.json_response(
+                {"status": "error", "message": f"Unknown operation: {operation}"}, 
+                status=400
+            )
+        
+        print(f"[DEBUG] Processing valid operation: {operation}")
         
         node_id = str(data.get('id', ''))
         payload = data.get('payload', {})
@@ -553,14 +423,17 @@ async def handle_text_loader_operations(request):
         
         handler = getattr(operations, operation)
         if operation == 'get_txt_files':
-            return await handler(payload)
+            result = await handler(payload)
         elif operation == 'reset_wildcards':
-            return await handler(node_id)
+            result = await handler(node_id)
         else:
-            return await handler(node_id, payload)
+            result = await handler(node_id, payload)
+        
+        print(f"[DEBUG] Operation result: {result}")
+        return result
         
     except Exception as e:
-        print(f"Error in handle_text_loader_operations: {e}")
+        print(f"[DEBUG] Error in handle_text_loader_operations: {e}")
         return web.json_response(
             {"status": "error", "message": str(e)},
             status=500

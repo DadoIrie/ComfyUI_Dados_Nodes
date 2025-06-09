@@ -242,20 +242,32 @@
     padding: var(--modal-spacing-sm) 0;
 }
 
-.wildcard-reset-button {
-    width: 100%;
+.sidebar-buttons-container .wildcard-reset-button,
+.sidebar-buttons-container .wildcard-save-button {
+    flex: 1;
     padding: 8px 12px;
-    background-color: var(--modal-button-secondary);
-    color: white;
     border: none;
     border-radius: var(--modal-border-radius);
     cursor: pointer;
-    margin-bottom: 15px;
     font-size: 0.9em;
+}
+
+.wildcard-reset-button {
+    background-color: var(--modal-button-secondary);
+    color: white;
+}
+
+.wildcard-save-button {
+    background-color: var(--modal-button-primary);
+    color: white;
 }
 
 .wildcard-reset-button:hover {
     background-color: var(--modal-button-secondary-hover);
+}
+
+.wildcard-save-button:hover {
+    background-color: var(--modal-button-primary-hover);
 }
 
 .wildcard-dropdowns {
@@ -277,6 +289,30 @@
     background-color: #333;
     padding: 4px 8px;
     border-radius: 3px;
+    transition: background-color 0.15s ease-out;
+}
+
+.wildcard-label.flash-update {
+    background-color: #428545;
+    transition: background-color 0.15s ease-out;
+}
+
+.wildcard-label.flash-reset {
+    background-color: #a44f4f;
+    transition: background-color 0.15s ease-out;
+}
+
+.wildcard-label.unsaved-selection {
+    background-color: #B8860B;
+    color: white;
+    transition: background-color 0.15s ease-out;
+}
+
+.wildcard-label svg {
+    width: 13px;
+    height: 13px;
+    vertical-align: middle;
+    margin: 0 4px;
 }
 
 .wildcard-dropdown {
