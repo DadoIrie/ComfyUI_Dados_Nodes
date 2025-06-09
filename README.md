@@ -94,6 +94,10 @@ ComfyUI_Dados_Nodes/models/
 └── joytag/
 ```
 
+## Known Issues
+
+- **SmolVLM2 Models**: SmolVLM2-256M-Video-Instruct and SmolVLM2-500M-Video-Instruct are currently not working. This will be fixed in upcoming releases.
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
