@@ -18,6 +18,8 @@ A collection of custom nodes for ComfyUI featuring AI vision models, advanced te
 - **Wildcard Prompt Editor** - Advanced wildcard editing with nested selections
 - **Wildcards Processor** - Process wildcards with seed control and attention support
 
+*Note: Use Wildcard Prompt Editor output with Wildcards Processor for random wildcard processing.*
+
 ## Installation
 
 ### Option 1: ComfyUI Manager (Recommended)
@@ -66,13 +68,14 @@ Simply search for "Dados Nodes" in ComfyUI Manager and install.
 - Seed-based randomization
 - Attention generator support
 - Compatible with dynamic prompts syntax
-- Deterministic results with same seed
+- Handles random wildcard selection from Prompt Editor output
 
 ### Wildcard Prompt Editor
 - Interactive web-based editor
 - Nested wildcard support
 - Real-time preview
 - Selection persistence
+- Connect output to Wildcards Processor for random wildcard processing
 
 ## Requirements
 
