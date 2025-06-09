@@ -50,7 +50,7 @@ def process_tag(tag):
     tag = tag.strip()
     return tag
 
-class JoyTaggerNode:
+class DN_JoyTaggerNode:
     def __init__(self):
         self.model = None
         self.top_tags = None

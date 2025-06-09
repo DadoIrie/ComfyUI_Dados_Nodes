@@ -10,7 +10,7 @@ const TypeSlotEvent = {
     Disconnect: false,
 };
 
-const _ID = "TextConcatenatorNode";
+const _ID = "DN_TextConcatenateNode";
 const _PREFIX = "text";
 const _TYPE = "STRING";
 

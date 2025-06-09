@@ -1,7 +1,7 @@
 from dynamicprompts.generators import RandomPromptGenerator
 from dynamicprompts.generators.attentiongenerator import AttentionGenerator
 
-class DN_wildcards_processor:
+class DN_WildcardsProcessor:
     
     def __init__(self):
         pass

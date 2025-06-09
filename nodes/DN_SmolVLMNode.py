@@ -51,7 +51,7 @@ def download_smolvlm(model_key):
     print(f"Model path: {path}")
     return path
 
-class SmolVLMNode:
+class DN_SmolVLMNode:
     def __init__(self):
         self.model = None
         self.processor = None

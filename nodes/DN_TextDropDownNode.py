@@ -12,7 +12,7 @@ import time
 from aiohttp import web
 from ..utils.api_routes import register_operation_handler
 
-class TextDropDownNode:
+class DN_TextDropDownNode:
     """
     A node that accepts a text input and outputs the dropdown selection.
     """
@@ -74,20 +74,20 @@ async def handle_text_dropdown_operations(request):
         if operation == 'update_selection':
             selection = payload.get('selection')
             if selection is not None:
-                TextDropDownNode.selections[node_id] = selection
+                DN_TextDropDownNode.selections[node_id] = selection
                 
                 entries = payload.get('entries')
                 if selection == "random" and entries is not None:
-                    TextDropDownNode.entries_map[node_id] = entries
+                    DN_TextDropDownNode.entries_map[node_id] = entries
                 
                 # Just return success without sending a message
                 return web.json_response({"status": "success"})
         
         elif operation == 'remove_selection':
-            if node_id in TextDropDownNode.selections:
-                del TextDropDownNode.selections[node_id]
-            if node_id in TextDropDownNode.entries_map:
-                del TextDropDownNode.entries_map[node_id]
+            if node_id in DN_TextDropDownNode.selections:
+                del DN_TextDropDownNode.selections[node_id]
+            if node_id in DN_TextDropDownNode.entries_map:
+                del DN_TextDropDownNode.entries_map[node_id]
                 
             # Just return success without sending a message
             return web.json_response({"status": "success"})

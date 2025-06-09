@@ -6,7 +6,7 @@
 
 from typing import Dict, Tuple
 
-class TextConcatenatorNode:
+class DN_TextConcatenateNode:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("text",)
     FUNCTION = "concatenate"

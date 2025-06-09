@@ -1,4 +1,4 @@
-class DadosMultilineString:
+class DN_MultilineString:
     @classmethod
     def INPUT_TYPES(cls):
         return {

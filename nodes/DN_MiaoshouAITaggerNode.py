@@ -49,7 +49,7 @@ def download_florence2(model_key):
     print(f"Model path: {path}")
     return path
 
-class MiaoshouAITaggerNode:
+class DN_MiaoshouAITaggerNode:
     def __init__(self):
         self.model = None
         self.processor = None

@@ -5,7 +5,7 @@ from server import PromptServer  # type: ignore pylint: disable=import-error
 
 # Define core constants
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-EXTENSION_NAME = "Dados_Nodes"
+EXTENSION_NAME = "ComfyUI_Dados_Nodes"
 MESSAGE_ROUTE = "/dadosNodes"
 
 class Constants:
@@ -22,44 +22,41 @@ COMMON_DIRECTORY = "./web/common"
 
 # Import node definitions
 # from .nodes.inactive_pinterest_image import inactivePinterestImageNode
-from .nodes.text_concat import TextConcatenatorNode
-from .nodes.text_dropdown import TextDropDownNode
+from .nodes.DN_TextConcatenateNode import DN_TextConcatenateNode
+from .nodes.DN_TextDropDownNode import DN_TextDropDownNode
 from .nodes.DN_WildcardPromptEditorNode import DN_WildcardPromptEditorNode
-from .nodes.smolvlm_node import SmolVLMNode
+from .nodes.DN_SmolVLMNode import DN_SmolVLMNode
 # from .nodes.pinterest_fetch import PinterestFetch
-from .nodes.miaoshouai_tagger import MiaoshouAITaggerNode
-from .nodes.multiline_string import DadosMultilineString
-from .nodes.joytagger_node import JoyTaggerNode
-from .nodes.wildcard_selector import WildcardSelectorNode
-from .nodes.dn_wildcards_processor import DN_wildcards_processor
+from .nodes.DN_MiaoshouAITaggerNode import DN_MiaoshouAITaggerNode
+from .nodes.DN_MultilineString import DN_MultilineString
+from .nodes.DN_JoyTaggerNode import DN_JoyTaggerNode
+from .nodes.DN_WildcardsProcessor import DN_WildcardsProcessor
 
 # Node class mappings
 NODE_CLASS_MAPPINGS = {
     # "inactivePinterestImageNode": inactivePinterestImageNode,
-    "TextConcatenatorNode": TextConcatenatorNode,
-    "TextDropDownNode": TextDropDownNode,
+    "DN_TextConcatenateNode": DN_TextConcatenateNode,
+    "DN_TextDropDownNode": DN_TextDropDownNode,
     "DN_WildcardPromptEditorNode": DN_WildcardPromptEditorNode,
-    "SmolVLMNode": SmolVLMNode,
+    "DN_SmolVLMNode": DN_SmolVLMNode,
     # "PinterestFetch": PinterestFetch,
-    "MiaoshouAITaggerNode": MiaoshouAITaggerNode,
-    "DadosMultilineString": DadosMultilineString,
-    "DadosJoyTaggerNode": JoyTaggerNode,
-    "WildcardSelectorNode": WildcardSelectorNode,
-    "DN_wildcards_processor": DN_wildcards_processor,
+    "DN_MiaoshouAITaggerNode": DN_MiaoshouAITaggerNode,
+    "DN_MultilineString": DN_MultilineString,
+    "DN_JoyTaggerNode": DN_JoyTaggerNode,
+    "DN_WildcardsProcessor": DN_WildcardsProcessor,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     # "inactivePinterestImageNode": "Pinterest Node (WIP - broken)",
-    "TextConcatenatorNode": "Text Concatenator",
-    "TextDropDownNode": "Text DropDown",
+    "DN_TextConcatenateNode": "Dynamic Text Concatenate",
+    "DN_TextDropDownNode": "Text DropDown",
     "DN_WildcardPromptEditorNode": "Wildcard Prompt Editor",
-    "SmolVLMNode": "SmolVLM Image Describer",
+    "DN_SmolVLMNode": "SmolVLM Image Describer",
     # "PinterestNode": "Pinterest Node",
-    "MiaoshouAITaggerNode": "MiaoshouAI Tagger",
-    "DadosMultilineString": "Multiline String",
-    "DadosJoyTaggerNode": "JoyTagger",
-    "WildcardSelectorNode": "Wildcard Selector",
-    "DN_wildcards_processor": "Wildcards Processor",
+    "DN_MiaoshouAITaggerNode": "MiaoshouAI Tagger",
+    "DN_MultilineString": "Multiline String",
+    "DN_JoyTaggerNode": "JoyTagger",
+    "DN_WildcardsProcessor": "Wildcards Processor",
 }
 
 from .utils.api_routes import register_routes
