@@ -22,41 +22,41 @@ COMMON_DIRECTORY = "./web/common"
 
 # Import node definitions
 # from .nodes.inactive_pinterest_image import inactivePinterestImageNode
+from .nodes.DN_MultilineString import DN_MultilineString
 from .nodes.DN_TextConcatenateNode import DN_TextConcatenateNode
 from .nodes.DN_TextDropDownNode import DN_TextDropDownNode
 from .nodes.DN_WildcardPromptEditorNode import DN_WildcardPromptEditorNode
+from .nodes.DN_WildcardsProcessor import DN_WildcardsProcessor
 from .nodes.DN_SmolVLMNode import DN_SmolVLMNode
 # from .nodes.pinterest_fetch import PinterestFetch
 from .nodes.DN_MiaoshouAITaggerNode import DN_MiaoshouAITaggerNode
-from .nodes.DN_MultilineString import DN_MultilineString
 from .nodes.DN_JoyTaggerNode import DN_JoyTaggerNode
-from .nodes.DN_WildcardsProcessor import DN_WildcardsProcessor
 
 # Node class mappings
 NODE_CLASS_MAPPINGS = {
     # "inactivePinterestImageNode": inactivePinterestImageNode,
+    "DN_MultilineString": DN_MultilineString,
     "DN_TextConcatenateNode": DN_TextConcatenateNode,
     "DN_TextDropDownNode": DN_TextDropDownNode,
     "DN_WildcardPromptEditorNode": DN_WildcardPromptEditorNode,
+    "DN_WildcardsProcessor": DN_WildcardsProcessor,
     "DN_SmolVLMNode": DN_SmolVLMNode,
     # "PinterestFetch": PinterestFetch,
     "DN_MiaoshouAITaggerNode": DN_MiaoshouAITaggerNode,
-    "DN_MultilineString": DN_MultilineString,
     "DN_JoyTaggerNode": DN_JoyTaggerNode,
-    "DN_WildcardsProcessor": DN_WildcardsProcessor,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     # "inactivePinterestImageNode": "Pinterest Node (WIP - broken)",
+    "DN_MultilineString": "Multiline String",
     "DN_TextConcatenateNode": "Dynamic Text Concatenate",
     "DN_TextDropDownNode": "Text DropDown",
     "DN_WildcardPromptEditorNode": "Wildcard Prompt Editor",
+    "DN_WildcardsProcessor": "Wildcards Processor",
     "DN_SmolVLMNode": "SmolVLM Image Describer",
     # "PinterestNode": "Pinterest Node",
     "DN_MiaoshouAITaggerNode": "MiaoshouAI Tagger",
-    "DN_MultilineString": "Multiline String",
     "DN_JoyTaggerNode": "JoyTagger",
-    "DN_WildcardsProcessor": "Wildcards Processor",
 }
 
 from .utils.api_routes import register_routes
