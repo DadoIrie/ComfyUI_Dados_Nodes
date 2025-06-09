@@ -76,11 +76,7 @@ Simply search for "Dados Nodes" in ComfyUI Manager and install.
 
 ## Requirements
 
-- ComfyUI
-- PyTorch with CUDA support (recommended)
-- Transformers library
-- HuggingFace Hub
-- Dynamic Prompts library
+- [dynamicprompts](https://github.com/adieyal/dynamicprompts) - For wildcard processing functionality
 
 ## Model Storage
 
