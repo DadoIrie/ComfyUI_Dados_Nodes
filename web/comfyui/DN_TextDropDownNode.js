@@ -13,9 +13,9 @@ let EXTENSION_NAME, MESSAGE_ROUTE, chainCallback, fetchSend;
 })().catch(error => console.error("Failed to load utilities:", error));
 
 app.registerExtension({
-    name: "TextDropDownNode",
+    name: "DN_TextDropDownNode",
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
-        if (nodeData.name !== "TextDropDownNode") {
+        if (nodeData.name !== "DN_TextDropDownNode") {
             return;
         }
 
@@ -163,7 +163,7 @@ app.registerExtension({
     setup(app) {
         const originalOnNodeRemoved = app.graph.onNodeRemoved;
         app.graph.onNodeRemoved = function(node) {
-            if (node.type === "TextDropDownNode") {
+            if (node.type === "DN_TextDropDownNode") {
                 fetchSend(
                     MESSAGE_ROUTE, 
                     node.id,
