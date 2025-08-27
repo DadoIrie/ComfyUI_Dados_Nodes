@@ -1,7 +1,7 @@
 [project]
 name = "comfyui_dados_nodes"
 description = "A collection of custom nodes for ComfyUI featuring lightweight AI vision and tagger models (SmolVLM & SmolVLM2, JoyTagger, MiaoshouAI), few simple text processing tools, and wildcard prompt utilities."
-version = "0.8.5"
+version = "0.8.6"
 license = {file = "LICENSE"}
 
 [project.urls]
