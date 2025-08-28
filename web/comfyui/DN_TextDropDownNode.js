@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js"
 
-let dropDownEntries = ["empty"];
+// Remove global variable declaration
 
 let EXTENSION_NAME, MESSAGE_ROUTE, chainCallback, fetchSend;
 (async () => {
@@ -21,7 +21,8 @@ app.registerExtension({
 
         chainCallback(nodeType.prototype, "onNodeCreated", function() {
             this.properties = this.properties || {};
-            this.properties.option = dropDownEntries[0];
+            this.dropDownEntries = ["empty"];
+            this.properties.option = this.dropDownEntries[0];
             this.properties.textValue = "";
             this.properties.actualSelection = this.properties.option;
             this.updateBackend = async function() {
@@ -32,7 +33,7 @@ app.registerExtension({
                 };
                 
                 if (this.properties.option === "random") {
-                    payload.entries = dropDownEntries.filter(entry => entry !== "random");
+                    payload.entries = this.dropDownEntries.filter(entry => entry !== "random");
                 }
                 
                 await fetchSend(MESSAGE_ROUTE, this.id, "update_selection", payload);
@@ -50,14 +51,14 @@ app.registerExtension({
                 return value;
             });
 
-            const dropdownWidget = this.addWidget("combo", "option", dropDownEntries[0], async (value) => {
+            const dropdownWidget = this.addWidget("combo", "option", this.dropDownEntries[0], async (value) => {
                 this.properties.option = value;
                 this.properties.actualSelection = value;
                 
                 await this.updateBackend();
                 
                 return value;
-            }, { values: dropDownEntries });
+            }, { values: this.dropDownEntries });
             this.addWidget("combo", "remove duplicates", "false", async (value) => {
                 this.properties.removeDuplicates = value;
                 this.regenerateDropdownEntries(this.properties.textValue, dropdownWidget);
@@ -74,7 +75,7 @@ app.registerExtension({
                 this.updateDropdownEntries(processedEntries, dropdownWidget);
                 if (processedEntries.length > 0) {
                     const currentSelection = this.properties.option || this.properties.actualSelection;
-                    if (currentSelection && processedEntries.includes(currentSelection)) {
+                    if (currentSelection && this.dropDownEntries.includes(currentSelection)) {
                         this.properties.option = currentSelection;
                         this.properties.actualSelection = currentSelection;
                         dropdownWidget.value = currentSelection;
@@ -109,8 +110,8 @@ app.registerExtension({
             };
             
             this.updateDropdownEntries = function(newEntries, widget) {
-                dropDownEntries = [...newEntries];
-                widget.options.values = dropDownEntries;
+                this.dropDownEntries = [...newEntries];
+                widget.options.values = this.dropDownEntries;
             };
             this.updateBackend().catch(() => {/* Silent error handling */});
         });
@@ -147,7 +148,7 @@ app.registerExtension({
                     const dropdownWidget = this.widgets.find(w => w.name === "option");
                     if (dropdownWidget && this.properties.textValue !== undefined) {
                         this.regenerateDropdownEntries(this.properties.textValue, dropdownWidget);
-                        if (this.properties.option && dropDownEntries.includes(this.properties.option)) {
+                        if (this.properties.option && this.dropDownEntries.includes(this.properties.option)) {
                             this.properties.actualSelection = this.properties.option;
                             dropdownWidget.value = this.properties.option;
                         }
