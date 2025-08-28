@@ -1,7 +1,5 @@
 import { app } from "../../scripts/app.js"
 
-// Remove global variable declaration
-
 let EXTENSION_NAME, MESSAGE_ROUTE, chainCallback, fetchSend;
 (async () => {
   const constants = await fetch('/dadosConstants').then(response => response.json());
