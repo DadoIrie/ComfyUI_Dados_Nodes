@@ -114,47 +114,20 @@ app.registerExtension({
             this.updateBackend().catch(() => {/* Silent error handling */});
         });
         
-        chainCallback(nodeType.prototype, "onSerialize", function(o) {
-            o.properties = o.properties || {};
-            o.properties.option = this.properties.option;
-            o.properties.textValue = this.properties.textValue;
-            o.properties.actualSelection = this.properties.actualSelection;
-            o.properties.removeDuplicates = this.properties.removeDuplicates;
-        });
-        
         chainCallback(nodeType.prototype, "onConfigure", function(o) {
-            if (o.properties) {
-                this.properties = this.properties || {};
-                if (o.properties.textValue !== undefined) {
-                    this.properties.textValue = o.properties.textValue;
-                }
-                
-                if (o.properties.option !== undefined) {
-                    this.properties.option = o.properties.option;
-                }
-                
-                if (o.properties.actualSelection !== undefined) {
-                    this.properties.actualSelection = o.properties.actualSelection;
-                } else {
-                    this.properties.actualSelection = this.properties.option;
-                }
-                
-                if (o.properties.removeDuplicates !== undefined) {
-                    this.properties.removeDuplicates = o.properties.removeDuplicates;
-                }
-                if (this.widgets) {
-                    const dropdownWidget = this.widgets.find(w => w.name === "option");
-                    if (dropdownWidget && this.properties.textValue !== undefined) {
-                        this.regenerateDropdownEntries(this.properties.textValue, dropdownWidget);
-                        if (this.properties.option && this.dropDownEntries.includes(this.properties.option)) {
-                            this.properties.actualSelection = this.properties.option;
-                            dropdownWidget.value = this.properties.option;
-                        }
+            if (this.widgets) {
+                const dropdownWidget = this.widgets.find(w => w.name === "option");
+                if (dropdownWidget && this.properties.textValue !== undefined) {
+                    this.regenerateDropdownEntries(this.properties.textValue, dropdownWidget);
+                    if (this.properties.option && this.dropDownEntries.includes(this.properties.option)) {
+                        this.properties.actualSelection = this.properties.option;
+                        dropdownWidget.value = this.properties.option;
                     }
                 }
-                this.updateBackend().catch(() => {/* Silent error handling */});
             }
+            this.updateBackend().catch(() => {/* Silent error handling */});
         });
+
         
         return nodeType;
     },
