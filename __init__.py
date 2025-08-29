@@ -25,6 +25,7 @@ COMMON_DIRECTORY = "./web/common"
 from .nodes.DN_MultilineString import DN_MultilineString
 from .nodes.DN_TextConcatenateNode import DN_TextConcatenateNode
 from .nodes.DN_TextDropDownNode import DN_TextDropDownNode
+from .nodes.DN_CSVMultiDropDownNode import DN_CSVMultiDropDownNode
 from .nodes.DN_WildcardPromptEditorNode import DN_WildcardPromptEditorNode
 from .nodes.DN_WildcardsProcessor import DN_WildcardsProcessor
 from .nodes.DN_SmolVLMNode import DN_SmolVLMNode
@@ -38,6 +39,7 @@ NODE_CLASS_MAPPINGS = {
     "DN_MultilineString": DN_MultilineString,
     "DN_TextConcatenateNode": DN_TextConcatenateNode,
     "DN_TextDropDownNode": DN_TextDropDownNode,
+    "DN_CSVMultiDropDownNode": DN_CSVMultiDropDownNode,
     "DN_WildcardPromptEditorNode": DN_WildcardPromptEditorNode,
     "DN_WildcardsProcessor": DN_WildcardsProcessor,
     "DN_SmolVLMNode": DN_SmolVLMNode,
@@ -51,6 +53,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "DN_MultilineString": "Multiline String",
     "DN_TextConcatenateNode": "Dynamic Text Concatenate",
     "DN_TextDropDownNode": "Text DropDown",
+    "DN_CSVMultiDropDownNode": "CSV MultiDropDown",
     "DN_WildcardPromptEditorNode": "Wildcard Prompt Editor",
     "DN_WildcardsProcessor": "Wildcards Processor",
     "DN_SmolVLMNode": "SmolVLM Image Describer",
