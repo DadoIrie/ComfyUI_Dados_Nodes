@@ -11,7 +11,8 @@ A collection of custom nodes for ComfyUI featuring AI vision models, advanced te
 
 ### 📝 Text Processing
 - **Dynamic Text Concatenate** - Flexible text combination with custom delimiters
-- **Text DropDown** - Interactive dropdown selections with random options
+- **Text DropDown** - Interactive dropdown selections with random selection and duplicate filtering
+- **CSV Multi DropDown** - Parse CSV rows into dynamic dropdowns with duplicate filtering and random selection
 - **Multiline String** - Simple multiline text input handling
 
 ### 🎲 Wildcard System
