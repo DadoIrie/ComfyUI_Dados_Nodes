@@ -259,7 +259,7 @@ class DN_WildcardPromptEditorNode:
         return (processed_text,)
     
     @classmethod
-    def IS_CHANGED(cls, unique_id=None):
+    def IS_CHANGED(cls, wildcards_prompt, wildcards_selections, unique_id=None):
         return random.randint(1, 1000000)
 
 class TextLoaderOperations:
