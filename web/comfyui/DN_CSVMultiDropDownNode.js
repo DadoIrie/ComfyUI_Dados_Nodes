@@ -27,17 +27,27 @@ app.registerExtension({
                     console.log("csv_text focused", this.id);
                 }); */
                 csvWidget.element.addEventListener('blur', () => {
-                    for (const id in this.dropdownWidgets) {
-                        const widget = this.dropdownWidgets[id];
-                        const index = this.widgets.indexOf(widget);
-                        if (index !== -1) {
-                            this.widgets.splice(index, 1);
-                        }
-                    }
-                    this.dropdownWidgets = {};
+                    this.resetDropdowns();
                     this.properties.csvText = csvWidget.value;
                     this.parseCSVToDropdowns(csvWidget.value);
                 });
+
+                this.addWidget("button", "load_csv", "Load CSV", () => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = '.csv';
+                    input.onchange = async (e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                            const content = await file.text();
+                            this.properties.csvText = content;
+                            csvWidget.value = content;
+                            this.resetDropdowns();
+                            this.parseCSVToDropdowns(content);
+                        }
+                    };
+                    input.click();
+                }, {});
             }
 
             this.updateBackend = async function() {
@@ -51,6 +61,18 @@ app.registerExtension({
                     }
                 }
                 await fetchSend(MESSAGE_ROUTE, this.id, "update_selections", payload);
+            };
+
+            this.resetDropdowns = function() {
+                for (const id in this.dropdownWidgets) {
+                    const widget = this.dropdownWidgets[id];
+                    const index = this.widgets.indexOf(widget);
+                    if (index !== -1) {
+                        this.widgets.splice(index, 1);
+                    }
+                }
+                this.dropdownWidgets = {};
+                this.setDirtyCanvas(true, true);
             };
 
             this.parseCSVToDropdowns = function(csvText) {
