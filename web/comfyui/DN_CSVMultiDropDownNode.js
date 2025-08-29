@@ -53,18 +53,6 @@ app.registerExtension({
                 await fetchSend(MESSAGE_ROUTE, this.id, "update_selections", payload);
             };
 
-/*             app.widgets['STRING'](this, "CSV", ["STRING", { multiline: true, placeholder: "Enter CSV data here..." }], (value) => {
-                this.properties.csvText = value;
-                this.parseCSVToDropdowns(value);
-                return value;
-            }); */
-
-/*             this.addWidget("combo", "remove duplicates", this.properties.removeDuplicates, (value) => {
-                this.properties.removeDuplicates = value;
-                this.parseCSVToDropdowns(this.properties.csvText);
-                return value;
-            }, { values: ["true", "false"] }); */
-
             this.parseCSVToDropdowns = function(csvText) {
                 if (!csvText) return;
                 const rows = csvText.split(/\r?\n/).filter(r => r.trim() !== "");
@@ -98,7 +86,6 @@ app.registerExtension({
                         widget = this.addWidget("combo", id, initialValue, async (value) => {
                             this.properties[id] = value;
                             await this.updateBackend();
-                            console.log(`Dropdown ${id} changed to ${value}`);
                             return value;
                         }, { values: options });
                     } else {
