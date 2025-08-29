@@ -92,7 +92,10 @@ app.registerExtension({
 
                     let widget = this.dropdownWidgets[id];
                     if (!widget) {
-                        widget = this.addWidget("combo", id, options[0], async (value) => {
+                        const initialValue = (this.properties[id] !== undefined && options.includes(this.properties[id]))
+                            ? this.properties[id]
+                            : options[0];
+                        widget = this.addWidget("combo", id, initialValue, async (value) => {
                             this.properties[id] = value;
                             await this.updateBackend();
                             console.log(`Dropdown ${id} changed to ${value}`);
