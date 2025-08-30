@@ -6,6 +6,29 @@ class WildcardManager {
     constructor(node, constants, textLoaderInstance, operations) {
         Object.assign(this, { node, constants, textLoaderInstance, operations });
         this.wildcardData = [];
+        // Add centralized state tracking
+        this.activeOverlay = null; // Track currently open tooltip or dropdown
+    }
+
+    // Add method to close any active overlays
+    _closeActiveOverlays(except = null) {
+        // Close all tooltips except the specified one
+        document.querySelectorAll('.wildcard-mark-tooltip').forEach(tooltip => {
+            if (tooltip !== except) {
+                tooltip.classList.remove('show');
+                setTimeout(() => tooltip.remove(), 200);
+            }
+        });
+
+        // Close all dropdowns except the specified one
+        document.querySelectorAll('.custom-dropdown.open').forEach(dropdown => {
+            if (dropdown !== except) {
+                this._closeCustomDropdown(dropdown);
+            }
+        });
+
+        // Update active overlay tracking
+        this.activeOverlay = except;
     }
 
     async loadWildcards(container) {
@@ -134,6 +157,9 @@ class WildcardManager {
     }
 
     showMarkTooltip(container, wildcard, markValue = '') {
+        // Close any active overlays before opening tooltip
+        this._closeActiveOverlays();
+
         // Remove any existing tooltips with fade out
         const existingTooltips = container.querySelectorAll('.wildcard-mark-tooltip');
         existingTooltips.forEach(t => {
@@ -143,6 +169,9 @@ class WildcardManager {
 
         const tooltip = document.createElement('div');
         tooltip.className = 'wildcard-mark-tooltip';
+
+        // Track this tooltip as the active overlay
+        this.activeOverlay = tooltip;
 
         // Centralized mark value retrieval
         const selections = JSON.parse(this.operations.originalSelections || '{}');
@@ -174,14 +203,20 @@ class WildcardManager {
             let val = input.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
             this.operations.updatePendingMark(wildcard.index, val);
             
+            // Clear active overlay tracking
+            this.activeOverlay = null;
+            
             // Fade out tooltip
             tooltip.classList.remove('show');
             setTimeout(() => {
                 tooltip.remove();
-                const section = container.closest('.wildcard-section');
-                if (section) {
-                    const newDropdown = this.createDropdown(wildcard);
-                    section.replaceChild(newDropdown, container);
+                // Update the mark icon state without recreating the entire dropdown
+                const markIcon = container.querySelector('.wildcard-mark-icon');
+                if (markIcon) {
+                    const selections = JSON.parse(this.operations.originalSelections || '{}');
+                    const pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
+                    const savedMark = selections[wildcard.index]?.mark ?? '';
+                    this._setMarkIconState(markIcon, pendingMark, savedMark);
                 }
             }, 200);
         };
@@ -190,14 +225,20 @@ class WildcardManager {
         const deleteMark = () => {
             this.operations.updatePendingMark(wildcard.index, '');
             
+            // Clear active overlay tracking
+            this.activeOverlay = null;
+            
             // Fade out tooltip
             tooltip.classList.remove('show');
             setTimeout(() => {
                 tooltip.remove();
-                const section = container.closest('.wildcard-section');
-                if (section) {
-                    const newDropdown = this.createDropdown(wildcard);
-                    section.replaceChild(newDropdown, container);
+                // Update the mark icon state without recreating the entire dropdown
+                const markIcon = container.querySelector('.wildcard-mark-icon');
+                if (markIcon) {
+                    const selections = JSON.parse(this.operations.originalSelections || '{}');
+                    const pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
+                    const savedMark = selections[wildcard.index]?.mark ?? '';
+                    this._setMarkIconState(markIcon, pendingMark, savedMark);
                 }
             }, 200);
         };
@@ -247,6 +288,7 @@ class WildcardManager {
         // Close tooltip with fade out when clicking outside
         const handleClickOutside = (event) => {
             if (!tooltip.contains(event.target) && event.target !== icon) {
+                this.activeOverlay = null; // Clear tracking
                 tooltip.classList.remove('show');
                 setTimeout(() => {
                     tooltip.remove();
@@ -326,9 +368,9 @@ class WildcardManager {
             this._toggleCustomDropdown(container);
         };
 
-        // Close dropdown when clicking outside
+        // Close dropdown when clicking outside (enhanced to work with centralized system)
         document.addEventListener('click', (e) => {
-            if (!container.contains(e.target)) {
+            if (!container.contains(e.target) && this.activeOverlay === container) {
                 this._closeCustomDropdown(container);
             }
         });
@@ -343,22 +385,20 @@ class WildcardManager {
     _toggleCustomDropdown(container) {
         const isOpen = container.classList.contains('open');
         
-        // Close all other dropdowns first
-        document.querySelectorAll('.custom-dropdown.open').forEach(dropdown => {
-            if (dropdown !== container) {
-                this._closeCustomDropdown(dropdown);
-            }
-        });
-
         if (isOpen) {
             this._closeCustomDropdown(container);
         } else {
+            // Close any active overlays before opening this dropdown
+            this._closeActiveOverlays(container);
             this._openCustomDropdown(container);
         }
     }
 
     _openCustomDropdown(container) {
         container.classList.add('open');
+        
+        // Track this dropdown as the active overlay
+        this.activeOverlay = container;
         
         // Focus the container for keyboard navigation
         container.focus();
@@ -372,6 +412,11 @@ class WildcardManager {
 
     _closeCustomDropdown(container) {
         container.classList.remove('open');
+        
+        // Clear active overlay tracking if this was the active one
+        if (this.activeOverlay === container) {
+            this.activeOverlay = null;
+        }
     }
 
     _handleCustomDropdownSelection(container, wildcard, selectedOption, selectedIndex) {
@@ -628,14 +673,32 @@ class WildcardManager {
 
     async saveSelections(container) {
         try {
+            // Save all pending mark values first
+            const pendingMarks = {};
+            Object.keys(this.operations.pendingSelections).forEach(wildcardIndex => {
+                const markValue = this.operations.pendingSelections[wildcardIndex]?.mark;
+                if (markValue !== undefined) {
+                    pendingMarks[wildcardIndex] = markValue;
+                }
+            });
+
             await this._savePendingSelections();
             await this.operations.saveSelections();
+            
+            // Flash the labels BEFORE updating anything else
             this._flashSavedLabels(container);
+            
+            // Update mark icons with the saved values
+            Object.keys(pendingMarks).forEach(wildcardIndex => {
+                const section = container.querySelector(`[data-wildcard-index="${wildcardIndex}"]`);
+                const markIcon = section?.querySelector('.wildcard-mark-icon');
+                if (markIcon) {
+                    const savedMark = pendingMarks[wildcardIndex];
+                    // After saving, pending becomes undefined and saved becomes the value
+                    this._setMarkIconState(markIcon, undefined, savedMark);
+                }
+            });
 
-            // Ensure pendingSelections is cleared and originalSelections is updated
-            this.operations.pendingSelections = {};
-            // Re-render the wildcards UI so mark icons update color
-            await this.loadWildcards(container);
         } catch (error) {
             console.error('Error saving selections:', error);
         }
@@ -643,15 +706,25 @@ class WildcardManager {
 
     async _savePendingSelections() {
         for (const [wildcardIndex, selectionData] of Object.entries(this.operations.pendingSelections)) {
-            const response = await fetchSend(this.constants.MESSAGE_ROUTE, this.node.id, "update_wildcard_selection", {
+            // Handle both selection and mark updates
+            const updateData = {
                 wildcard_index: wildcardIndex,
                 selected_value: selectionData.selected,
                 original_wildcard: selectionData.original,
                 wildcards_selections: this.textLoaderInstance.getHiddenWidgetValue("wildcards_selections")
-            });
+            };
+
+            // Add mark data if it exists
+            if (selectionData.mark !== undefined) {
+                updateData.mark_value = selectionData.mark;
+            }
+
+            const response = await fetchSend(this.constants.MESSAGE_ROUTE, this.node.id, "update_wildcard_selection", updateData);
             
             if (response?.status === "success" && response.selections_json) {
                 this.textLoaderInstance.updateHiddenWidget("wildcards_selections", response.selections_json);
+                // Update originalSelections immediately so mark icon states are correct
+                this.operations.originalSelections = response.selections_json;
             }
         }
     }
@@ -694,22 +767,30 @@ class Operations {
     }
 
     updatePendingMark(wildcardIndex, markValue) {
+        // Get current saved mark value
         let originalMark = '';
         let selections = {};
         try {
             selections = JSON.parse(this.originalSelections || '{}');
+            originalMark = selections[wildcardIndex]?.mark || '';
         } catch (e) {}
-        if (selections[wildcardIndex]?.mark) {
-            originalMark = selections[wildcardIndex].mark;
-        }
 
+        // Initialize pending selection if it doesn't exist
         if (!this.pendingSelections[wildcardIndex]) {
             this.pendingSelections[wildcardIndex] = { selected: '', original: '' };
         }
+        
+        // Set the mark value
         this.pendingSelections[wildcardIndex].mark = markValue;
 
-        // Only set unsaved changes if mark is actually changed
-        this.hasUnsavedSelectionChanges = (markValue !== originalMark);
+        // Only set unsaved changes if mark is actually different from saved
+        this.hasUnsavedSelectionChanges = (markValue !== originalMark) || 
+            Object.keys(this.pendingSelections).some(index => {
+                const pending = this.pendingSelections[index];
+                const orig = selections[index] || {};
+                return (pending.selected || '') !== (orig.selected || '') || 
+                       (pending.mark || '') !== (orig.mark || '');
+            });
     }
 
     async saveContent(content) {
