@@ -134,7 +134,12 @@ class WildcardManager {
     }
 
     showMarkTooltip(container, wildcard, markValue = '') {
-        container.querySelectorAll('.wildcard-mark-tooltip').forEach(t => t.remove());
+        // Remove any existing tooltips with fade out
+        const existingTooltips = container.querySelectorAll('.wildcard-mark-tooltip');
+        existingTooltips.forEach(t => {
+            t.classList.remove('show');
+            setTimeout(() => t.remove(), 200); // Wait for fade out animation
+        });
 
         const tooltip = document.createElement('div');
         tooltip.className = 'wildcard-mark-tooltip';
@@ -164,27 +169,37 @@ class WildcardManager {
         deleteBtn.style.cursor = 'pointer';
         deleteBtn.title = 'Delete mark';
 
-        // Add mark logic
+        // Add mark logic with fade out
         const addMark = () => {
             let val = input.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
             this.operations.updatePendingMark(wildcard.index, val);
-            tooltip.remove();
-            const section = container.closest('.wildcard-section');
-            if (section) {
-                const newDropdown = this.createDropdown(wildcard);
-                section.replaceChild(newDropdown, container);
-            }
+            
+            // Fade out tooltip
+            tooltip.classList.remove('show');
+            setTimeout(() => {
+                tooltip.remove();
+                const section = container.closest('.wildcard-section');
+                if (section) {
+                    const newDropdown = this.createDropdown(wildcard);
+                    section.replaceChild(newDropdown, container);
+                }
+            }, 200);
         };
 
-        // Delete mark logic
+        // Delete mark logic with fade out
         const deleteMark = () => {
             this.operations.updatePendingMark(wildcard.index, '');
-            tooltip.remove();
-            const section = container.closest('.wildcard-section');
-            if (section) {
-                const newDropdown = this.createDropdown(wildcard);
-                section.replaceChild(newDropdown, container);
-            }
+            
+            // Fade out tooltip
+            tooltip.classList.remove('show');
+            setTimeout(() => {
+                tooltip.remove();
+                const section = container.closest('.wildcard-section');
+                if (section) {
+                    const newDropdown = this.createDropdown(wildcard);
+                    section.replaceChild(newDropdown, container);
+                }
+            }, 200);
         };
 
         addBtn.onclick = addMark;
@@ -197,11 +212,12 @@ class WildcardManager {
         tooltip.appendChild(addBtn);
         tooltip.appendChild(deleteBtn);
 
-        // Positioning logic (unchanged)
+        // Positioning logic
         const icon = container.querySelector('.wildcard-mark-icon');
         const row = icon.parentElement;
         row.appendChild(tooltip);
 
+        // Position tooltip and then fade in
         setTimeout(() => {
             const iconRect = icon.getBoundingClientRect();
             const rowRect = row.getBoundingClientRect();
@@ -216,18 +232,33 @@ class WildcardManager {
             }
             tooltip.style.left = `${left}px`;
             tooltip.style.top = `${top}px`;
+            
+            // Trigger fade in animation
+            requestAnimationFrame(() => {
+                tooltip.classList.add('show');
+            });
         }, 0);
 
-        input.focus();
+        // Focus input after fade in
+        setTimeout(() => {
+            input.focus();
+        }, 100);
 
-        // Close tooltip when clicking outside
+        // Close tooltip with fade out when clicking outside
         const handleClickOutside = (event) => {
             if (!tooltip.contains(event.target) && event.target !== icon) {
-                tooltip.remove();
-                document.removeEventListener('mousedown', handleClickOutside);
+                tooltip.classList.remove('show');
+                setTimeout(() => {
+                    tooltip.remove();
+                    document.removeEventListener('mousedown', handleClickOutside);
+                }, 200);
             }
         };
-        document.addEventListener('mousedown', handleClickOutside);
+        
+        // Add click outside listener after a brief delay to prevent immediate closure
+        setTimeout(() => {
+            document.addEventListener('mousedown', handleClickOutside);
+        }, 100);
     }
 
     _createElement(tag, className, textContent = '') {

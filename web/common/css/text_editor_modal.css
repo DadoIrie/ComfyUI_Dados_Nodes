@@ -523,18 +523,28 @@
 /* Tooltip for marking input */
 .wildcard-mark-tooltip {
     position: absolute;
-    background: rgba(20, 20, 20, 0.98); /* even darker */
+    background: rgba(20, 20, 20, 0.98);
     color: #ccc;
-    padding: 10px 14px;
-    border-radius: 6px;
-    z-index: 120;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    padding: 8px;
+    border-radius: 4px;
     display: flex;
     align-items: center;
-    gap: 10px;
-    min-width: 180px;
-    border: none;
+    gap: 6px;
+    z-index: 1001;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    /* Add fade animation properties */
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(0.95) translateY(-5px);
+    transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
 }
+
+.wildcard-mark-tooltip.show {
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1) translateY(0);
+}
+
 .wildcard-mark-tooltip input[type="text"] {
     background: #444;                   /* slightly lighter gray */
     color: #ccc;                        /* light gray font */
