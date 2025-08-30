@@ -1095,11 +1095,11 @@ class ButtonManager {
 
 export function createTextEditorModal(node, textContent, constants, textLoaderInstance) {
     const loadTextEditorCSS = async () => {
-        if (!document.querySelector('link[href$="/text_editor_modal.css"]')) {
+        if (!document.querySelector('link[href$="/wildcard_prompt_editor_modal.css"]')) {
             const cssLink = document.createElement('link');
             Object.assign(cssLink, {
                 rel: 'stylesheet',
-                href: `/extensions/${constants.EXTENSION_NAME}/common/css/text_editor_modal.css`
+                href: `/extensions/${constants.EXTENSION_NAME}/common/css/wildcard_prompt_editor_modal.css`
             });
             
             return new Promise((resolve) => {

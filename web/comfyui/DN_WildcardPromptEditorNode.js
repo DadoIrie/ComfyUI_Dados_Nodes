@@ -67,7 +67,7 @@ class DN_WildcardPromptEditorNode {
             const textContent = response?.status === "success" ? response.content || '' : wildcards_prompt;
             const constants = { EXTENSION_NAME, MESSAGE_ROUTE };
             
-            const { createTextEditorModal } = await import(`/extensions/${EXTENSION_NAME}/common/js/wildcard_text_editor_modal.js`);
+            const { createTextEditorModal } = await import(`/extensions/${EXTENSION_NAME}/common/js/wildcard_prompt_editor_modal.js`);
             createTextEditorModal(
                 this.node, 
                 textContent, 
