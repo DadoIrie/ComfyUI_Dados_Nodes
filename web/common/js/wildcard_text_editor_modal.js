@@ -8,6 +8,8 @@ class WildcardManager {
         this.wildcardData = [];
         // Add centralized state tracking
         this.activeOverlay = null; // Track currently open tooltip or dropdown
+        // Add wildcard structure tracking for change detection
+        this.lastWildcardStructure = null;
     }
 
     // Add method to close any active overlays
@@ -35,13 +37,24 @@ class WildcardManager {
         try {
             const response = await this._fetchWildcards();
             if (response?.status === "success" && response.wildcards) {
+                // Check if wildcard structure has changed
+                const structureChanged = this._hasWildcardStructureChanged(response.wildcards);
+                
                 this.wildcardData = response.wildcards;
                 this.createWildcardUI(container, response.wildcards);
                 
-                // Use requestAnimationFrame to ensure DOM is rendered before restoring
-                requestAnimationFrame(() => {
-                    this.restoreSelectionStates(response.wildcards);
-                });
+                // Only reset selections/marks if structure changed, otherwise restore them
+                if (structureChanged) {
+                    // Structure changed - reset both selections and marks in operations
+                    this.operations.resetPendingSelections();
+                    // Update the stored structure
+                    this._updateWildcardStructure(response.wildcards);
+                } else {
+                    // Structure unchanged - restore both selections and marks
+                    requestAnimationFrame(() => {
+                        this.restoreSelectionStates(response.wildcards);
+                    });
+                }
                 
                 return this.countTotalWildcards(response.wildcards);
             }
@@ -80,17 +93,34 @@ class WildcardManager {
         const section = document.querySelector(`[data-wildcard-index="${wildcard.index}"]`);
         const dropdown = section?.querySelector('.custom-dropdown');
         
-        if (!dropdown || !wildcard.selected) {
+        if (!dropdown) {
             return;
         }
         
-        const selectedIndex = wildcard.options.indexOf(wildcard.selected);
-        if (selectedIndex <= 0) {
-            return;
+        // Restore selection state
+        if (wildcard.selected) {
+            const selectedIndex = wildcard.options.indexOf(wildcard.selected);
+            if (selectedIndex > 0) {
+                this._restoreDropdownUI(dropdown, wildcard, selectedIndex);
+                this._restoreChildrenVisibility(wildcard, selectedIndex);
+            }
         }
         
-        this._restoreDropdownUI(dropdown, wildcard, selectedIndex);
-        this._restoreChildrenVisibility(wildcard, selectedIndex);
+        // Restore mark state
+        this._restoreMarkState(section, wildcard);
+    }
+
+    _restoreMarkState(section, wildcard) {
+        const markIcon = section?.querySelector('.wildcard-mark-icon');
+        if (!markIcon) return;
+
+        // Get current mark values
+        const selections = JSON.parse(this.operations.originalSelections || '{}');
+        const pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
+        const savedMark = selections[wildcard.index]?.mark ?? '';
+
+        // Restore mark icon state
+        this._setMarkIconState(markIcon, pendingMark, savedMark);
     }
 
     _restoreDropdownUI(dropdown, wildcard, selectedIndex) {
@@ -516,7 +546,9 @@ class WildcardManager {
 
     async handleSelectionChange(wildcard, selectedValue, selectedIndex) {
         try {
+            // Update the selection (mark preservation is handled in updatePendingSelection)
             this.operations.updatePendingSelection(wildcard.index, selectedValue, wildcard.original);
+            
             this.updateChildrenVisibility(wildcard, selectedIndex, false);
         } catch (error) {
             console.error('Error updating wildcard selection:', error);
@@ -693,6 +725,9 @@ class WildcardManager {
     updateFromSave(container, wildcards) {
         if (!wildcards) return 0;
         
+        // Always update structure when saving (this is a definitive change)
+        this._updateWildcardStructure(wildcards);
+        
         this.wildcardData = wildcards;
         this.createWildcardUI(container, wildcards);
         this.restoreSelectionStates(wildcards);
@@ -783,6 +818,42 @@ class WildcardManager {
             setTimeout(() => label.classList.remove('flash-update'), 300);
         });
     }
+
+    // Add method to check if wildcard structure has changed
+    _hasWildcardStructureChanged(newWildcards) {
+        if (!this.lastWildcardStructure) {
+            return true; // First load
+        }
+
+        const newStructure = this._extractWildcardStructure(newWildcards);
+        return JSON.stringify(this.lastWildcardStructure) !== JSON.stringify(newStructure);
+    }
+
+    // Extract the structural information of wildcards (excluding selections/marks)
+    _extractWildcardStructure(wildcards) {
+        return wildcards.map(wildcard => ({
+            index: wildcard.index,
+            original: wildcard.original,
+            options: wildcard.options,
+            is_entry_wildcard: wildcard.is_entry_wildcard,
+            children: wildcard.children ? this._extractChildrenStructure(wildcard.children) : null,
+            entry_wildcards: wildcard.entry_wildcards ? this._extractChildrenStructure(wildcard.entry_wildcards) : null
+        }));
+    }
+
+    // Extract structure for nested wildcards
+    _extractChildrenStructure(children) {
+        const structure = {};
+        for (const [key, childArray] of Object.entries(children)) {
+            structure[key] = this._extractWildcardStructure(childArray);
+        }
+        return structure;
+    }
+
+    // Update stored wildcard structure
+    _updateWildcardStructure(wildcards) {
+        this.lastWildcardStructure = this._extractWildcardStructure(wildcards);
+    }
 }
 
 class Operations {
@@ -806,15 +877,42 @@ class Operations {
     }
 
     updatePendingSelection(wildcardIndex, selectedValue, originalWildcard) {
-        this.pendingSelections[wildcardIndex] = {
-            selected: selectedValue,
-            original: originalWildcard
-        };
+        // Get existing mark from both pending and saved
+        let existingMark;
+        const pendingMark = this.pendingSelections[wildcardIndex]?.mark;
+        
+        if (pendingMark !== undefined) {
+            // Use pending mark if it exists
+            existingMark = pendingMark;
+        } else {
+            // Check for saved mark in originalSelections
+            try {
+                const selections = JSON.parse(this.originalSelections || '{}');
+                existingMark = selections[wildcardIndex]?.mark;
+            } catch (e) {
+                existingMark = undefined;
+            }
+        }
+        
+        // Update or create the selection entry
+        if (!this.pendingSelections[wildcardIndex]) {
+            this.pendingSelections[wildcardIndex] = {};
+        }
+        
+        // Update only the selection fields
+        this.pendingSelections[wildcardIndex].selected = selectedValue;
+        this.pendingSelections[wildcardIndex].original = originalWildcard;
+        
+        // Preserve the mark if it existed (either pending or saved)
+        if (existingMark !== undefined && existingMark !== '') {
+            this.pendingSelections[wildcardIndex].mark = existingMark;
+        }
+        
         this.hasUnsavedSelectionChanges = true;
     }
 
     updatePendingMark(wildcardIndex, markValue) {
-        // Get current saved mark value
+        // Get current saved values
         let originalMark = '';
         let selections = {};
         try {
@@ -822,12 +920,19 @@ class Operations {
             originalMark = selections[wildcardIndex]?.mark || '';
         } catch (e) {}
 
-        // Initialize pending selection if it doesn't exist
+        // Initialize pending selection if it doesn't exist, preserving existing selection
         if (!this.pendingSelections[wildcardIndex]) {
-            this.pendingSelections[wildcardIndex] = { selected: '', original: '' };
+            // Use saved selection data as fallback
+            const savedSelection = selections[wildcardIndex]?.selected || '';
+            const savedOriginal = selections[wildcardIndex]?.original || '';
+            
+            this.pendingSelections[wildcardIndex] = { 
+                selected: savedSelection, 
+                original: savedOriginal
+            };
         }
         
-        // Set the mark value
+        // Set the mark value, preserving existing selection
         this.pendingSelections[wildcardIndex].mark = markValue;
 
         // Only set unsaved changes if mark is actually different from saved
@@ -899,6 +1004,12 @@ class Operations {
             }
         }
         return false;
+    }
+
+    // Add method to reset pending selections when wildcard structure changes
+    resetPendingSelections() {
+        this.pendingSelections = {};
+        this.hasUnsavedSelectionChanges = false;
     }
 }
 
