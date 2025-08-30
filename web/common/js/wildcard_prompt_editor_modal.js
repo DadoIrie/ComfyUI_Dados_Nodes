@@ -1209,9 +1209,7 @@ export function createTextEditorModal(node, textContent, constants, textLoaderIn
 
     mainSection.appendChild(buttonContainer);
     contentDiv.appendChild(mainSection);
-    console.log('Sidebar created:', sidebar);
     contentDiv.appendChild(sidebar);
-    console.log('Sidebar appended:', contentDiv.querySelector('.text-editor-sidebar'));
 
     const modalConfig = {
         content: contentDiv,
