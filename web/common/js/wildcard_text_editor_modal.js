@@ -183,7 +183,15 @@ class WildcardManager {
 
         markIcon.onclick = (e) => {
             e.stopPropagation();
-            this.showMarkTooltip(container, wildcard, pendingMark);
+            
+            const existingTooltip = container.querySelector('.wildcard-mark-tooltip');
+        
+            if (existingTooltip) {
+                existingTooltip.remove();
+                this.activeOverlay = null;
+            } else {
+                this.showMarkTooltip(container, wildcard, pendingMark);
+            }
         };
 
         row.appendChild(dropdown);
