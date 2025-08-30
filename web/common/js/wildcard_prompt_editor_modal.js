@@ -781,6 +781,7 @@ class WildcardManager {
                 wildcards_selections: this.textLoaderInstance.getHiddenWidgetValue("wildcards_selections")
             };
 
+            // UPDATED: Ensure mark value is sent correctly
             if (selectionData.mark !== undefined) {
                 updateData.mark_value = selectionData.mark;
             }

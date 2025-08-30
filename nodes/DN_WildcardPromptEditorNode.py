@@ -169,6 +169,10 @@ class DN_WildcardPromptEditorNode:
                 if selected_value in wildcard['options']:
                     wildcard['selected'] = selected_value
                     
+                    # NEW: Transfer mark data from selections to wildcard object
+                    if 'mark' in selection_data:
+                        wildcard['mark'] = selection_data['mark']
+                    
                     if 'children' in wildcard and wildcard['children']:
                         selected_index = wildcard['options'].index(selected_value)
                         if selected_index > 0:
@@ -248,33 +252,172 @@ class DN_WildcardPromptEditorNode:
     
     def process_prompt(self, wildcards_prompt="", wildcards_selections="", unique_id=None):
         if not wildcards_prompt.strip():
-            return ('',)
+            return ('', '')
         try:
             selections = json.loads(wildcards_selections) if wildcards_selections.strip() else {}
         except json.JSONDecodeError:
             selections = {}
 
-        clean_prompt = wildcards_prompt
-        marked_prompt = self.apply_markings_to_text(wildcards_prompt, selections)
+        # Apply wildcards to get clean text (no marks)
+        clean_prompt = self.apply_wildcards_to_text(wildcards_prompt, selections)
+        
+        # Apply markings using the new position-based system
+        marked_prompt = self.apply_markings_during_resolution(wildcards_prompt, selections)
+        
         return (clean_prompt, marked_prompt)
 
-    def apply_markings_to_text(self, clean_prompt: str, selections: Dict) -> str:
-        matches = self._find_wildcard_matches(clean_prompt)
-        modified_text = clean_prompt
+    def apply_markings_during_resolution(self, original_prompt: str, selections: Dict) -> str:
+        """Apply markings during wildcard resolution to handle position tracking"""
+        # Calculate effective marks with inheritance
+        effective_marks = self._calculate_effective_marks(selections)
+        
+        # Process wildcards and apply marks simultaneously
+        processed_selections = self._flatten_selections_for_processing(selections)
+        return self._apply_wildcards_and_marks_recursive(original_prompt, processed_selections, effective_marks, "", selections)
+
+    def _apply_wildcards_and_marks_recursive(self, text: str, selections: Dict, effective_marks: Dict, parent_index: str, full_selections: Dict) -> str:
+        """Apply wildcards and marks simultaneously to handle position tracking"""
+        matches = self._find_wildcard_matches(text)
+        
+        modified_text = text
         offset = 0
+        
         for i, (start, end, content) in enumerate(matches):
-            current_index = str(i + 1)
-            sel = selections.get(current_index, {})
-            mark = sel.get("mark", "")
-            if mark:
-                mark = mark.upper()
-                original = clean_prompt[start:end]
-                wrapped = f"START_{mark}{original}END_{mark}"
-                adjusted_start = start + offset
-                adjusted_end = end + offset
-                modified_text = modified_text[:adjusted_start] + wrapped + modified_text[adjusted_end:]
-                offset += len(wrapped) - (end - start)
+            current_index = f"{parent_index}.{i + 1}" if parent_index else str(i + 1)
+            
+            # Get selected value
+            selected_value = selections.get(current_index, '')
+            
+            print(f"DEBUG: Processing wildcard {current_index}, selected: '{selected_value}'")  # DEBUG
+            
+            if selected_value:
+                replacement = self._process_wildcard_with_marks(
+                    text, start, end, content, current_index, selected_value, 
+                    selections, effective_marks, full_selections
+                )
+            else:
+                # No selection - keep the original wildcard text
+                replacement = text[start:end]
+            
+            # Apply mark to this wildcard if it has one AND it's not empty
+            effective_mark = effective_marks.get(current_index)
+            print(f"DEBUG: Wildcard {current_index} effective_mark: '{effective_mark}'")  # DEBUG
+            
+            if effective_mark and effective_mark.strip():
+                print(f"DEBUG: Applying mark {effective_mark} to wildcard {current_index}")  # DEBUG
+                replacement = f"START_{effective_mark.upper()}{replacement}END_{effective_mark.upper()}"
+            else:
+                print(f"DEBUG: No mark applied to wildcard {current_index} (mark: '{effective_mark}')")  # DEBUG
+            
+            # Replace in text
+            adjusted_start = start + offset
+            adjusted_end = end + offset
+            modified_text = modified_text[:adjusted_start] + replacement + modified_text[adjusted_end:]
+            offset += len(replacement) - (end - start)
+        
         return modified_text
+
+    def _process_wildcard_with_marks(
+            self, text: str, start: int, end: int, content: str, 
+            current_index: str, selected_value: str, 
+            selections: Dict, effective_marks: Dict, full_selections: Dict) -> str:
+        """Process a single wildcard with mark support"""
+        
+        if self._has_top_level_pipes(content):
+            options = self._split_top_level_options(content)
+            if selected_value in options:
+                selected_option_index = options.index(selected_value) + 1
+                child_index = f"{current_index}.{selected_option_index}"
+                
+                # Recursively process the selected value
+                replacement = self._apply_wildcards_and_marks_recursive(
+                    selected_value, selections, effective_marks, child_index, full_selections
+                )
+                
+                # Process entry wildcards
+                replacement = self._apply_entry_wildcards_with_marks(
+                    replacement, selections, effective_marks, child_index, full_selections
+                )
+            else:
+                replacement = text[start:end]  # Keep original if not found
+        else:
+            # For simple options (like {correctA|correctB}), just use the selected value
+            replacement = selected_value
+            
+            # Process any entry wildcards within this selected value
+            replacement = self._apply_entry_wildcards_with_marks(
+                replacement, selections, effective_marks, current_index + ".1", full_selections
+            )
+        
+        return replacement
+
+    def _apply_entry_wildcards_with_marks(self, text: str, selections: Dict, effective_marks: Dict, base_index: str, full_selections: Dict) -> str:
+        """Apply entry wildcard selections with marks"""
+        modified_text = text
+        entry_matches = list(re.finditer(r'\{([^{}]+)\}', text))
+        
+        # Process in reverse order to maintain positions
+        for i, match in enumerate(reversed(entry_matches)):
+            entry_index = f"{base_index}.e{len(entry_matches) - i}"
+            
+            selected_value = selections.get(entry_index, '')
+            
+            if selected_value:
+                replacement = selected_value
+                
+                # Apply mark if this entry wildcard has one AND it's not empty
+                effective_mark = effective_marks.get(entry_index)
+                if effective_mark and effective_mark.strip():  # ← Added strip() check
+                    replacement = f"START_{effective_mark.upper()}{replacement}END_{effective_mark.upper()}"
+                
+                start, end = match.span()
+                modified_text = modified_text[:start] + replacement + modified_text[end:]
+        
+        return modified_text
+
+    def _calculate_effective_marks(self, selections: Dict) -> Dict[str, str]:
+        """Calculate effective marks for each wildcard using inheritance"""
+        print(f"DEBUG: Input selections: {selections}")  # DEBUG
+        effective_marks = {}
+        
+        # First pass: collect direct marks
+        direct_marks = {}
+        for wildcard_index, selection_data in selections.items():
+            if isinstance(selection_data, dict) and 'mark' in selection_data:
+                mark = selection_data.get('mark', '')
+                direct_marks[wildcard_index] = mark
+                print(f"DEBUG: Found mark for {wildcard_index}: '{mark}'")  # DEBUG
+        
+        print(f"DEBUG: Direct marks: {direct_marks}")  # DEBUG
+        
+        # Second pass: apply inheritance
+        for wildcard_index in selections.keys():
+            if wildcard_index in direct_marks:
+                effective_marks[wildcard_index] = direct_marks[wildcard_index]
+            else:
+                inherited_mark = self._find_inherited_mark(wildcard_index, direct_marks)
+                if inherited_mark:
+                    effective_marks[wildcard_index] = inherited_mark
+        
+        print(f"DEBUG: Final effective marks: {effective_marks}")  # DEBUG
+        return effective_marks
+
+    def _find_inherited_mark(self, wildcard_index: str, direct_marks: Dict[str, str]) -> Optional[str]:
+        """Find the most specific parent mark for inheritance"""
+        index_parts = wildcard_index.split('.')
+        
+        # Walk up the hierarchy looking for a marked parent
+        for i in range(len(index_parts) - 1, 0, -1):
+            parent_index = '.'.join(index_parts[:i])
+            if parent_index in direct_marks:
+                return direct_marks[parent_index]
+        
+        return None
+
+    # Keep the old apply_markings_to_text method for backward compatibility but use new system
+    def apply_markings_to_text(self, clean_prompt: str, selections: Dict) -> str:
+        """Legacy method - now redirects to new implementation"""
+        return self.apply_markings_during_resolution(clean_prompt, selections)
 
     @classmethod
     def IS_CHANGED(cls, wildcards_prompt, wildcards_selections, unique_id=None):
@@ -367,6 +510,9 @@ class TextLoaderOperations:
                     'selected': wildcard['selected'],
                     'original': wildcard['original']
                 }
+                # NEW: Preserve mark if it exists
+                if wildcard.get('mark'):
+                    selections[wildcard['index']]['mark'] = wildcard['mark']
             
             if wildcard.get('children'):
                 for child_wildcards in wildcard['children'].values():
@@ -380,6 +526,7 @@ class TextLoaderOperations:
         wildcard_index = str(payload.get('wildcard_index', ''))
         selected_value = payload.get('selected_value', '')
         original_wildcard = payload.get('original_wildcard', '')
+        mark_value = payload.get('mark_value')  # NEW: Handle mark value
         wildcards_selections = payload.get('wildcards_selections', '')
         
         try:
@@ -392,6 +539,13 @@ class TextLoaderOperations:
                 'selected': selected_value,
                 'original': original_wildcard
             }
+            # NEW: Handle mark value
+            if mark_value is not None:
+                if mark_value:  # Non-empty mark
+                    selections[wildcard_index]['mark'] = mark_value
+                elif 'mark' in selections[wildcard_index]:
+                    # Remove mark if empty value provided
+                    del selections[wildcard_index]['mark']
         else:
             selections.pop(wildcard_index, None)
         
