@@ -49,12 +49,13 @@ class WildcardManager {
                     this.operations.resetPendingSelections();
                     // Update the stored structure
                     this._updateWildcardStructure(response.wildcards);
-                } else {
-                    // Structure unchanged - restore both selections and marks
-                    requestAnimationFrame(() => {
-                        this.restoreSelectionStates(response.wildcards);
-                    });
                 }
+                
+                // Always restore selection states regardless of structure change
+                // This ensures nested wildcards are visible when they should be
+                requestAnimationFrame(() => {
+                    this.restoreSelectionStates(response.wildcards);
+                });
                 
                 return this.countTotalWildcards(response.wildcards);
             }
