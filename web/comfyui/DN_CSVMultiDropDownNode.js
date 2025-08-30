@@ -21,6 +21,20 @@ app.registerExtension({
             this.properties.removeDuplicates = this.properties.removeDuplicates || "false";
             this.dropdownWidgets = {};
 
+            if (this.outputs) {
+                for (let i = this.outputs.length - 1; i >= 0; i--) {
+                    const output = this.outputs[i];
+                    if (output.name !== "combined_selections") {
+                        this.removeOutput(i);
+                    }
+                }
+            }
+
+            const computed = this.computeSize();
+            this.size[0] = Math.max(this.size[0], computed[0]);
+            this.size[1] = computed[1];
+            this.setDirtyCanvas(true, true);
+
             const csvWidget = this.widgets.find(w => w.name === "csv_text");
             if (csvWidget && csvWidget.element) {
                 /* csvWidget.element.addEventListener('focus', () => {
@@ -72,6 +86,16 @@ app.registerExtension({
                     }
                 }
                 this.dropdownWidgets = {};
+                
+                if (this.outputs) {
+                    for (let i = this.outputs.length - 1; i >= 0; i--) {
+                        const output = this.outputs[i];
+                        if (output.name !== "combined_selections") {
+                            this.removeOutput(i);
+                        }
+                    }
+                }
+                
                 this.setDirtyCanvas(true, true);
             };
 
@@ -110,6 +134,11 @@ app.registerExtension({
                             await this.updateBackend();
                             return value;
                         }, { values: options });
+                        
+                        const existingOutput = this.outputs?.find(output => output.name === id);
+                        if (!existingOutput) {
+                            this.addOutput(id, "STRING");
+                        }
                     } else {
                         widget.options.values = options;
                         if (widget.value && options.includes(widget.value)) {

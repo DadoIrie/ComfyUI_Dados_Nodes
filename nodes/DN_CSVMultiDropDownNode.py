@@ -15,13 +15,13 @@ class DN_CSVMultiDropDownNode:
     """
     Node that outputs selections from multiple CSV-based dropdowns.
     """
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("text",)
+    RETURN_TYPES = ("STRING",) * 31
+    RETURN_NAMES = ("combined_selections",) + tuple(str(i) for i in range(1, 31))
     FUNCTION = "process"
     CATEGORY = "Dado's Nodes/Text"
 
-    selections: ClassVar[Dict[str, Dict[str, str]]] = {}  # node_id -> {dropdown_id: selection}
-    entries_map: ClassVar[Dict[str, Dict[str, List[str]]]] = {}  # node_id -> {dropdown_id: entries}
+    selections: ClassVar[Dict[str, Dict[str, str]]] = {}
+    entries_map: ClassVar[Dict[str, Dict[str, List[str]]]] = {}
     DEFAULT_SELECTION = "empty"
 
     @classmethod
@@ -42,14 +42,35 @@ class DN_CSVMultiDropDownNode:
         selections_for_node = self.__class__.selections.get(node_id, {})
         result_entries = []
 
-        for dropdown_id, selection in selections_for_node.items():
+        dropdown_order = []
+        if csv_text:
+            rows = csv_text.split('\n')
+            for row in rows:
+                row = row.strip()
+                if not row:
+                    continue
+                parts = row.split(',')
+                if len(parts) >= 2:
+                    dropdown_id = parts[0].strip().strip('"')
+                    dropdown_order.append(dropdown_id)
+
+        for dropdown_id in dropdown_order:
+            selection = selections_for_node.get(dropdown_id, self.DEFAULT_SELECTION)
             if selection == "random":
                 entries = self.__class__.entries_map.get(node_id, {}).get(dropdown_id, [])
                 selection = random.choice(entries) if entries else self.DEFAULT_SELECTION
             result_entries.append(selection)
 
-        # return concatenated string of all dropdown selections
-        return (", ".join(result_entries) if result_entries else self.DEFAULT_SELECTION,)
+        combined = ", ".join(result_entries) if result_entries else self.DEFAULT_SELECTION
+        
+        individual_outputs = []
+        for i in range(30):
+            if i < len(result_entries):
+                individual_outputs.append(result_entries[i])
+            else:
+                individual_outputs.append("")
+        
+        return (combined,) + tuple(individual_outputs)
 
     @classmethod
     def IS_CHANGED(cls, csv_text, remove_duplicates, unique_id: str) -> str:
@@ -71,7 +92,6 @@ async def handle_csv_dropdown_operations(request):
         payload = data.get('payload', {})
 
         if operation == 'update_selections':
-            # payload is now a dict of dropdown_id -> selection
             selections_for_node = {}
             entries_for_node = {}
 
