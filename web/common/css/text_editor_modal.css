@@ -425,6 +425,7 @@
     padding: 4px 8px;
     border-radius: 3px;
     transition: background-color 0.15s ease-out;
+    user-select: none;
 }
 
 .wildcard-label.flash-update {
@@ -579,4 +580,83 @@
     margin-right: 2px;
     width: 24px;
     height: 24px;
+}
+
+/* Marking icon next to dropdown */
+.wildcard-mark-icon {
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    cursor: pointer;
+    margin-left: 6px;
+    margin-right: 2px;
+    color: #999; /* light gray default */
+    transition: color 0.2s ease; /* smooth fade transition */
+    flex: 0 0 auto;
+    height: 100%;
+}
+
+.wildcard-mark-icon:hover {
+    color: #fff; /* fade to white on hover */
+}
+
+/* Marked pencil icon - keep existing functionality but with new colors */
+.wildcard-mark-icon.marked {
+    color: #4CAF50 !important; /* green for marked and saved */
+    background: none !important;
+    border-radius: 3px;
+    padding: 2px;
+}
+
+.wildcard-mark-icon.marked:hover {
+    color: #5CBF60 !important; /* slightly lighter green on hover */
+}
+
+/* Unsaved changes state */
+.wildcard-mark-icon.unsaved {
+    color: #FFD700 !important; /* yellow for unsaved changes */
+    background: none !important;
+}
+
+.wildcard-mark-icon.unsaved:hover {
+    color: #FFED4E !important; /* slightly lighter yellow on hover */
+}
+
+/* Tooltip icons */
+.wildcard-mark-add-icon,
+.wildcard-mark-delete-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 6px;
+    margin-right: 2px;
+    width: 24px;
+    height: 24px;
+    color: #999; /* light gray default */
+    transition: color 0.2s ease; /* smooth fade transition */
+    cursor: pointer;
+}
+
+.wildcard-mark-add-icon:hover,
+.wildcard-mark-delete-icon:hover {
+    color: #fff; /* fade to white on hover */
+}
+
+/* Remove the old button styling from tooltip */
+.wildcard-mark-tooltip button {
+    background: none !important;
+    color: inherit !important;
+    border: none !important;
+    border-radius: none !important;
+    padding: 0 !important;
+    cursor: pointer;
+    font-size: inherit !important;
+    transition: none !important;
+}
+
+.wildcard-mark-tooltip button:hover {
+    background: none !important;
+    color: inherit !important;
 }

@@ -37,7 +37,12 @@ class WildcardManager {
             if (response?.status === "success" && response.wildcards) {
                 this.wildcardData = response.wildcards;
                 this.createWildcardUI(container, response.wildcards);
-                this.restoreSelectionStates(response.wildcards);
+                
+                // Use requestAnimationFrame to ensure DOM is rendered before restoring
+                requestAnimationFrame(() => {
+                    this.restoreSelectionStates(response.wildcards);
+                });
+                
                 return this.countTotalWildcards(response.wildcards);
             }
             return 0;
@@ -57,19 +62,57 @@ class WildcardManager {
     }
 
     restoreSelectionStates(wildcards) {
+        // Ensure all DOM elements exist before attempting restoration
+        const allSectionsExist = wildcards.every(wildcard => {
+            const section = document.querySelector(`[data-wildcard-index="${wildcard.index}"]`);
+            return section !== null;
+        });
+        
+        if (!allSectionsExist) {
+            setTimeout(() => this.restoreSelectionStates(wildcards), 20);
+            return;
+        }
+        
         wildcards.forEach(wildcard => this.restoreWildcardState(wildcard));
     }
 
     restoreWildcardState(wildcard) {
         const section = document.querySelector(`[data-wildcard-index="${wildcard.index}"]`);
-        const dropdown = section?.querySelector('.wildcard-dropdown');
+        const dropdown = section?.querySelector('.custom-dropdown');
         
-        if (dropdown && wildcard.selected) {
-            dropdown.value = wildcard.selected;
-            const selectedIndex = wildcard.options.indexOf(wildcard.selected);
-            if (selectedIndex > 0 && !wildcard.is_entry_wildcard) {
-                this.updateChildrenVisibility(wildcard, selectedIndex, true);
-            }
+        if (!dropdown || !wildcard.selected) {
+            return;
+        }
+        
+        const selectedIndex = wildcard.options.indexOf(wildcard.selected);
+        if (selectedIndex <= 0) {
+            return;
+        }
+        
+        this._restoreDropdownUI(dropdown, wildcard, selectedIndex);
+        this._restoreChildrenVisibility(wildcard, selectedIndex);
+    }
+
+    _restoreDropdownUI(dropdown, wildcard, selectedIndex) {
+        const button = dropdown.querySelector('.custom-dropdown-button');
+        const options = dropdown.querySelectorAll('.custom-dropdown-option');
+        
+        // Update button text
+        button.textContent = this.truncateOption(wildcard.selected);
+        
+        // Update selected option styling
+        options.forEach(opt => opt.classList.remove('selected'));
+        if (options[selectedIndex]) {
+            options[selectedIndex].classList.add('selected');
+        }
+    }
+
+    _restoreChildrenVisibility(wildcard, selectedIndex) {
+        const hasChildren = wildcard.children || wildcard.entry_wildcards;
+        const isParentWildcard = !wildcard.is_entry_wildcard;
+        
+        if (isParentWildcard && hasChildren) {
+            this.updateChildrenVisibility(wildcard, selectedIndex, true);
         }
     }
 
@@ -95,7 +138,8 @@ class WildcardManager {
         section.dataset.wildcardIndex = wildcard.index;
         section.appendChild(this.createDropdown(wildcard));
 
-        if (wildcard.children) {
+        // Create children container if wildcard has children OR entry_wildcards
+        if (wildcard.children || wildcard.entry_wildcards) {
             const childrenContainer = document.createElement('div');
             childrenContainer.className = 'wildcard-children';
             childrenContainer.style.display = 'none';
@@ -147,8 +191,6 @@ class WildcardManager {
             markIcon.classList.add('unsaved'); // yellow
         } else if ((pendingMark !== undefined ? pendingMark : savedMark)) {
             markIcon.classList.add('marked'); // green
-        } else {
-            markIcon.style.color = "#fff"; // white
         }
     }
 
@@ -510,7 +552,9 @@ class WildcardManager {
     }
 
     _updateChildren(childrenContainer, wildcard, selectedIndex) {
-        if (!childrenContainer) return;
+        if (!childrenContainer) {
+            return;
+        }
 
         childrenContainer.innerHTML = '';
         
@@ -522,7 +566,6 @@ class WildcardManager {
         const selectedOptionIndex = selectedIndex.toString();
         const childWildcards = wildcard.children?.[selectedOptionIndex];
         const entryWildcards = wildcard.entry_wildcards?.[selectedOptionIndex];
-        
         let hasContent = false;
 
         if (childWildcards?.length > 0) {
@@ -543,7 +586,11 @@ class WildcardManager {
 
     _restoreChildStates(childWildcards, entryWildcards) {
         const wildcards = childWildcards || entryWildcards;
-        wildcards?.forEach(wildcard => this.restoreWildcardState(wildcard));
+        if (wildcards) {
+            wildcards.forEach(wildcard => {
+                this.restoreWildcardState(wildcard);
+            });
+        }
     }
 
     createEntryWildcardDropdown(entryWildcard) {
