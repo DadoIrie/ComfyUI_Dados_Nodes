@@ -91,9 +91,9 @@ class WildcardManager {
         const row = document.createElement('div');
         row.className = 'wildcard-dropdown-row';
 
-        const dropdown = this._createSelect(wildcard);
+        const dropdown = this._createCustomDropdown(wildcard);
 
-        // Get mark value from pendingSelections or originalSelections
+        // Centralized mark value retrieval
         const selections = JSON.parse(this.operations.originalSelections || '{}');
         const pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
         const savedMark = selections[wildcard.index]?.mark ?? '';
@@ -102,20 +102,7 @@ class WildcardManager {
         markIcon.className = 'wildcard-mark-icon';
         markIcon.innerHTML = getIcon("mark");
 
-        // Remove all color classes and inline color first
-        markIcon.classList.remove('marked', 'unsaved');
-        markIcon.style.color = ""; // Remove any previous inline color
-
-        if (pendingMark !== undefined && pendingMark !== savedMark) {
-            // There is an unsaved change (added, changed, or deleted)
-            markIcon.classList.add('unsaved'); // yellow
-        } else if ((pendingMark !== undefined ? pendingMark : savedMark)) {
-            // Mark is saved and present
-            markIcon.classList.add('marked'); // green
-        } else {
-            // Mark is saved and empty
-            markIcon.style.color = "#fff"; // white
-        }
+        this._setMarkIconState(markIcon, pendingMark, savedMark);
 
         markIcon.onclick = (e) => {
             e.stopPropagation();
@@ -129,22 +116,39 @@ class WildcardManager {
         return container;
     }
 
+    _setMarkIconState(markIcon, pendingMark, savedMark) {
+        markIcon.classList.remove('marked', 'unsaved');
+        markIcon.style.color = "";
+
+        if (pendingMark !== undefined && pendingMark !== savedMark) {
+            markIcon.classList.add('unsaved'); // yellow
+        } else if ((pendingMark !== undefined ? pendingMark : savedMark)) {
+            markIcon.classList.add('marked'); // green
+        } else {
+            markIcon.style.color = "#fff"; // white
+        }
+    }
+
+    _getMarkInputValue(pendingMark, savedMark) {
+        return pendingMark !== undefined ? pendingMark : savedMark;
+    }
+
     showMarkTooltip(container, wildcard, markValue = '') {
         container.querySelectorAll('.wildcard-mark-tooltip').forEach(t => t.remove());
 
         const tooltip = document.createElement('div');
         tooltip.className = 'wildcard-mark-tooltip';
 
-        // Get both pending and saved marks
+        // Centralized mark value retrieval
         const selections = JSON.parse(this.operations.originalSelections || '{}');
         const pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
         const savedMark = selections[wildcard.index]?.mark ?? '';
 
-        // Prefill: use pending if exists, else saved
+        // Prefill: use helper
         const input = document.createElement('input');
         input.type = 'text';
         input.placeholder = 'Type mark (letters only)';
-        input.value = (pendingMark !== undefined ? pendingMark : savedMark);
+        input.value = this._getMarkInputValue(pendingMark, savedMark);
 
         // Add icon
         const addBtn = document.createElement('span');
@@ -165,7 +169,6 @@ class WildcardManager {
             let val = input.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
             this.operations.updatePendingMark(wildcard.index, val);
             tooltip.remove();
-            // Re-render the dropdown UI so icon color updates
             const section = container.closest('.wildcard-section');
             if (section) {
                 const newDropdown = this.createDropdown(wildcard);
@@ -177,7 +180,6 @@ class WildcardManager {
         const deleteMark = () => {
             this.operations.updatePendingMark(wildcard.index, '');
             tooltip.remove();
-            // Re-render the dropdown UI so icon color updates
             const section = container.closest('.wildcard-section');
             if (section) {
                 const newDropdown = this.createDropdown(wildcard);
@@ -235,21 +237,163 @@ class WildcardManager {
         return element;
     }
 
-    _createSelect(wildcard) {
-        const dropdown = document.createElement('select');
-        dropdown.className = 'wildcard-dropdown';
-        dropdown.dataset.wildcardIndex = wildcard.index;
+    _createCustomDropdown(wildcard) {
+        const container = document.createElement('div');
+        container.className = 'custom-dropdown';
+        container.dataset.wildcardIndex = wildcard.index;
 
+        // Create button that shows selected value
+        const button = document.createElement('button');
+        button.className = 'custom-dropdown-button';
+        button.type = 'button';
+
+        // Create arrow icon
+        const arrow = document.createElement('div');
+        arrow.className = 'custom-dropdown-arrow';
+        arrow.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6,9 12,15 18,9"></polyline>
+            </svg>
+        `;
+
+        // Create options container
+        const optionsContainer = document.createElement('div');
+        optionsContainer.className = 'custom-dropdown-options';
+
+        // Set initial button text
+        const selectedValue = wildcard.selected || '';
+        const selectedIndex = selectedValue ? wildcard.options.indexOf(selectedValue) : 0;
+        button.textContent = selectedIndex === 0 ? '(not selected)' : this.truncateOption(selectedValue);
+
+        // Create options
         wildcard.options.forEach((option, index) => {
-            const optionElement = document.createElement('option');
-            optionElement.value = index === 0 ? '' : option;
+            const optionElement = document.createElement('div');
+            optionElement.className = 'custom-dropdown-option';
+            optionElement.dataset.value = index === 0 ? '' : option;
+            optionElement.dataset.index = index;
             optionElement.textContent = index === 0 ? '(not selected)' : this.truncateOption(option);
-            dropdown.appendChild(optionElement);
+            
+            if (index === 0) {
+                optionElement.classList.add('not-selected');
+            }
+            
+            if (index === selectedIndex) {
+                optionElement.classList.add('selected');
+            }
+
+            optionElement.onclick = (e) => {
+                e.stopPropagation();
+                this._handleCustomDropdownSelection(container, wildcard, option, index);
+            };
+
+            optionsContainer.appendChild(optionElement);
         });
 
-        dropdown.value = wildcard.selected || '';
-        dropdown.onchange = () => this.handleSelectionChange(wildcard, dropdown.value, dropdown.selectedIndex);
-        return dropdown;
+        // Toggle dropdown on button click
+        button.onclick = (e) => {
+            e.stopPropagation();
+            this._toggleCustomDropdown(container);
+        };
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!container.contains(e.target)) {
+                this._closeCustomDropdown(container);
+            }
+        });
+
+        container.appendChild(button);
+        container.appendChild(arrow);
+        container.appendChild(optionsContainer);
+
+        return container;
+    }
+
+    _toggleCustomDropdown(container) {
+        const isOpen = container.classList.contains('open');
+        
+        // Close all other dropdowns first
+        document.querySelectorAll('.custom-dropdown.open').forEach(dropdown => {
+            if (dropdown !== container) {
+                this._closeCustomDropdown(dropdown);
+            }
+        });
+
+        if (isOpen) {
+            this._closeCustomDropdown(container);
+        } else {
+            this._openCustomDropdown(container);
+        }
+    }
+
+    _openCustomDropdown(container) {
+        container.classList.add('open');
+        
+        // Focus the container for keyboard navigation
+        container.focus();
+        
+        // Scroll selected option into view
+        const selectedOption = container.querySelector('.custom-dropdown-option.selected');
+        if (selectedOption) {
+            selectedOption.scrollIntoView({ block: 'nearest' });
+        }
+    }
+
+    _closeCustomDropdown(container) {
+        container.classList.remove('open');
+    }
+
+    _handleCustomDropdownSelection(container, wildcard, selectedOption, selectedIndex) {
+        const button = container.querySelector('.custom-dropdown-button');
+        const options = container.querySelectorAll('.custom-dropdown-option');
+        
+        // Update button text
+        button.textContent = selectedIndex === 0 ? '(not selected)' : this.truncateOption(selectedOption);
+        
+        // Update selected option styling
+        options.forEach(opt => opt.classList.remove('selected'));
+        options[selectedIndex].classList.add('selected');
+        
+        // Close dropdown
+        this._closeCustomDropdown(container);
+        
+        // Handle the selection change
+        const selectedValue = selectedIndex === 0 ? '' : selectedOption;
+        this.handleSelectionChange(wildcard, selectedValue, selectedIndex);
+    }
+
+    _createEntrySelect(entryWildcard) {
+        // Use custom dropdown for entry wildcards too
+        const customDropdown = this._createCustomDropdown(entryWildcard);
+        customDropdown.classList.add('entry-dropdown');
+        
+        // Override the selection handler for entry wildcards
+        const button = customDropdown.querySelector('.custom-dropdown-button');
+        const originalHandler = button.onclick;
+        
+        customDropdown.querySelectorAll('.custom-dropdown-option').forEach(option => {
+            const originalOptionHandler = option.onclick;
+            option.onclick = (e) => {
+                e.stopPropagation();
+                const selectedValue = option.dataset.value;
+                const selectedIndex = parseInt(option.dataset.index);
+                
+                // Update UI
+                const button = customDropdown.querySelector('.custom-dropdown-button');
+                const options = customDropdown.querySelectorAll('.custom-dropdown-option');
+                
+                button.textContent = selectedIndex === 0 ? '(not selected)' : option.textContent;
+                options.forEach(opt => opt.classList.remove('selected'));
+                option.classList.add('selected');
+                
+                this._closeCustomDropdown(customDropdown);
+                
+                // Handle entry wildcard change
+                this.handleEntryWildcardChange(entryWildcard.index, selectedValue, entryWildcard.original);
+            };
+        });
+        
+        return customDropdown;
     }
 
     async handleSelectionChange(wildcard, selectedValue, selectedIndex) {
@@ -337,23 +481,6 @@ class WildcardManager {
         container.appendChild(label);
         container.appendChild(dropdown);
         return container;
-    }
-
-    _createEntrySelect(entryWildcard) {
-        const dropdown = document.createElement('select');
-        dropdown.className = 'wildcard-dropdown entry-dropdown';
-        dropdown.dataset.wildcardIndex = entryWildcard.index;
-        
-        entryWildcard.options.forEach((option, index) => {
-            const optionElement = document.createElement('option');
-            optionElement.value = index === 0 ? '' : option;
-            optionElement.textContent = index === 0 ? '(not selected)' : option;
-            dropdown.appendChild(optionElement);
-        });
-        
-        dropdown.value = entryWildcard.selected || '';
-        dropdown.onchange = () => this.handleEntryWildcardChange(entryWildcard.index, dropdown.value, entryWildcard.original);
-        return dropdown;
     }
 
     async handleEntryWildcardChange(wildcardIndex, selectedValue, originalWildcard) {
