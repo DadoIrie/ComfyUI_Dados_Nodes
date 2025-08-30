@@ -21,13 +21,13 @@ class DN_WildcardPromptEditorNode:
             }
         }
     
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("text",)
-    FUNCTION = "process_text"
+    RETURN_TYPES = ("STRING",) * 2
+    RETURN_NAMES = ("clean_prompt", "marked_prompt")
+    FUNCTION = "process_prompt"
     CATEGORY = "Dado's Nodes/Text"
     
-    def parse_wildcards(self, text: str) -> list:
-        return self._parse_wildcards_recursive(text, "")
+    def parse_wildcards(self, clean_prompt: str) -> list:
+        return self._parse_wildcards_recursive(clean_prompt, "")
     
     def _extract_entry_wildcards(self, option_text: str, parent_child_index: str) -> list:
         entry_wildcards = []
@@ -47,16 +47,16 @@ class DN_WildcardPromptEditorNode:
         
         return entry_wildcards
     
-    def _parse_wildcards_recursive(self, text: str, parent_index: str) -> list:
+    def _parse_wildcards_recursive(self, clean_prompt: str, parent_index: str) -> list:
         wildcards = []
-        matches = self._find_wildcard_matches(text)
+        matches = self._find_wildcard_matches(clean_prompt)
         
         for i, (start, end, content) in enumerate(matches):
             current_index = f"{parent_index}.{i + 1}" if parent_index else str(i + 1)
             
             wildcard = {
                 'index': current_index,
-                'original': text[start:end],
+                'original': clean_prompt[start:end],
                 'position': start,
                 'options': [''],
                 'selected': '',
@@ -92,25 +92,25 @@ class DN_WildcardPromptEditorNode:
         
         return wildcards
 
-    def _find_wildcard_matches(self, text: str) -> list:
+    def _find_wildcard_matches(self, clean_prompt: str) -> list:
         matches = []
         i = 0
-        while i < len(text):
-            if text[i] == '{':
+        while i < len(clean_prompt):
+            if clean_prompt[i] == '{':
                 start = i
                 brace_count = 1
                 i += 1
                 
-                while i < len(text) and brace_count > 0:
-                    if text[i] == '{':
+                while i < len(clean_prompt) and brace_count > 0:
+                    if clean_prompt[i] == '{':
                         brace_count += 1
-                    elif text[i] == '}':
+                    elif clean_prompt[i] == '}':
                         brace_count -= 1
                     i += 1
                 
                 if brace_count == 0:
                     end = i
-                    content = text[start + 1:end - 1]
+                    content = clean_prompt[start + 1:end - 1]
                     matches.append((start, end, content))
                 else:
                     break
@@ -152,8 +152,8 @@ class DN_WildcardPromptEditorNode:
         
         return options
     
-    def _contains_wildcards(self, text: str) -> bool:
-        return '{' in text and '}' in text
+    def _contains_wildcards(self, clean_prompt: str) -> bool:
+        return '{' in clean_prompt and '}' in clean_prompt
     
     def _has_nested_structure(self, content: str) -> bool:
         return self._has_top_level_pipes(content)
@@ -188,9 +188,9 @@ class DN_WildcardPromptEditorNode:
                                 )
         return wildcards
     
-    def apply_wildcards_to_text(self, text: str, selections: Dict) -> str:
+    def apply_wildcards_to_text(self, clean_prompt: str, selections: Dict) -> str:
         processed_selections = self._flatten_selections_for_processing(selections)
-        return self._apply_wildcards_to_text_recursive(text, processed_selections, "")
+        return self._apply_wildcards_to_text_recursive(clean_prompt, processed_selections, "")
     
     def _flatten_selections_for_processing(self, selections: Dict) -> Dict:
         flattened = {}
@@ -199,10 +199,10 @@ class DN_WildcardPromptEditorNode:
                 flattened[key] = value['selected']
         return flattened
     
-    def _apply_wildcards_to_text_recursive(self, text: str, selections: Dict, parent_index: str) -> str:
-        matches = self._find_wildcard_matches(text)
+    def _apply_wildcards_to_text_recursive(self, clean_prompt: str, selections: Dict, parent_index: str) -> str:
+        matches = self._find_wildcard_matches(clean_prompt)
         
-        modified_text = text
+        modified_text = clean_prompt
         offset = 0
         
         for i, (start, end, content) in enumerate(matches):
@@ -220,7 +220,7 @@ class DN_WildcardPromptEditorNode:
                         
                         replacement = self._apply_entry_wildcards_to_text(replacement, selections, child_index)
                     else:
-                        replacement = text[start:end]
+                        replacement = clean_prompt[start:end]
                 else:
                     replacement = self._apply_entry_wildcards_to_text(selected_value, selections, current_index + ".1")
                 
@@ -231,10 +231,10 @@ class DN_WildcardPromptEditorNode:
         
         return modified_text
     
-    def _apply_entry_wildcards_to_text(self, text: str, selections: Dict, base_index: str) -> str:
-        """Apply entry wildcard selections to text"""
-        modified_text = text
-        entry_matches = list(re.finditer(r'\{([^{}]+)\}', text))
+    def _apply_entry_wildcards_to_text(self, clean_prompt: str, selections: Dict, base_index: str) -> str:
+        """Apply entry wildcard selections to clean_prompt"""
+        modified_text = clean_prompt
+        entry_matches = list(re.finditer(r'\{([^{}]+)\}', clean_prompt))
         
         for i, match in enumerate(reversed(entry_matches)):
             entry_index = f"{base_index}.e{len(entry_matches) - i}"
@@ -246,18 +246,36 @@ class DN_WildcardPromptEditorNode:
         
         return modified_text
     
-    def process_text(self, wildcards_prompt="", wildcards_selections="", unique_id=None):
+    def process_prompt(self, wildcards_prompt="", wildcards_selections="", unique_id=None):
         if not wildcards_prompt.strip():
             return ('',)
-        
         try:
             selections = json.loads(wildcards_selections) if wildcards_selections.strip() else {}
         except json.JSONDecodeError:
             selections = {}
-        
-        processed_text = self.apply_wildcards_to_text(wildcards_prompt, selections)
-        return (processed_text,)
-    
+
+        clean_prompt = wildcards_prompt
+        marked_prompt = self.apply_markings_to_text(wildcards_prompt, selections)
+        return (clean_prompt, marked_prompt)
+
+    def apply_markings_to_text(self, clean_prompt: str, selections: Dict) -> str:
+        matches = self._find_wildcard_matches(clean_prompt)
+        modified_text = clean_prompt
+        offset = 0
+        for i, (start, end, content) in enumerate(matches):
+            current_index = str(i + 1)
+            sel = selections.get(current_index, {})
+            mark = sel.get("mark", "")
+            if mark:
+                mark = mark.upper()
+                original = clean_prompt[start:end]
+                wrapped = f"START_{mark}{original}END_{mark}"
+                adjusted_start = start + offset
+                adjusted_end = end + offset
+                modified_text = modified_text[:adjusted_start] + wrapped + modified_text[adjusted_end:]
+                offset += len(wrapped) - (end - start)
+        return modified_text
+
     @classmethod
     def IS_CHANGED(cls, wildcards_prompt, wildcards_selections, unique_id=None):
         return random.randint(1, 1000000)

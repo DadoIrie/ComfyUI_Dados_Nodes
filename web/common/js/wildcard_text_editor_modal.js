@@ -84,13 +84,148 @@ class WildcardManager {
     createDropdown(wildcard) {
         const container = document.createElement('div');
         container.className = 'wildcard-dropdown-container';
-        
+
         const label = this._createElement('div', 'wildcard-label', `Wildcard ${wildcard.index}`);
+        container.appendChild(label);
+
+        const row = document.createElement('div');
+        row.className = 'wildcard-dropdown-row';
+
         const dropdown = this._createSelect(wildcard);
 
-        container.appendChild(label);
-        container.appendChild(dropdown);
+        // Get mark value from pendingSelections or originalSelections
+        const selections = JSON.parse(this.operations.originalSelections || '{}');
+        const pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
+        const savedMark = selections[wildcard.index]?.mark ?? '';
+
+        const markIcon = document.createElement('span');
+        markIcon.className = 'wildcard-mark-icon';
+        markIcon.innerHTML = getIcon("mark");
+
+        // Remove all color classes and inline color first
+        markIcon.classList.remove('marked', 'unsaved');
+        markIcon.style.color = ""; // Remove any previous inline color
+
+        if (pendingMark !== undefined && pendingMark !== savedMark) {
+            // There is an unsaved change (added, changed, or deleted)
+            markIcon.classList.add('unsaved'); // yellow
+        } else if ((pendingMark !== undefined ? pendingMark : savedMark)) {
+            // Mark is saved and present
+            markIcon.classList.add('marked'); // green
+        } else {
+            // Mark is saved and empty
+            markIcon.style.color = "#fff"; // white
+        }
+
+        markIcon.onclick = (e) => {
+            e.stopPropagation();
+            this.showMarkTooltip(container, wildcard, pendingMark);
+        };
+
+        row.appendChild(dropdown);
+        row.appendChild(markIcon);
+
+        container.appendChild(row);
         return container;
+    }
+
+    showMarkTooltip(container, wildcard, markValue = '') {
+        container.querySelectorAll('.wildcard-mark-tooltip').forEach(t => t.remove());
+
+        const tooltip = document.createElement('div');
+        tooltip.className = 'wildcard-mark-tooltip';
+
+        // Get both pending and saved marks
+        const selections = JSON.parse(this.operations.originalSelections || '{}');
+        const pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
+        const savedMark = selections[wildcard.index]?.mark ?? '';
+
+        // Prefill: use pending if exists, else saved
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'Type mark (letters only)';
+        input.value = (pendingMark !== undefined ? pendingMark : savedMark);
+
+        // Add icon
+        const addBtn = document.createElement('span');
+        addBtn.innerHTML = getIcon("add");
+        addBtn.className = 'wildcard-mark-add-icon';
+        addBtn.style.cursor = 'pointer';
+        addBtn.title = 'Add mark';
+
+        // Delete icon
+        const deleteBtn = document.createElement('span');
+        deleteBtn.innerHTML = getIcon("delete");
+        deleteBtn.className = 'wildcard-mark-delete-icon';
+        deleteBtn.style.cursor = 'pointer';
+        deleteBtn.title = 'Delete mark';
+
+        // Add mark logic
+        const addMark = () => {
+            let val = input.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
+            this.operations.updatePendingMark(wildcard.index, val);
+            tooltip.remove();
+            // Re-render the dropdown UI so icon color updates
+            const section = container.closest('.wildcard-section');
+            if (section) {
+                const newDropdown = this.createDropdown(wildcard);
+                section.replaceChild(newDropdown, container);
+            }
+        };
+
+        // Delete mark logic
+        const deleteMark = () => {
+            this.operations.updatePendingMark(wildcard.index, '');
+            tooltip.remove();
+            // Re-render the dropdown UI so icon color updates
+            const section = container.closest('.wildcard-section');
+            if (section) {
+                const newDropdown = this.createDropdown(wildcard);
+                section.replaceChild(newDropdown, container);
+            }
+        };
+
+        addBtn.onclick = addMark;
+        deleteBtn.onclick = deleteMark;
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter') addMark();
+        };
+
+        tooltip.appendChild(input);
+        tooltip.appendChild(addBtn);
+        tooltip.appendChild(deleteBtn);
+
+        // Positioning logic (unchanged)
+        const icon = container.querySelector('.wildcard-mark-icon');
+        const row = icon.parentElement;
+        row.appendChild(tooltip);
+
+        setTimeout(() => {
+            const iconRect = icon.getBoundingClientRect();
+            const rowRect = row.getBoundingClientRect();
+            const tooltipRect = tooltip.getBoundingClientRect();
+
+            let left = icon.offsetLeft + icon.offsetWidth - tooltip.offsetWidth;
+            left = Math.max(left, 0);
+
+            let top = icon.offsetTop + icon.offsetHeight + 4;
+            if (row.offsetHeight - (icon.offsetTop + icon.offsetHeight) < tooltip.offsetHeight && icon.offsetTop > tooltip.offsetHeight) {
+                top = icon.offsetTop - tooltip.offsetHeight - 4;
+            }
+            tooltip.style.left = `${left}px`;
+            tooltip.style.top = `${top}px`;
+        }, 0);
+
+        input.focus();
+
+        // Close tooltip when clicking outside
+        const handleClickOutside = (event) => {
+            if (!tooltip.contains(event.target) && event.target !== icon) {
+                tooltip.remove();
+                document.removeEventListener('mousedown', handleClickOutside);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
     }
 
     _createElement(tag, className, textContent = '') {
@@ -312,6 +447,17 @@ class WildcardManager {
         this.createWildcardUI(container, wildcards);
         this.restoreSelectionStates(wildcards);
         const totalCount = this.countTotalWildcards(wildcards);
+
+        // Fetch marked prompt from backend and show it
+        fetchSend(this.constants.MESSAGE_ROUTE, this.node.id, "get_content", {
+            wildcards_prompt: this.textLoaderInstance.getHiddenWidgetValue("wildcards_prompt"),
+            wildcards_selections: this.textLoaderInstance.getHiddenWidgetValue("wildcards_selections")
+        }).then(response => {
+            if (response?.marked_prompt) {
+                this.showNotification(container, `Marked prompt: ${response.marked_prompt}`);
+            }
+        });
+
         this.showNotification(container, `Wildcards updated (${totalCount} found)`);
         return totalCount;
     }
@@ -327,6 +473,11 @@ class WildcardManager {
             await this._savePendingSelections();
             await this.operations.saveSelections();
             this._flashSavedLabels(container);
+
+            // Ensure pendingSelections is cleared and originalSelections is updated
+            this.operations.pendingSelections = {};
+            // Re-render the wildcards UI so mark icons update color
+            await this.loadWildcards(container);
         } catch (error) {
             console.error('Error saving selections:', error);
         }
@@ -384,6 +535,25 @@ class Operations {
         this.hasUnsavedSelectionChanges = true;
     }
 
+    updatePendingMark(wildcardIndex, markValue) {
+        let originalMark = '';
+        let selections = {};
+        try {
+            selections = JSON.parse(this.originalSelections || '{}');
+        } catch (e) {}
+        if (selections[wildcardIndex]?.mark) {
+            originalMark = selections[wildcardIndex].mark;
+        }
+
+        if (!this.pendingSelections[wildcardIndex]) {
+            this.pendingSelections[wildcardIndex] = { selected: '', original: '' };
+        }
+        this.pendingSelections[wildcardIndex].mark = markValue;
+
+        // Only set unsaved changes if mark is actually changed
+        this.hasUnsavedSelectionChanges = (markValue !== originalMark);
+    }
+
     async saveContent(content) {
         this.textLoaderInstance.updateHiddenWidget("wildcards_prompt", content);
         
@@ -425,7 +595,24 @@ class Operations {
     }
 
     hasUnsavedChanges() {
-        return this.hasUnsavedTextChanges || this.hasUnsavedSelectionChanges;
+        if (this.hasUnsavedTextChanges) return true;
+
+        // Compare all marks and selections between original and pending
+        let original = {};
+        try {
+            original = JSON.parse(this.originalSelections || '{}');
+        } catch (e) {}
+
+        for (const [index, pending] of Object.entries(this.pendingSelections)) {
+            const origMark = original[index]?.mark || '';
+            const pendingMark = pending.mark || '';
+            const origSel = original[index]?.selected || '';
+            const pendingSel = pending.selected || '';
+            if (origMark !== pendingMark || origSel !== pendingSel) {
+                return true;
+            }
+        }
+        return false;
     }
 }
 
@@ -564,7 +751,7 @@ class ButtonManager {
     async handleModalClose() {
         if (this.operations.hasUnsavedChanges()) {
             const message = this.operations.hasUnsavedTextChanges 
-                ? 'You have unsaved prompt changes. Do you want to save before closing?'
+                ? 'You have unsaved prompt changes. Do you want to save before closing?' 
                 : 'You have not applied selection changes. Do you want to apply those before closing?';
                 
             const result = window.confirm(message);

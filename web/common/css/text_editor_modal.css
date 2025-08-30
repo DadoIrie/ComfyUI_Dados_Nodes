@@ -49,7 +49,7 @@
 }
 
 .dn_modal .dn_close_button {
-    z-index: 999999;
+    z-index: 50;
     pointer-events: auto;
     position: absolute;
 }
@@ -274,7 +274,15 @@
 .wildcard-dropdown-container {
     display: flex;
     flex-direction: column;
-    gap: var(--modal-spacing-xs);
+    align-items: stretch;
+    gap: 2px;
+}
+
+.wildcard-dropdown-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
 }
 
 .wildcard-label {
@@ -311,7 +319,9 @@
 }
 
 .wildcard-dropdown {
-    width: 100%;
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
     padding: 6px 8px;
     background-color: #444;
     color: white;
@@ -361,4 +371,88 @@
         opacity: 0; 
         transform: translateY(-10px); 
     }
+}
+
+/* Marking icon next to dropdown */
+.wildcard-mark-icon {
+    font-size: 15px;           /* smaller size */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    cursor: pointer;
+    margin-left: 6px;
+    margin-right: 2px;         /* add a little space from right border */
+    color: #B8860B;
+    transition: color 0.15s;
+    flex: 0 0 auto;
+    height: 100%;              /* helps vertical centering */
+}
+.wildcard-mark-icon:hover {
+    color: #FFD700;
+}
+
+/* Marked pencil icon */
+.wildcard-mark-icon.marked {
+    color: #4CAF50 !important; /* green for marked and saved */
+    background: none !important; /* remove green background */
+    border-radius: 3px;
+    padding: 2px;
+}
+
+/* Add a yellow state for unsaved changes */
+.wildcard-mark-icon.unsaved {
+    color: #FFD700 !important; /* yellow for unsaved changes */
+    background: none !important;
+}
+
+/* Tooltip for marking input */
+.wildcard-mark-tooltip {
+    position: absolute;
+    background: rgba(20, 20, 20, 0.98); /* even darker */
+    color: #ccc;
+    padding: 10px 14px;
+    border-radius: 6px;
+    z-index: 120;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 180px;
+    border: none;
+}
+.wildcard-mark-tooltip input[type="text"] {
+    background: #444;                   /* slightly lighter gray */
+    color: #ccc;                        /* light gray font */
+    border: none;                       /* no border */
+    border-radius: 4px;
+    padding: 5px 10px;
+    font-size: 0.98em;
+    outline: none;
+}
+
+.wildcard-mark-tooltip button {
+    background: #B8860B;
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background 0.15s;
+}
+.wildcard-mark-tooltip button:hover {
+    background: #FFD700;
+    color: #222;
+}
+
+.wildcard-mark-add-icon,
+.wildcard-mark-delete-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 6px;
+    margin-right: 2px;
+    width: 24px;
+    height: 24px;
 }
