@@ -184,14 +184,26 @@ class WildcardManager {
         markIcon.onclick = (e) => {
             e.stopPropagation();
             
-            const existingTooltip = container.querySelector('.wildcard-mark-tooltip');
-        
+            // Check if there's already a tooltip for THIS specific wildcard
+            const existingTooltip = document.querySelector('.wildcard-mark-tooltip');
+            const isThisWildcard = existingTooltip && 
+                existingTooltip.dataset.wildcardIndex === wildcard.index.toString();
+            
             if (existingTooltip) {
-                existingTooltip.remove();
-                this.activeOverlay = null;
-            } else {
-                this.showMarkTooltip(container, wildcard, pendingMark);
+                if (isThisWildcard) {
+                    // Close if it's the same wildcard
+                    console.log('Closing tooltip for same wildcard');
+                    this._closeActiveOverlays();
+                    return;
+                } else {
+                    // Close existing and open new one for different wildcard
+                    console.log('Closing tooltip for different wildcard, opening new one');
+                    this._closeActiveOverlays();
+                }
             }
+            
+            console.log('Showing new tooltip');
+            this.showMarkTooltip(container, wildcard, pendingMark);
         };
 
         row.appendChild(dropdown);
@@ -217,9 +229,18 @@ class WildcardManager {
     }
 
     showMarkTooltip(container, wildcard, markValue = '') {
-        this._closeActiveOverlays();
+        console.log('showMarkTooltip called, activeOverlay before:', this.activeOverlay);
+        
+        // Check if tooltip is already showing for this wildcard - improved check
+        if (this.activeOverlay && 
+            this.activeOverlay.classList.contains('wildcard-mark-tooltip') && 
+            this.activeOverlay.parentNode) {
+            console.log('Found existing tooltip, closing');
+            this._closeActiveOverlays();
+            return;
+        }
 
-        const existingTooltips = container.querySelectorAll('.wildcard-mark-tooltip');
+        const existingTooltips = document.querySelectorAll('.wildcard-mark-tooltip');
         existingTooltips.forEach(t => {
             t.classList.remove('show');
             setTimeout(() => t.remove(), 200);
@@ -227,8 +248,11 @@ class WildcardManager {
 
         const tooltip = document.createElement('div');
         tooltip.className = 'wildcard-mark-tooltip';
+        tooltip.dataset.wildcardIndex = wildcard.index;
 
+        // Set activeOverlay IMMEDIATELY after creating tooltip
         this.activeOverlay = tooltip;
+        console.log('Set activeOverlay to:', this.activeOverlay);
 
         const selections = JSON.parse(this.operations.originalSelections || '{}');
         const pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
@@ -299,32 +323,42 @@ class WildcardManager {
         tooltip.appendChild(deleteBtn);
 
         const icon = container.querySelector('.wildcard-mark-icon');
-        const row = icon.parentElement;
-        row.appendChild(tooltip);
+        const modal = document.querySelector('.text-editor-modal');
+        
+        // Append to modal to avoid clipping by sidebar overflow
+        modal.appendChild(tooltip);
+
+        // Add scroll listener to hide tooltip when scrolling
+        const sidebarContent = document.querySelector('.wildcard-dropdowns');
+        const handleScroll = () => {
+            if (tooltip && tooltip.parentNode) {
+                this.activeOverlay = null;
+                tooltip.classList.remove('show');
+                setTimeout(() => {
+                    tooltip.remove();
+                    sidebarContent.removeEventListener('scroll', handleScroll);
+                }, 200);
+            }
+        };
+        
+        if (sidebarContent) {
+            sidebarContent.addEventListener('scroll', handleScroll);
+        }
 
         setTimeout(() => {
             const iconRect = icon.getBoundingClientRect();
-            const rowRect = row.getBoundingClientRect();
-            const tooltipRect = tooltip.getBoundingClientRect();
-
-            let left = icon.offsetLeft + icon.offsetWidth - tooltip.offsetWidth;
-            left = Math.max(left, 0);
-
-            let top = icon.offsetTop + icon.offsetHeight + 4;
-            if (row.offsetHeight - (icon.offsetTop + icon.offsetHeight) < tooltip.offsetHeight && icon.offsetTop > tooltip.offsetHeight) {
-                top = icon.offsetTop - tooltip.offsetHeight - 4;
-            }
-            tooltip.style.left = `${left}px`;
-            tooltip.style.top = `${top}px`;
+            const modalRect = modal.getBoundingClientRect();
+            
+            // Position relative to modal
+            tooltip.style.position = 'absolute';
+            tooltip.style.left = `${iconRect.right - modalRect.left - tooltip.offsetWidth}px`;
+            tooltip.style.top = `${iconRect.top - modalRect.top - tooltip.offsetHeight - 4}px`;
+            tooltip.style.zIndex = '99999';
             
             requestAnimationFrame(() => {
                 tooltip.classList.add('show');
             });
         }, 0);
-
-        setTimeout(() => {
-            input.focus();
-        }, 100);
 
         const handleClickOutside = (event) => {
             if (!tooltip.contains(event.target) && event.target !== icon) {
@@ -333,6 +367,9 @@ class WildcardManager {
                 setTimeout(() => {
                     tooltip.remove();
                     document.removeEventListener('mousedown', handleClickOutside);
+                    if (sidebarContent) {
+                        sidebarContent.removeEventListener('scroll', handleScroll);
+                    }
                 }, 200);
             }
         };
@@ -401,16 +438,16 @@ class WildcardManager {
             this._toggleCustomDropdown(container);
         };
 
-        document.addEventListener('click', (e) => {
-            if (!container.contains(e.target) && this.activeOverlay === container) {
-                this._closeCustomDropdown(container);
-            }
-        });
+/*         document.addEventListener('mousedown', handleClickOutsideDropdown); */
 
         container.appendChild(button);
         container.appendChild(arrow);
         container.appendChild(optionsContainer);
 
+        return container;
+    }
+
+    _toggleCustomDropdown(container) {
         return container;
     }
 
@@ -427,23 +464,32 @@ class WildcardManager {
 
     _openCustomDropdown(container) {
         container.classList.add('open');
-        
         this.activeOverlay = container;
-        
         container.focus();
-        
+
         const selectedOption = container.querySelector('.custom-dropdown-option.selected');
         if (selectedOption) {
             selectedOption.scrollIntoView({ block: 'nearest' });
         }
+
+        // Add click outside handler
+        const handleClickOutsideDropdown = (e) => {
+            if (!container.contains(e.target)) {
+                this._closeCustomDropdown(container);
+                document.removeEventListener('mousedown', handleClickOutsideDropdown);
+            }
+        };
+        setTimeout(() => {
+            document.addEventListener('mousedown', handleClickOutsideDropdown);
+        }, 0);
     }
 
     _closeCustomDropdown(container) {
         container.classList.remove('open');
-        
         if (this.activeOverlay === container) {
             this.activeOverlay = null;
         }
+        // Remove click outside handler if needed (already handled above)
     }
 
     _handleCustomDropdownSelection(container, wildcard, selectedOption, selectedIndex) {
@@ -1162,7 +1208,9 @@ export function createTextEditorModal(node, textContent, constants, textLoaderIn
 
     mainSection.appendChild(buttonContainer);
     contentDiv.appendChild(mainSection);
+    console.log('Sidebar created:', sidebar);
     contentDiv.appendChild(sidebar);
+    console.log('Sidebar appended:', contentDiv.querySelector('.text-editor-sidebar'));
 
     const modalConfig = {
         content: contentDiv,
