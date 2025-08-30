@@ -6,15 +6,11 @@ class WildcardManager {
     constructor(node, constants, textLoaderInstance, operations) {
         Object.assign(this, { node, constants, textLoaderInstance, operations });
         this.wildcardData = [];
-        // Add centralized state tracking
-        this.activeOverlay = null; // Track currently open tooltip or dropdown
-        // Add wildcard structure tracking for change detection
+        this.activeOverlay = null;
         this.lastWildcardStructure = null;
     }
 
-    // Add method to close any active overlays
     _closeActiveOverlays(except = null) {
-        // Close all tooltips except the specified one
         document.querySelectorAll('.wildcard-mark-tooltip').forEach(tooltip => {
             if (tooltip !== except) {
                 tooltip.classList.remove('show');
@@ -22,14 +18,12 @@ class WildcardManager {
             }
         });
 
-        // Close all dropdowns except the specified one
         document.querySelectorAll('.custom-dropdown.open').forEach(dropdown => {
             if (dropdown !== except) {
                 this._closeCustomDropdown(dropdown);
             }
         });
 
-        // Update active overlay tracking
         this.activeOverlay = except;
     }
 
@@ -37,22 +31,16 @@ class WildcardManager {
         try {
             const response = await this._fetchWildcards();
             if (response?.status === "success" && response.wildcards) {
-                // Check if wildcard structure has changed
                 const structureChanged = this._hasWildcardStructureChanged(response.wildcards);
                 
                 this.wildcardData = response.wildcards;
                 this.createWildcardUI(container, response.wildcards);
                 
-                // Only reset selections/marks if structure changed, otherwise restore them
                 if (structureChanged) {
-                    // Structure changed - reset both selections and marks in operations
                     this.operations.resetPendingSelections();
-                    // Update the stored structure
                     this._updateWildcardStructure(response.wildcards);
                 }
                 
-                // Always restore selection states regardless of structure change
-                // This ensures nested wildcards are visible when they should be
                 requestAnimationFrame(() => {
                     this.restoreSelectionStates(response.wildcards);
                 });
@@ -76,7 +64,6 @@ class WildcardManager {
     }
 
     restoreSelectionStates(wildcards) {
-        // Ensure all DOM elements exist before attempting restoration
         const allSectionsExist = wildcards.every(wildcard => {
             const section = document.querySelector(`[data-wildcard-index="${wildcard.index}"]`);
             return section !== null;
@@ -98,7 +85,6 @@ class WildcardManager {
             return;
         }
         
-        // Restore selection state
         if (wildcard.selected) {
             const selectedIndex = wildcard.options.indexOf(wildcard.selected);
             if (selectedIndex > 0) {
@@ -107,7 +93,6 @@ class WildcardManager {
             }
         }
         
-        // Restore mark state
         this._restoreMarkState(section, wildcard);
     }
 
@@ -115,12 +100,10 @@ class WildcardManager {
         const markIcon = section?.querySelector('.wildcard-mark-icon');
         if (!markIcon) return;
 
-        // Get current mark values
         const selections = JSON.parse(this.operations.originalSelections || '{}');
         const pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
         const savedMark = selections[wildcard.index]?.mark ?? '';
 
-        // Restore mark icon state
         this._setMarkIconState(markIcon, pendingMark, savedMark);
     }
 
@@ -128,10 +111,8 @@ class WildcardManager {
         const button = dropdown.querySelector('.custom-dropdown-button');
         const options = dropdown.querySelectorAll('.custom-dropdown-option');
         
-        // Update button text
         button.textContent = this.truncateOption(wildcard.selected);
         
-        // Update selected option styling
         options.forEach(opt => opt.classList.remove('selected'));
         if (options[selectedIndex]) {
             options[selectedIndex].classList.add('selected');
@@ -169,7 +150,6 @@ class WildcardManager {
         section.dataset.wildcardIndex = wildcard.index;
         section.appendChild(this.createDropdown(wildcard));
 
-        // Create children container if wildcard has children OR entry_wildcards
         if (wildcard.children || wildcard.entry_wildcards) {
             const childrenContainer = document.createElement('div');
             childrenContainer.className = 'wildcard-children';
@@ -191,7 +171,6 @@ class WildcardManager {
 
         const dropdown = this._createCustomDropdown(wildcard);
 
-        // Centralized mark value retrieval
         const selections = JSON.parse(this.operations.originalSelections || '{}');
         const pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
         const savedMark = selections[wildcard.index]?.mark ?? '';
@@ -219,9 +198,9 @@ class WildcardManager {
         markIcon.style.color = "";
 
         if (pendingMark !== undefined && pendingMark !== savedMark) {
-            markIcon.classList.add('unsaved'); // yellow
+            markIcon.classList.add('unsaved');
         } else if ((pendingMark !== undefined ? pendingMark : savedMark)) {
-            markIcon.classList.add('marked'); // green
+            markIcon.classList.add('marked');
         }
     }
 
@@ -230,60 +209,49 @@ class WildcardManager {
     }
 
     showMarkTooltip(container, wildcard, markValue = '') {
-        // Close any active overlays before opening tooltip
         this._closeActiveOverlays();
 
-        // Remove any existing tooltips with fade out
         const existingTooltips = container.querySelectorAll('.wildcard-mark-tooltip');
         existingTooltips.forEach(t => {
             t.classList.remove('show');
-            setTimeout(() => t.remove(), 200); // Wait for fade out animation
+            setTimeout(() => t.remove(), 200);
         });
 
         const tooltip = document.createElement('div');
         tooltip.className = 'wildcard-mark-tooltip';
 
-        // Track this tooltip as the active overlay
         this.activeOverlay = tooltip;
 
-        // Centralized mark value retrieval
         const selections = JSON.parse(this.operations.originalSelections || '{}');
         const pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
         const savedMark = selections[wildcard.index]?.mark ?? '';
 
-        // Prefill: use helper
         const input = document.createElement('input');
         input.type = 'text';
         input.placeholder = 'Type mark (letters only)';
         input.value = this._getMarkInputValue(pendingMark, savedMark);
 
-        // Add icon
         const addBtn = document.createElement('span');
         addBtn.innerHTML = getIcon("add");
         addBtn.className = 'wildcard-mark-add-icon';
         addBtn.style.cursor = 'pointer';
         addBtn.title = 'Add mark';
 
-        // Delete icon
         const deleteBtn = document.createElement('span');
         deleteBtn.innerHTML = getIcon("delete");
         deleteBtn.className = 'wildcard-mark-delete-icon';
         deleteBtn.style.cursor = 'pointer';
         deleteBtn.title = 'Delete mark';
 
-        // Add mark logic with fade out
         const addMark = () => {
             let val = input.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
             this.operations.updatePendingMark(wildcard.index, val);
             
-            // Clear active overlay tracking
             this.activeOverlay = null;
             
-            // Fade out tooltip
             tooltip.classList.remove('show');
             setTimeout(() => {
                 tooltip.remove();
-                // Update the mark icon state without recreating the entire dropdown
                 const markIcon = container.querySelector('.wildcard-mark-icon');
                 if (markIcon) {
                     const selections = JSON.parse(this.operations.originalSelections || '{}');
@@ -294,18 +262,14 @@ class WildcardManager {
             }, 200);
         };
 
-        // Delete mark logic with fade out
         const deleteMark = () => {
             this.operations.updatePendingMark(wildcard.index, '');
             
-            // Clear active overlay tracking
             this.activeOverlay = null;
             
-            // Fade out tooltip
             tooltip.classList.remove('show');
             setTimeout(() => {
                 tooltip.remove();
-                // Update the mark icon state without recreating the entire dropdown
                 const markIcon = container.querySelector('.wildcard-mark-icon');
                 if (markIcon) {
                     const selections = JSON.parse(this.operations.originalSelections || '{}');
@@ -326,12 +290,10 @@ class WildcardManager {
         tooltip.appendChild(addBtn);
         tooltip.appendChild(deleteBtn);
 
-        // Positioning logic
         const icon = container.querySelector('.wildcard-mark-icon');
         const row = icon.parentElement;
         row.appendChild(tooltip);
 
-        // Position tooltip and then fade in
         setTimeout(() => {
             const iconRect = icon.getBoundingClientRect();
             const rowRect = row.getBoundingClientRect();
@@ -347,21 +309,18 @@ class WildcardManager {
             tooltip.style.left = `${left}px`;
             tooltip.style.top = `${top}px`;
             
-            // Trigger fade in animation
             requestAnimationFrame(() => {
                 tooltip.classList.add('show');
             });
         }, 0);
 
-        // Focus input after fade in
         setTimeout(() => {
             input.focus();
         }, 100);
 
-        // Close tooltip with fade out when clicking outside
         const handleClickOutside = (event) => {
             if (!tooltip.contains(event.target) && event.target !== icon) {
-                this.activeOverlay = null; // Clear tracking
+                this.activeOverlay = null;
                 tooltip.classList.remove('show');
                 setTimeout(() => {
                     tooltip.remove();
@@ -370,7 +329,6 @@ class WildcardManager {
             }
         };
         
-        // Add click outside listener after a brief delay to prevent immediate closure
         setTimeout(() => {
             document.addEventListener('mousedown', handleClickOutside);
         }, 100);
@@ -388,12 +346,10 @@ class WildcardManager {
         container.className = 'custom-dropdown';
         container.dataset.wildcardIndex = wildcard.index;
 
-        // Create button that shows selected value
         const button = document.createElement('button');
         button.className = 'custom-dropdown-button';
         button.type = 'button';
 
-        // Create arrow icon
         const arrow = document.createElement('div');
         arrow.className = 'custom-dropdown-arrow';
         arrow.innerHTML = `
@@ -402,16 +358,13 @@ class WildcardManager {
             </svg>
         `;
 
-        // Create options container
         const optionsContainer = document.createElement('div');
         optionsContainer.className = 'custom-dropdown-options';
 
-        // Set initial button text
         const selectedValue = wildcard.selected || '';
         const selectedIndex = selectedValue ? wildcard.options.indexOf(selectedValue) : 0;
         button.textContent = selectedIndex === 0 ? '(not selected)' : this.truncateOption(selectedValue);
 
-        // Create options
         wildcard.options.forEach((option, index) => {
             const optionElement = document.createElement('div');
             optionElement.className = 'custom-dropdown-option';
@@ -435,13 +388,11 @@ class WildcardManager {
             optionsContainer.appendChild(optionElement);
         });
 
-        // Toggle dropdown on button click
         button.onclick = (e) => {
             e.stopPropagation();
             this._toggleCustomDropdown(container);
         };
 
-        // Close dropdown when clicking outside (enhanced to work with centralized system)
         document.addEventListener('click', (e) => {
             if (!container.contains(e.target) && this.activeOverlay === container) {
                 this._closeCustomDropdown(container);
@@ -461,7 +412,6 @@ class WildcardManager {
         if (isOpen) {
             this._closeCustomDropdown(container);
         } else {
-            // Close any active overlays before opening this dropdown
             this._closeActiveOverlays(container);
             this._openCustomDropdown(container);
         }
@@ -470,13 +420,10 @@ class WildcardManager {
     _openCustomDropdown(container) {
         container.classList.add('open');
         
-        // Track this dropdown as the active overlay
         this.activeOverlay = container;
         
-        // Focus the container for keyboard navigation
         container.focus();
         
-        // Scroll selected option into view
         const selectedOption = container.querySelector('.custom-dropdown-option.selected');
         if (selectedOption) {
             selectedOption.scrollIntoView({ block: 'nearest' });
@@ -486,7 +433,6 @@ class WildcardManager {
     _closeCustomDropdown(container) {
         container.classList.remove('open');
         
-        // Clear active overlay tracking if this was the active one
         if (this.activeOverlay === container) {
             this.activeOverlay = null;
         }
@@ -496,27 +442,21 @@ class WildcardManager {
         const button = container.querySelector('.custom-dropdown-button');
         const options = container.querySelectorAll('.custom-dropdown-option');
         
-        // Update button text
         button.textContent = selectedIndex === 0 ? '(not selected)' : this.truncateOption(selectedOption);
         
-        // Update selected option styling
         options.forEach(opt => opt.classList.remove('selected'));
         options[selectedIndex].classList.add('selected');
         
-        // Close dropdown
         this._closeCustomDropdown(container);
         
-        // Handle the selection change
         const selectedValue = selectedIndex === 0 ? '' : selectedOption;
         this.handleSelectionChange(wildcard, selectedValue, selectedIndex);
     }
 
     _createEntrySelect(entryWildcard) {
-        // Use custom dropdown for entry wildcards too
         const customDropdown = this._createCustomDropdown(entryWildcard);
         customDropdown.classList.add('entry-dropdown');
         
-        // Override the selection handler for entry wildcards
         const button = customDropdown.querySelector('.custom-dropdown-button');
         const originalHandler = button.onclick;
         
@@ -527,7 +467,6 @@ class WildcardManager {
                 const selectedValue = option.dataset.value;
                 const selectedIndex = parseInt(option.dataset.index);
                 
-                // Update UI
                 const button = customDropdown.querySelector('.custom-dropdown-button');
                 const options = customDropdown.querySelectorAll('.custom-dropdown-option');
                 
@@ -537,7 +476,6 @@ class WildcardManager {
                 
                 this._closeCustomDropdown(customDropdown);
                 
-                // Handle entry wildcard change
                 this.handleEntryWildcardChange(entryWildcard.index, selectedValue, entryWildcard.original);
             };
         });
@@ -547,7 +485,6 @@ class WildcardManager {
 
     async handleSelectionChange(wildcard, selectedValue, selectedIndex) {
         try {
-            // Update the selection (mark preservation is handled in updatePendingSelection)
             this.operations.updatePendingSelection(wildcard.index, selectedValue, wildcard.original);
             
             this.updateChildrenVisibility(wildcard, selectedIndex, false);
@@ -726,7 +663,6 @@ class WildcardManager {
     updateFromSave(container, wildcards) {
         if (!wildcards) return 0;
         
-        // Always update structure when saving (this is a definitive change)
         this._updateWildcardStructure(wildcards);
         
         this.wildcardData = wildcards;
@@ -734,7 +670,6 @@ class WildcardManager {
         this.restoreSelectionStates(wildcards);
         const totalCount = this.countTotalWildcards(wildcards);
 
-        // Fetch marked prompt from backend and show it
         fetchSend(this.constants.MESSAGE_ROUTE, this.node.id, "get_content", {
             wildcards_prompt: this.textLoaderInstance.getHiddenWidgetValue("wildcards_prompt"),
             wildcards_selections: this.textLoaderInstance.getHiddenWidgetValue("wildcards_selections")
@@ -756,7 +691,6 @@ class WildcardManager {
 
     async saveSelections(container) {
         try {
-            // Save all pending mark values first
             const pendingMarks = {};
             Object.keys(this.operations.pendingSelections).forEach(wildcardIndex => {
                 const markValue = this.operations.pendingSelections[wildcardIndex]?.mark;
@@ -768,16 +702,13 @@ class WildcardManager {
             await this._savePendingSelections();
             await this.operations.saveSelections();
             
-            // Flash the labels BEFORE updating anything else
             this._flashSavedLabels(container);
             
-            // Update mark icons with the saved values
             Object.keys(pendingMarks).forEach(wildcardIndex => {
                 const section = container.querySelector(`[data-wildcard-index="${wildcardIndex}"]`);
                 const markIcon = section?.querySelector('.wildcard-mark-icon');
                 if (markIcon) {
                     const savedMark = pendingMarks[wildcardIndex];
-                    // After saving, pending becomes undefined and saved becomes the value
                     this._setMarkIconState(markIcon, undefined, savedMark);
                 }
             });
@@ -789,7 +720,6 @@ class WildcardManager {
 
     async _savePendingSelections() {
         for (const [wildcardIndex, selectionData] of Object.entries(this.operations.pendingSelections)) {
-            // Handle both selection and mark updates
             const updateData = {
                 wildcard_index: wildcardIndex,
                 selected_value: selectionData.selected,
@@ -797,7 +727,6 @@ class WildcardManager {
                 wildcards_selections: this.textLoaderInstance.getHiddenWidgetValue("wildcards_selections")
             };
 
-            // Add mark data if it exists
             if (selectionData.mark !== undefined) {
                 updateData.mark_value = selectionData.mark;
             }
@@ -806,7 +735,6 @@ class WildcardManager {
             
             if (response?.status === "success" && response.selections_json) {
                 this.textLoaderInstance.updateHiddenWidget("wildcards_selections", response.selections_json);
-                // Update originalSelections immediately so mark icon states are correct
                 this.operations.originalSelections = response.selections_json;
             }
         }
@@ -820,17 +748,15 @@ class WildcardManager {
         });
     }
 
-    // Add method to check if wildcard structure has changed
     _hasWildcardStructureChanged(newWildcards) {
         if (!this.lastWildcardStructure) {
-            return true; // First load
+            return true;
         }
 
         const newStructure = this._extractWildcardStructure(newWildcards);
         return JSON.stringify(this.lastWildcardStructure) !== JSON.stringify(newStructure);
     }
 
-    // Extract the structural information of wildcards (excluding selections/marks)
     _extractWildcardStructure(wildcards) {
         return wildcards.map(wildcard => ({
             index: wildcard.index,
@@ -842,7 +768,6 @@ class WildcardManager {
         }));
     }
 
-    // Extract structure for nested wildcards
     _extractChildrenStructure(children) {
         const structure = {};
         for (const [key, childArray] of Object.entries(children)) {
@@ -851,7 +776,6 @@ class WildcardManager {
         return structure;
     }
 
-    // Update stored wildcard structure
     _updateWildcardStructure(wildcards) {
         this.lastWildcardStructure = this._extractWildcardStructure(wildcards);
     }
@@ -878,15 +802,12 @@ class Operations {
     }
 
     updatePendingSelection(wildcardIndex, selectedValue, originalWildcard) {
-        // Get existing mark from both pending and saved
         let existingMark;
         const pendingMark = this.pendingSelections[wildcardIndex]?.mark;
         
         if (pendingMark !== undefined) {
-            // Use pending mark if it exists
             existingMark = pendingMark;
         } else {
-            // Check for saved mark in originalSelections
             try {
                 const selections = JSON.parse(this.originalSelections || '{}');
                 existingMark = selections[wildcardIndex]?.mark;
@@ -895,16 +816,13 @@ class Operations {
             }
         }
         
-        // Update or create the selection entry
         if (!this.pendingSelections[wildcardIndex]) {
             this.pendingSelections[wildcardIndex] = {};
         }
         
-        // Update only the selection fields
         this.pendingSelections[wildcardIndex].selected = selectedValue;
         this.pendingSelections[wildcardIndex].original = originalWildcard;
         
-        // Preserve the mark if it existed (either pending or saved)
         if (existingMark !== undefined && existingMark !== '') {
             this.pendingSelections[wildcardIndex].mark = existingMark;
         }
@@ -913,7 +831,6 @@ class Operations {
     }
 
     updatePendingMark(wildcardIndex, markValue) {
-        // Get current saved values
         let originalMark = '';
         let selections = {};
         try {
@@ -921,9 +838,7 @@ class Operations {
             originalMark = selections[wildcardIndex]?.mark || '';
         } catch (e) {}
 
-        // Initialize pending selection if it doesn't exist, preserving existing selection
         if (!this.pendingSelections[wildcardIndex]) {
-            // Use saved selection data as fallback
             const savedSelection = selections[wildcardIndex]?.selected || '';
             const savedOriginal = selections[wildcardIndex]?.original || '';
             
@@ -933,10 +848,8 @@ class Operations {
             };
         }
         
-        // Set the mark value, preserving existing selection
         this.pendingSelections[wildcardIndex].mark = markValue;
 
-        // Only set unsaved changes if mark is actually different from saved
         this.hasUnsavedSelectionChanges = (markValue !== originalMark) || 
             Object.keys(this.pendingSelections).some(index => {
                 const pending = this.pendingSelections[index];
@@ -989,7 +902,6 @@ class Operations {
     hasUnsavedChanges() {
         if (this.hasUnsavedTextChanges) return true;
 
-        // Compare all marks and selections between original and pending
         let original = {};
         try {
             original = JSON.parse(this.originalSelections || '{}');
@@ -1007,7 +919,6 @@ class Operations {
         return false;
     }
 
-    // Add method to reset pending selections when wildcard structure changes
     resetPendingSelections() {
         this.pendingSelections = {};
         this.hasUnsavedSelectionChanges = false;

@@ -271,12 +271,11 @@
     gap: var(--modal-spacing-sm);
 }
 
-/* Hide the original select dropdown */
+
 .wildcard-dropdown {
     display: none;
 }
 
-/* Custom dropdown container */
 .custom-dropdown {
     position: relative;
     flex: 1 1 auto;
@@ -284,7 +283,6 @@
     width: auto;
 }
 
-/* Custom dropdown button (what you click) */
 .custom-dropdown-button {
     width: 100%;
     padding: 6px 8px;
@@ -296,7 +294,7 @@
     cursor: pointer;
     text-align: left;
     position: relative;
-    padding-right: 32px; /* make room for arrow */
+    padding-right: 32px;
     transition: background-color var(--modal-transition);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -312,7 +310,6 @@
     background: rgba(30, 30, 30, 0.98);
 }
 
-/* Custom dropdown arrow */
 .custom-dropdown-arrow {
     position: absolute;
     right: 8px;
@@ -332,7 +329,6 @@
     transform: translateY(-50%) rotate(180deg);
 }
 
-/* Custom dropdown options list */
 .custom-dropdown-options {
     position: absolute;
     top: 100%;
@@ -357,7 +353,6 @@
     transform: translateY(0);
 }
 
-/* Individual option styling */
 .custom-dropdown-option {
     padding: 8px 12px;
     cursor: pointer;
@@ -384,7 +379,6 @@
     font-style: italic;
 }
 
-/* Custom scrollbar for dropdown options */
 .custom-dropdown-options::-webkit-scrollbar {
     width: 6px;
 }
@@ -488,40 +482,37 @@
     }
 }
 
-/* Marking icon next to dropdown */
 .wildcard-mark-icon {
-    font-size: 15px;           /* smaller size */
+    font-size: 15px;
     display: flex;
     align-items: center;
     justify-content: center;
     vertical-align: middle;
     cursor: pointer;
     margin-left: 6px;
-    margin-right: 2px;         /* add a little space from right border */
+    margin-right: 2px;
     color: #B8860B;
     transition: color 0.15s;
     flex: 0 0 auto;
-    height: 100%;              /* helps vertical centering */
+    height: 100%;
 }
 .wildcard-mark-icon:hover {
     color: #FFD700;
 }
 
-/* Marked pencil icon */
 .wildcard-mark-icon.marked {
-    color: #4CAF50 !important; /* green for marked and saved */
-    background: none !important; /* remove green background */
+    color: #4CAF50 !important;
+    background: none !important;
     border-radius: 3px;
     padding: 2px;
 }
 
-/* Add a yellow state for unsaved changes */
+
 .wildcard-mark-icon.unsaved {
-    color: #FFD700 !important; /* yellow for unsaved changes */
+    color: #FFD700 !important;
     background: none !important;
 }
 
-/* Tooltip for marking input */
 .wildcard-mark-tooltip {
     position: absolute;
     background: rgba(20, 20, 20, 0.98);
@@ -533,7 +524,6 @@
     gap: 6px;
     z-index: 1001;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-    /* Add fade animation properties */
     opacity: 0;
     visibility: hidden;
     transform: scale(0.95) translateY(-5px);
@@ -547,9 +537,9 @@
 }
 
 .wildcard-mark-tooltip input[type="text"] {
-    background: #444;                   /* slightly lighter gray */
-    color: #ccc;                        /* light gray font */
-    border: none;                       /* no border */
+    background: #444;
+    color: #ccc;
+    border: none;
     border-radius: 4px;
     padding: 5px 10px;
     font-size: 0.98em;
@@ -582,7 +572,6 @@
     height: 24px;
 }
 
-/* Marking icon next to dropdown */
 .wildcard-mark-icon {
     font-size: 15px;
     display: flex;
@@ -592,39 +581,36 @@
     cursor: pointer;
     margin-left: 6px;
     margin-right: 2px;
-    color: #999; /* light gray default */
-    transition: color 0.2s ease; /* smooth fade transition */
+    color: #999;
+    transition: color 0.2s ease;
     flex: 0 0 auto;
     height: 100%;
 }
 
 .wildcard-mark-icon:hover {
-    color: #fff; /* fade to white on hover */
+    color: #fff;
 }
 
-/* Marked pencil icon - keep existing functionality but with new colors */
 .wildcard-mark-icon.marked {
-    color: #4CAF50 !important; /* green for marked and saved */
+    color: #4CAF50 !important;
     background: none !important;
     border-radius: 3px;
     padding: 2px;
 }
 
 .wildcard-mark-icon.marked:hover {
-    color: #5CBF60 !important; /* slightly lighter green on hover */
+    color: #5CBF60 !important;
 }
 
-/* Unsaved changes state */
 .wildcard-mark-icon.unsaved {
-    color: #FFD700 !important; /* yellow for unsaved changes */
+    color: #FFD700 !important;
     background: none !important;
 }
 
 .wildcard-mark-icon.unsaved:hover {
-    color: #FFED4E !important; /* slightly lighter yellow on hover */
+    color: #FFED4E !important;
 }
 
-/* Tooltip icons */
 .wildcard-mark-add-icon,
 .wildcard-mark-delete-icon {
     display: flex;
@@ -634,17 +620,16 @@
     margin-right: 2px;
     width: 24px;
     height: 24px;
-    color: #999; /* light gray default */
-    transition: color 0.2s ease; /* smooth fade transition */
+    color: #999;
+    transition: color 0.2s ease;
     cursor: pointer;
 }
 
 .wildcard-mark-add-icon:hover,
 .wildcard-mark-delete-icon:hover {
-    color: #fff; /* fade to white on hover */
+    color: #fff;
 }
 
-/* Remove the old button styling from tooltip */
 .wildcard-mark-tooltip button {
     background: none !important;
     color: inherit !important;
