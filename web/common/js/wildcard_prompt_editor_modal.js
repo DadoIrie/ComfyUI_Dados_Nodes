@@ -101,8 +101,25 @@ class WildcardManager {
         if (!markIcon) return;
 
         const selections = JSON.parse(this.operations.originalSelections || '{}');
-        const pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
-        const savedMark = selections[wildcard.index]?.mark ?? '';
+        const wildcardId = this._createWildcardIdentifier(wildcard);
+        
+        // Look for mark by wildcard identifier first, then fallback to index
+        let savedMark = '';
+        let pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
+
+        // First try to find by identifier in all selections
+        for (const [selectionIndex, selectionData] of Object.entries(selections)) {
+            const selectionId = this._getWildcardIdentifierFromSelections(selections, selectionIndex);
+            if (selectionId === wildcardId && selectionData.mark) {
+                savedMark = selectionData.mark;
+                break;
+            }
+        }
+
+        // Fallback to direct index lookup
+        if (!savedMark && selections[wildcard.index]?.mark) {
+            savedMark = selections[wildcard.index].mark;
+        }
 
         this._setMarkIconState(markIcon, pendingMark, savedMark);
     }
@@ -172,8 +189,25 @@ class WildcardManager {
         const dropdown = this._createCustomDropdown(wildcard);
 
         const selections = JSON.parse(this.operations.originalSelections || '{}');
-        const pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
-        const savedMark = selections[wildcard.index]?.mark ?? '';
+        const wildcardId = this._createWildcardIdentifier(wildcard);
+        
+        // Look for mark by identifier first
+        let savedMark = '';
+        let pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
+
+        // Search for mark by identifier
+        for (const [selectionIndex, selectionData] of Object.entries(selections)) {
+            const selectionId = this._getWildcardIdentifierFromSelections(selections, selectionIndex);
+            if (selectionId === wildcardId && selectionData.mark) {
+                savedMark = selectionData.mark;
+                break;
+            }
+        }
+
+        // Fallback to direct index
+        if (!savedMark && selections[wildcard.index]?.mark) {
+            savedMark = selections[wildcard.index].mark;
+        }
 
         const markIcon = document.createElement('span');
         markIcon.className = 'wildcard-mark-icon';
@@ -184,26 +218,20 @@ class WildcardManager {
         markIcon.onclick = (e) => {
             e.stopPropagation();
             
-            // Check if there's already a tooltip for THIS specific wildcard
             const existingTooltip = document.querySelector('.wildcard-mark-tooltip');
             const isThisWildcard = existingTooltip && 
                 existingTooltip.dataset.wildcardIndex === wildcard.index.toString();
             
             if (existingTooltip) {
                 if (isThisWildcard) {
-                    // Close if it's the same wildcard
-                    console.log('Closing tooltip for same wildcard');
                     this._closeActiveOverlays();
                     return;
                 } else {
-                    // Close existing and open new one for different wildcard
-                    console.log('Closing tooltip for different wildcard, opening new one');
                     this._closeActiveOverlays();
                 }
             }
             
-            console.log('Showing new tooltip');
-            this.showMarkTooltip(container, wildcard, pendingMark);
+            this.showMarkTooltip(container, wildcard, pendingMark || savedMark);
         };
 
         row.appendChild(dropdown);
@@ -229,13 +257,9 @@ class WildcardManager {
     }
 
     showMarkTooltip(container, wildcard, markValue = '') {
-        console.log('showMarkTooltip called, activeOverlay before:', this.activeOverlay);
-        
-        // Check if tooltip is already showing for this wildcard - improved check
         if (this.activeOverlay && 
             this.activeOverlay.classList.contains('wildcard-mark-tooltip') && 
             this.activeOverlay.parentNode) {
-            console.log('Found existing tooltip, closing');
             this._closeActiveOverlays();
             return;
         }
@@ -250,13 +274,25 @@ class WildcardManager {
         tooltip.className = 'wildcard-mark-tooltip';
         tooltip.dataset.wildcardIndex = wildcard.index;
 
-        // Set activeOverlay IMMEDIATELY after creating tooltip
         this.activeOverlay = tooltip;
-        console.log('Set activeOverlay to:', this.activeOverlay);
 
         const selections = JSON.parse(this.operations.originalSelections || '{}');
+        const wildcardId = this._createWildcardIdentifier(wildcard);
+        
+        // Find mark by identifier or index
+        let savedMark = '';
+        for (const [selectionIndex, selectionData] of Object.entries(selections)) {
+            const selectionId = this._getWildcardIdentifierFromSelections(selections, selectionIndex);
+            if (selectionId === wildcardId && selectionData.mark) {
+                savedMark = selectionData.mark;
+                break;
+            }
+        }
+        if (!savedMark) {
+            savedMark = selections[wildcard.index]?.mark ?? '';
+        }
+
         const pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
-        const savedMark = selections[wildcard.index]?.mark ?? '';
 
         const input = document.createElement('input');
         input.type = 'text';
@@ -277,10 +313,11 @@ class WildcardManager {
 
         const addMark = () => {
             let val = input.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
-            this.operations.updatePendingMark(wildcard.index, val);
-            
+            // MODIFIED: Store wildcard position and content for stable identification
+            this.operations.updatePendingMark(wildcard.index, val, wildcard);
+
             this.activeOverlay = null;
-            
+            input.blur();
             tooltip.classList.remove('show');
             setTimeout(() => {
                 tooltip.remove();
@@ -288,17 +325,31 @@ class WildcardManager {
                 if (markIcon) {
                     const selections = JSON.parse(this.operations.originalSelections || '{}');
                     const pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
-                    const savedMark = selections[wildcard.index]?.mark ?? '';
+                    
+                    // Find saved mark by identifier
+                    let savedMark = '';
+                    const wildcardId = this._createWildcardIdentifier(wildcard);
+                    for (const [selectionIndex, selectionData] of Object.entries(selections)) {
+                        const selectionId = this._getWildcardIdentifierFromSelections(selections, selectionIndex);
+                        if (selectionId === wildcardId && selectionData.mark) {
+                            savedMark = selectionData.mark;
+                            break;
+                        }
+                    }
+                    if (!savedMark) {
+                        savedMark = selections[wildcard.index]?.mark ?? '';
+                    }
+                    
                     this._setMarkIconState(markIcon, pendingMark, savedMark);
                 }
             }, 200);
         };
 
         const deleteMark = () => {
-            this.operations.updatePendingMark(wildcard.index, '');
-            
+            this.operations.updatePendingMark(wildcard.index, '', wildcard);
+
             this.activeOverlay = null;
-            
+            input.blur();
             tooltip.classList.remove('show');
             setTimeout(() => {
                 tooltip.remove();
@@ -306,7 +357,21 @@ class WildcardManager {
                 if (markIcon) {
                     const selections = JSON.parse(this.operations.originalSelections || '{}');
                     const pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
-                    const savedMark = selections[wildcard.index]?.mark ?? '';
+                    
+                    // Find saved mark by identifier
+                    let savedMark = '';
+                    const wildcardId = this._createWildcardIdentifier(wildcard);
+                    for (const [selectionIndex, selectionData] of Object.entries(selections)) {
+                        const selectionId = this._getWildcardIdentifierFromSelections(selections, selectionIndex);
+                        if (selectionId === wildcardId && selectionData.mark) {
+                            savedMark = selectionData.mark;
+                            break;
+                        }
+                    }
+                    if (!savedMark) {
+                        savedMark = selections[wildcard.index]?.mark ?? '';
+                    }
+                    
                     this._setMarkIconState(markIcon, pendingMark, savedMark);
                 }
             }, 200);
@@ -325,14 +390,13 @@ class WildcardManager {
         const icon = container.querySelector('.wildcard-mark-icon');
         const modal = document.querySelector('.text-editor-modal');
         
-        // Append to modal to avoid clipping by sidebar overflow
         modal.appendChild(tooltip);
 
-        // Add scroll listener to hide tooltip when scrolling
         const sidebarContent = document.querySelector('.wildcard-dropdowns');
         const handleScroll = () => {
             if (tooltip && tooltip.parentNode) {
                 this.activeOverlay = null;
+                input.blur();
                 tooltip.classList.remove('show');
                 setTimeout(() => {
                     tooltip.remove();
@@ -349,7 +413,6 @@ class WildcardManager {
             const iconRect = icon.getBoundingClientRect();
             const modalRect = modal.getBoundingClientRect();
             
-            // Position relative to modal
             tooltip.style.position = 'absolute';
             tooltip.style.left = `${iconRect.right - modalRect.left - tooltip.offsetWidth}px`;
             tooltip.style.top = `${iconRect.top - modalRect.top - tooltip.offsetHeight - 4}px`;
@@ -357,12 +420,16 @@ class WildcardManager {
             
             requestAnimationFrame(() => {
                 tooltip.classList.add('show');
+                requestAnimationFrame(() => {
+                    input.focus();
+                });
             });
         }, 0);
 
         const handleClickOutside = (event) => {
             if (!tooltip.contains(event.target) && event.target !== icon) {
                 this.activeOverlay = null;
+                input.blur();
                 tooltip.classList.remove('show');
                 setTimeout(() => {
                     tooltip.remove();
@@ -444,10 +511,6 @@ class WildcardManager {
         container.appendChild(arrow);
         container.appendChild(optionsContainer);
 
-        return container;
-    }
-
-    _toggleCustomDropdown(container) {
         return container;
     }
 
@@ -539,7 +602,8 @@ class WildcardManager {
 
     async handleSelectionChange(wildcard, selectedValue, selectedIndex) {
         try {
-            this.operations.updatePendingSelection(wildcard.index, selectedValue, wildcard.original);
+            // MODIFIED: Include position data
+            this.operations.updatePendingSelection(wildcard.index, selectedValue, wildcard.original, wildcard.position);
             
             this.updateChildrenVisibility(wildcard, selectedIndex, false);
         } catch (error) {
@@ -747,9 +811,14 @@ class WildcardManager {
         try {
             const pendingMarks = {};
             Object.keys(this.operations.pendingSelections).forEach(wildcardIndex => {
-                const markValue = this.operations.pendingSelections[wildcardIndex]?.mark;
+                const selectionData = this.operations.pendingSelections[wildcardIndex];
+                const markValue = selectionData?.mark;
                 if (markValue !== undefined) {
-                    pendingMarks[wildcardIndex] = markValue;
+                    pendingMarks[wildcardIndex] = {
+                        mark: markValue,
+                        original: selectionData.original,
+                        position: selectionData.position
+                    };
                 }
             });
 
@@ -762,7 +831,7 @@ class WildcardManager {
                 const section = container.querySelector(`[data-wildcard-index="${wildcardIndex}"]`);
                 const markIcon = section?.querySelector('.wildcard-mark-icon');
                 if (markIcon) {
-                    const savedMark = pendingMarks[wildcardIndex];
+                    const savedMark = pendingMarks[wildcardIndex].mark;
                     this._setMarkIconState(markIcon, undefined, savedMark);
                 }
             });
@@ -773,26 +842,62 @@ class WildcardManager {
     }
 
     async _savePendingSelections() {
+        // Group updates: first do selections, then do marks to ensure marks are preserved
+        const selectionUpdates = [];
+        const markUpdates = [];
+        
         for (const [wildcardIndex, selectionData] of Object.entries(this.operations.pendingSelections)) {
-            const updateData = {
-                wildcard_index: wildcardIndex,
-                selected_value: selectionData.selected,
-                original_wildcard: selectionData.original,
-                wildcards_selections: this.textLoaderInstance.getHiddenWidgetValue("wildcards_selections")
-            };
-
-            // UPDATED: Ensure mark value is sent correctly
-            if (selectionData.mark !== undefined) {
-                updateData.mark_value = selectionData.mark;
+            // If there's a selection change, add it to selection updates
+            if (selectionData.selected !== undefined) {
+                selectionUpdates.push({
+                    wildcard_index: wildcardIndex,
+                    selected_value: selectionData.selected,
+                    original_wildcard: selectionData.original,
+                    wildcard_position: selectionData.position,
+                    wildcard_content: selectionData.original
+                });
             }
+            
+            // If there's a mark change, add it to mark updates  
+            if (selectionData.mark !== undefined) {
+                markUpdates.push({
+                    wildcard_index: wildcardIndex,
+                    selected_value: selectionData.selected || '',
+                    original_wildcard: selectionData.original,
+                    mark_value: selectionData.mark,
+                    wildcard_position: selectionData.position,
+                    wildcard_content: selectionData.original
+                });
+            }
+        }
 
+        let latestSelectionsJson = this.textLoaderInstance.getHiddenWidgetValue("wildcards_selections");
+        
+        // Process selection updates first
+        for (const updateData of selectionUpdates) {
+            updateData.wildcards_selections = latestSelectionsJson;
+            
             const response = await fetchSend(this.constants.MESSAGE_ROUTE, this.node.id, "update_wildcard_selection", updateData);
             
             if (response?.status === "success" && response.selections_json) {
-                this.textLoaderInstance.updateHiddenWidget("wildcards_selections", response.selections_json);
-                this.operations.originalSelections = response.selections_json;
+                latestSelectionsJson = response.selections_json;
             }
         }
+        
+        // Process mark updates second, ensuring we preserve all existing marks
+        for (const updateData of markUpdates) {
+            updateData.wildcards_selections = latestSelectionsJson;
+            
+            const response = await fetchSend(this.constants.MESSAGE_ROUTE, this.node.id, "update_wildcard_selection", updateData);
+            
+            if (response?.status === "success" && response.selections_json) {
+                latestSelectionsJson = response.selections_json;
+            }
+        }
+        
+        // Update with the final selections JSON that contains all changes
+        this.textLoaderInstance.updateHiddenWidget("wildcards_selections", latestSelectionsJson);
+        this.operations.originalSelections = latestSelectionsJson;
     }
 
     _flashSavedLabels(container) {
@@ -834,6 +939,24 @@ class WildcardManager {
     _updateWildcardStructure(wildcards) {
         this.lastWildcardStructure = this._extractWildcardStructure(wildcards);
     }
+
+    // NEW: Create stable wildcard identifier
+    _createWildcardIdentifier(wildcard) {
+        // Combine original content and position for a stable identifier
+        const content = wildcard.original || '';
+        const position = wildcard.position || 0;
+        // Create a hash-like identifier that's stable regardless of index changes
+        return `${content}@${position}`;
+    }
+
+    // NEW: Get wildcard identifier from selections
+    _getWildcardIdentifierFromSelections(selections, wildcardIndex) {
+        const selection = selections[wildcardIndex];
+        if (selection && selection.original !== undefined && selection.position !== undefined) {
+            return `${selection.original}@${selection.position}`;
+        }
+        return null;
+    }
 }
 
 class Operations {
@@ -856,7 +979,7 @@ class Operations {
         this.hasUnsavedTextChanges = currentText !== this.originalText;
     }
 
-    updatePendingSelection(wildcardIndex, selectedValue, originalWildcard) {
+    updatePendingSelection(wildcardIndex, selectedValue, originalWildcard, wildcardPosition) {
         let existingMark;
         const pendingMark = this.pendingSelections[wildcardIndex]?.mark;
         
@@ -865,7 +988,23 @@ class Operations {
         } else {
             try {
                 const selections = JSON.parse(this.originalSelections || '{}');
-                existingMark = selections[wildcardIndex]?.mark;
+                
+                // NEW: Search by identifier first
+                const wildcardId = `${originalWildcard}@${wildcardPosition}`;
+                for (const [selectionIndex, selectionData] of Object.entries(selections)) {
+                    const selectionId = selectionData.original && selectionData.position !== undefined
+                        ? `${selectionData.original}@${selectionData.position}`
+                        : null;
+                    if (selectionId === wildcardId && selectionData.mark) {
+                        existingMark = selectionData.mark;
+                        break;
+                    }
+                }
+                
+                // Fallback to direct index lookup
+                if (existingMark === undefined) {
+                    existingMark = selections[wildcardIndex]?.mark;
+                }
             } catch (e) {
                 existingMark = undefined;
             }
@@ -877,6 +1016,7 @@ class Operations {
         
         this.pendingSelections[wildcardIndex].selected = selectedValue;
         this.pendingSelections[wildcardIndex].original = originalWildcard;
+        this.pendingSelections[wildcardIndex].position = wildcardPosition; // NEW: Store position
         
         if (existingMark !== undefined && existingMark !== '') {
             this.pendingSelections[wildcardIndex].mark = existingMark;
@@ -885,22 +1025,49 @@ class Operations {
         this.hasUnsavedSelectionChanges = true;
     }
 
-    updatePendingMark(wildcardIndex, markValue) {
+    // MODIFIED: Update to include wildcard metadata
+    updatePendingMark(wildcardIndex, markValue, wildcard = null) {
         let originalMark = '';
         let selections = {};
         try {
             selections = JSON.parse(this.originalSelections || '{}');
-            originalMark = selections[wildcardIndex]?.mark || '';
+            
+            // NEW: Search by identifier if wildcard provided
+            if (wildcard) {
+                const wildcardId = `${wildcard.original}@${wildcard.position}`;
+                for (const [selectionIndex, selectionData] of Object.entries(selections)) {
+                    const selectionId = selectionData.original && selectionData.position !== undefined
+                        ? `${selectionData.original}@${selectionData.position}`
+                        : null;
+                    if (selectionId === wildcardId && selectionData.mark) {
+                        originalMark = selectionData.mark;
+                        break;
+                    }
+                }
+            }
+            
+            // Fallback to direct lookup
+            if (!originalMark) {
+                originalMark = selections[wildcardIndex]?.mark || '';
+            }
         } catch (e) {}
 
         if (!this.pendingSelections[wildcardIndex]) {
             const savedSelection = selections[wildcardIndex]?.selected || '';
-            const savedOriginal = selections[wildcardIndex]?.original || '';
+            const savedOriginal = wildcard?.original || selections[wildcardIndex]?.original || '';
+            const savedPosition = wildcard?.position ?? selections[wildcardIndex]?.position;
             
             this.pendingSelections[wildcardIndex] = { 
                 selected: savedSelection, 
-                original: savedOriginal
+                original: savedOriginal,
+                position: savedPosition // NEW: Store position
             };
+        }
+        
+        // NEW: Update position if wildcard provided
+        if (wildcard) {
+            this.pendingSelections[wildcardIndex].original = wildcard.original;
+            this.pendingSelections[wildcardIndex].position = wildcard.position;
         }
         
         this.pendingSelections[wildcardIndex].mark = markValue;
@@ -939,7 +1106,19 @@ class Operations {
             currentSelections = {};
         }
 
-        Object.assign(currentSelections, this.pendingSelections);
+        // FIXED: Merge each pending selection individually to preserve existing marks
+        for (const [wildcardIndex, pendingData] of Object.entries(this.pendingSelections)) {
+            if (!currentSelections[wildcardIndex]) {
+                currentSelections[wildcardIndex] = {};
+            }
+            
+            // Merge the pending data with existing data
+            currentSelections[wildcardIndex] = {
+                ...currentSelections[wildcardIndex],
+                ...pendingData
+            };
+        }
+
         this.textLoaderInstance.updateHiddenWidget("wildcards_selections", JSON.stringify(currentSelections));
         
         this.originalSelections = JSON.stringify(currentSelections);
@@ -1056,6 +1235,10 @@ class ButtonManager {
         return this.elements.createButton('text-editor-save-button', 'Save', () => this.handleSave());
     }
 
+    createClearButton() {
+        return this.elements.createButton('text-editor-clear-button', 'Clear', () => this.handleClear());
+    }
+
     createResetButton() {
         return this.elements.createButton('wildcard-reset-button', 'Reset', () => this.handleReset());
     }
@@ -1067,11 +1250,6 @@ class ButtonManager {
     async handleSave() {
         const textarea = this.elements.elements.textarea;
         const saveButton = document.querySelector('.text-editor-save-button');
-        
-        if (!textarea.value.trim()) {
-            alert('Empty content is not allowed');
-            return;
-        }
 
         this.setButtonState(saveButton, 'Saving...', true);
 
@@ -1095,6 +1273,43 @@ class ButtonManager {
             console.error('Error saving content:', error);
             alert('Error saving content');
             this.setButtonState(saveButton, 'Save', false);
+        }
+    }
+
+    async handleClear() {
+        if (window.confirm('Are you sure you want to clear all text content? This will remove all text and wildcards.')) {
+            const clearButton = document.querySelector('.text-editor-clear-button');
+            this.setButtonState(clearButton, 'Clearing...', true);
+            
+            try {
+                // Clear the textarea
+                const textarea = this.elements.elements.textarea;
+                textarea.value = '';
+                
+                // Save the empty content
+                await this.operations.saveContent('');
+                
+                // Update UI to show no wildcards
+                this.wildcardManager.createWildcardUI(this.elements.elements.wildcardDropdowns, []);
+                this.elements.autoExpandSidebar(0);
+                
+                // Show notification
+                this.wildcardManager.showNotification(
+                    this.elements.elements.wildcardDropdowns, 
+                    'Text content cleared'
+                );
+                
+                this.setButtonState(clearButton, 'Cleared!', true);
+                
+                setTimeout(() => {
+                    this.setButtonState(clearButton, 'Clear', false);
+                }, 1000);
+                
+            } catch (error) {
+                console.error('Error clearing content:', error);
+                alert('Error clearing content');
+                this.setButtonState(clearButton, 'Clear', false);
+            }
         }
     }
 
@@ -1204,8 +1419,18 @@ export function createTextEditorModal(node, textContent, constants, textLoaderIn
     wildcardControls.insertBefore(sidebarButtonsContainer, elements.elements.wildcardDropdowns);
     elements.elements.sidebarContent.appendChild(wildcardControls);
 
+    // MODIFIED: Create main button container with both Clear and Save buttons
+    const mainButtonsContainer = document.createElement('div');
+    Object.assign(mainButtonsContainer.style, {
+        display: 'flex',
+        gap: '10px'
+    });
+    
+    mainButtonsContainer.appendChild(buttonManager.createClearButton());
+    mainButtonsContainer.appendChild(buttonManager.createSaveButton());
+
     buttonContainer.appendChild(document.createElement('div'));
-    buttonContainer.appendChild(buttonManager.createSaveButton());
+    buttonContainer.appendChild(mainButtonsContainer);
 
     mainSection.appendChild(buttonContainer);
     contentDiv.appendChild(mainSection);

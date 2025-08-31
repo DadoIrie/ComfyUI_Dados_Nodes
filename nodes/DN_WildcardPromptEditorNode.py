@@ -479,11 +479,8 @@ class TextLoaderOperations:
         content = payload.get('content', '')
         wildcards_selections = payload.get('wildcards_selections', '')
         
-        if not content.strip():
-            return self.error_response("Empty files are not allowed")
-        
         # Parse wildcards from the new content
-        wildcards = self.node.parse_wildcards(content)
+        wildcards = self.node.parse_wildcards(content) if content.strip() else []
         
         # Apply existing selections if any
         try:
@@ -508,7 +505,8 @@ class TextLoaderOperations:
             if wildcard.get('selected'):
                 selections[wildcard['index']] = {
                     'selected': wildcard['selected'],
-                    'original': wildcard['original']
+                    'original': wildcard['original'],
+                    'position': wildcard.get('position', 0)  # NEW: Include position
                 }
                 # NEW: Preserve mark if it exists
                 if wildcard.get('mark'):
@@ -526,7 +524,9 @@ class TextLoaderOperations:
         wildcard_index = str(payload.get('wildcard_index', ''))
         selected_value = payload.get('selected_value', '')
         original_wildcard = payload.get('original_wildcard', '')
-        mark_value = payload.get('mark_value')  # NEW: Handle mark value
+        mark_value = payload.get('mark_value')
+        wildcard_position = payload.get('wildcard_position', 0)  # NEW: Get position
+        wildcard_content = payload.get('wildcard_content', '')   # NEW: Get content
         wildcards_selections = payload.get('wildcards_selections', '')
         
         try:
@@ -534,25 +534,53 @@ class TextLoaderOperations:
         except json.JSONDecodeError:
             selections = {}
         
-        if selected_value:
-            selections[wildcard_index] = {
-                'selected': selected_value,
-                'original': original_wildcard
-            }
-            # NEW: Handle mark value
-            if mark_value is not None:
-                if mark_value:  # Non-empty mark
-                    selections[wildcard_index]['mark'] = mark_value
-                elif 'mark' in selections[wildcard_index]:
-                    # Remove mark if empty value provided
-                    del selections[wildcard_index]['mark']
-        else:
+        # FIXED: Preserve existing data when updating
+        if wildcard_index not in selections:
+            selections[wildcard_index] = {}
+        
+        # Update selection data if provided
+        if selected_value is not None:  # Allow empty string
+            selections[wildcard_index]['selected'] = selected_value
+            selections[wildcard_index]['original'] = original_wildcard
+            selections[wildcard_index]['position'] = wildcard_position
+        
+        # Handle mark value separately to preserve existing selection data
+        if mark_value is not None:
+            if mark_value:  # Non-empty mark
+                selections[wildcard_index]['mark'] = mark_value
+                selections[wildcard_index]['mark_content'] = wildcard_content
+                selections[wildcard_index]['mark_position'] = wildcard_position
+            else:
+                # Remove mark if empty value provided
+                selections[wildcard_index].pop('mark', None)
+                selections[wildcard_index].pop('mark_content', None)
+                selections[wildcard_index].pop('mark_position', None)
+        
+        # Only remove the entire entry if it has no useful data
+        if (not selections[wildcard_index].get('selected') and not selections[wildcard_index].get('mark') and wildcard_index in selections):
             selections.pop(wildcard_index, None)
         
         return self.success_response({
             "message": "Wildcard selection updated",
             "selections_json": json.dumps(selections, ensure_ascii=False)
         })
+
+    def _cleanup_orphaned_marks(self, selections: Dict):
+        """Remove mark data for selections that no longer have a selected value"""
+        keys_to_clean = []
+        for key, selection_data in selections.items():
+            if isinstance(selection_data, dict):
+                if not selection_data.get('selected') and selection_data.get('mark'):
+                    # Mark exists but no selection - clean it up
+                    keys_to_clean.append(key)
+        
+        for key in keys_to_clean:
+            if 'mark' in selections[key]:
+                del selections[key]['mark']
+            if 'mark_content' in selections[key]:
+                del selections[key]['mark_content']
+            if 'mark_position' in selections[key]:
+                del selections[key]['mark_position']
 
     def _clear_wildcard_branch(self, selections: Dict, wildcard_index: str):
         keys_to_remove = [key for key in selections.keys() if key == wildcard_index or key.startswith(wildcard_index + '.')]
