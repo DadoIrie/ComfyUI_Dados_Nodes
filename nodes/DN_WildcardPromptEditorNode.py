@@ -288,8 +288,6 @@ class DN_WildcardPromptEditorNode:
             # Get selected value
             selected_value = selections.get(current_index, '')
             
-            print(f"DEBUG: Processing wildcard {current_index}, selected: '{selected_value}'")  # DEBUG
-            
             if selected_value:
                 replacement = self._process_wildcard_with_marks(
                     text, start, end, content, current_index, selected_value, 
@@ -301,13 +299,9 @@ class DN_WildcardPromptEditorNode:
             
             # Apply mark to this wildcard if it has one AND it's not empty
             effective_mark = effective_marks.get(current_index)
-            print(f"DEBUG: Wildcard {current_index} effective_mark: '{effective_mark}'")  # DEBUG
             
             if effective_mark and effective_mark.strip():
-                print(f"DEBUG: Applying mark {effective_mark} to wildcard {current_index}")  # DEBUG
                 replacement = f"START_{effective_mark.upper()}{replacement}END_{effective_mark.upper()}"
-            else:
-                print(f"DEBUG: No mark applied to wildcard {current_index} (mark: '{effective_mark}')")  # DEBUG
             
             # Replace in text
             adjusted_start = start + offset
