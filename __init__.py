@@ -27,6 +27,7 @@ from .nodes.DN_TextConcatenateNode import DN_TextConcatenateNode
 from .nodes.DN_TextDropDownNode import DN_TextDropDownNode
 from .nodes.DN_CSVMultiDropDownNode import DN_CSVMultiDropDownNode
 from .nodes.DN_WildcardPromptEditorNode import DN_WildcardPromptEditorNode
+from .nodes.DN_WildcardSelectorComposerV2 import DN_WildcardSelectorComposerV2
 from .nodes.DN_PromptSectionsExtractor import DN_PromptSectionsExtractor
 from .nodes.DN_WildcardsProcessor import DN_WildcardsProcessor
 from .nodes.DN_SmolVLMNode import DN_SmolVLMNode
@@ -42,6 +43,7 @@ NODE_CLASS_MAPPINGS = {
     "DN_TextDropDownNode": DN_TextDropDownNode,
     "DN_CSVMultiDropDownNode": DN_CSVMultiDropDownNode,
     "DN_WildcardPromptEditorNode": DN_WildcardPromptEditorNode,
+    "DN_WildcardSelectorComposerV2": DN_WildcardSelectorComposerV2,
     "DN_PromptSectionsExtractor": DN_PromptSectionsExtractor,
     "DN_WildcardsProcessor": DN_WildcardsProcessor,
     "DN_SmolVLMNode": DN_SmolVLMNode,
@@ -57,6 +59,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "DN_TextDropDownNode": "Text DropDown",
     "DN_CSVMultiDropDownNode": "CSV MultiDropDown",
     "DN_WildcardPromptEditorNode": "Wildcard Prompt Editor",
+    "DN_WildcardSelectorComposerV2": "Wildcard Selector/Composer",
     "DN_PromptSectionsExtractor": "Prompt Sections Extractor",
     "DN_WildcardsProcessor": "Wildcards Processor",
     "DN_SmolVLMNode": "SmolVLM Image Describer",

@@ -1,0 +1,93 @@
+:root {
+    --wc-modal-z-index: 10000;
+}
+
+#wildcard-selector-composer-v2-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: var(--wc-modal-z-index);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.15s ease forwards;
+}
+
+#wildcard-selector-composer-v2-modal {
+    width: 80vw;
+    height: 85vh;
+    z-index: calc(var(--wc-modal-z-index) + 1);
+    display: flex;
+    overflow: hidden;
+}
+
+#wildcard-selector-composer-v2-overlay.closing {
+    animation: fadeOut 0.15s ease 0.200s forwards;
+}
+
+#wildcard-selector-composer-v2-modal > .sidebar {
+    width: 25%;
+    height: calc(100% - 2rem);   /* 1rem less top and bottom */
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    background: rgb(30, 30, 30);
+    transform: scaleX(0);
+    transform-origin: left center;
+    position: relative;
+    animation: growWidth 0.15s cubic-bezier(.25,.8,.25,1) 0.150s forwards;
+}
+  
+#wildcard-selector-composer-v2-modal > .textbox {
+    width: 75%;
+    background: rgb(25, 25, 25);
+    position: relative;
+}
+
+#wildcard-selector-composer-v2-modal:not(.closing) > .textbox {
+    opacity: 0;
+    animation: fadeIn 0.15s cubic-bezier(.25,.8,.25,1) forwards;
+}
+
+#wildcard-selector-composer-v2-modal.closing .textbox {
+    opacity: 1;
+    animation: fadeOut 0.15s cubic-bezier(.25,.8,.25,1) 0.150s forwards;
+}
+
+#wildcard-selector-composer-v2-modal.closing .sidebar {
+    animation: shrinkWidth 0.15s cubic-bezier(.25,.8,.25,1) forwards;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@keyframes growWidth {
+    from { 
+        width: 0% !important;
+        transform: scaleX(0);
+    }
+    to { 
+        width: 30% !important;
+        transform: scaleX(1);
+    }
+}
+
+@keyframes shrinkWidth {
+    from { 
+        width: 30% !important;
+        transform: scaleX(1);
+    }
+    to { 
+        width: 0% !important;
+        transform: scaleX(0);
+    }
+}
