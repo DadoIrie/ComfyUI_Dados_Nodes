@@ -27,6 +27,12 @@ export async function createTextEditorModal(node, constants) {
     
     sidebar.className = "sidebar";
     textbox.className = "textbox";
+
+    // Add dummy button
+    const toggleBtn = document.createElement("button");
+    toggleBtn.textContent = "Toggle Sidebar";
+    toggleBtn.onclick = () => modal.classList.toggle("sidebar-hidden");
+    textbox.appendChild(toggleBtn);
     
     modal.appendChild(textbox);
     modal.appendChild(sidebar);

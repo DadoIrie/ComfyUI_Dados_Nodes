@@ -38,12 +38,14 @@
     transform-origin: left center;
     position: relative;
     animation: growWidth 0.15s cubic-bezier(.25,.8,.25,1) 0.150s forwards;
+    transition: width 0.3s ease 0.3s, transform 0.3s ease 0.3s; /* delay to start after textbox shrinks */
 }
   
 #wildcard-selector-composer-v2-modal > .textbox {
     width: 75%;
     background: rgb(25, 25, 25);
     position: relative;
+    transition: width 0.3s ease;
 }
 
 #wildcard-selector-composer-v2-modal:not(.closing) > .textbox {
@@ -58,6 +60,18 @@
 
 #wildcard-selector-composer-v2-modal.closing .sidebar {
     animation: shrinkWidth 0.15s cubic-bezier(.25,.8,.25,1) forwards;
+}
+
+/* Simple toggle - sidebar hidden */
+#wildcard-selector-composer-v2-modal.sidebar-hidden > .sidebar {
+    width: 0%;
+    transform: scaleX(0);
+    transition: width 0.3s ease, transform 0.3s ease;
+}
+
+#wildcard-selector-composer-v2-modal.sidebar-hidden > .textbox {
+    width: 100%;
+    transition: width 0.3s ease 0.3s; /* delay to start after sidebar shrinks */
 }
 
 @keyframes fadeIn {
