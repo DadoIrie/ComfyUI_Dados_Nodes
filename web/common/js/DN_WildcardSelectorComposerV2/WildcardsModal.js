@@ -10,10 +10,12 @@ export class WildcardsModal {
         this.overlay = null;
         this.modal = null;
         this.textboxContent = null;
+        this.structureData = null; // Store structure data
     }
 
     async show() {
         await this.ensureCSSLoaded();
+        await this.loadStructureData(); // Load structure data
         this.createElements();
         this.setupEventHandlers();
         document.body.appendChild(this.overlay);
@@ -39,6 +41,11 @@ export class WildcardsModal {
             
             document.head.appendChild(link);
         });
+    }
+
+    async loadStructureData() {
+        this.structureData = await this.nodeDataProcessor.loadStructureData(this.constants);
+        console.log("Loaded structure data:", this.structureData);
     }
 
     createElements() {
@@ -165,10 +172,12 @@ export class WildcardsModal {
         const content = this.getContent();
         
         try {
+            // Update prompt content
             this.nodeDataProcessor.updateNodeData({
                 wildcards_prompt: content
             });
             
+            // Save prompt content to backend and get structure data
             const response = await fetchSend(
                 this.constants.MESSAGE_ROUTE, 
                 this.node.id, 
@@ -176,15 +185,27 @@ export class WildcardsModal {
                 { content: content }
             );
             
-            const originalText = this.saveBtn.textContent;
-            this.saveBtn.textContent = "Saved!";
-            setTimeout(() => {
-                this.saveBtn.textContent = originalText;
-            }, 1000);
+            // Update structure data from response
+            if (response.status === 'success' && response.structure_data) {
+                this.structureData = response.structure_data;
+                
+                // Save structure data to widget
+                await this.nodeDataProcessor.saveStructureData(this.structureData, this.constants);
+            }
+            
+            // **REFRESH CANVAS - This triggers node re-execution**
+            this.node.setDirtyCanvas(true, true);
+            
+            // Alternative methods for canvas refresh:
+            // app.graph.setDirtyCanvas(true, true); // Global canvas refresh
+            // this.node.onResize?.(this.node.size); // Force node resize/redraw
+            
+            // Show success feedback
+            this.showSuccessMessage("Saved!");
             
         } catch (error) {
             console.error("Error saving content:", error);
-            alert("Error saving content");
+            this.showErrorMessage("Save failed");
         }
     }
 
@@ -225,5 +246,17 @@ export class WildcardsModal {
 
         this.overlay.addEventListener("click", closeHandler);
         document.addEventListener("keydown", closeHandler);
+    }
+
+    showSuccessMessage(message) {
+        const originalText = this.saveBtn.textContent;
+        this.saveBtn.textContent = message;
+        setTimeout(() => {
+            this.saveBtn.textContent = originalText;
+        }, 1000);
+    }
+
+    showErrorMessage(message) {
+        alert(message);
     }
 }
