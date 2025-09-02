@@ -34,15 +34,7 @@ class DN_WildcardSelectorComposerV2 {
 
     async handleEditContent() {
         try {
-            // move this into the modal
-            /* const response = await fetchSend(MESSAGE_ROUTE, this.node.id, "get_content", {
-                wildcards_prompt: wildcards_prompt,
-                wildcards_selections: wildcards_selections
-            }); */
-
-            // const textContent = response?.status === "success" ? response.content || '' : wildcards_prompt;
             const constants = { EXTENSION_NAME, MESSAGE_ROUTE };
-            
             const { showWildcardSelectorModal } = await import(`/extensions/${EXTENSION_NAME}/common/js/DN_WildcardSelectorComposerV2/modal_init.js`);
             showWildcardSelectorModal(
                 this.node, 

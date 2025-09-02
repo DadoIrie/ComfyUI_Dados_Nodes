@@ -16,8 +16,8 @@ class DN_WildcardSelectorComposerV2:
     def INPUT_TYPES(cls):
         return {            
             "optional": {
-                "wildcards_prompt": ("STRING", {"default": "", "multiline": True}),
-                "wildcards_selections": ("STRING", {"default": "{}"}),
+                "wildcards_prompt": ("STRING",),
+                "wildcards_selections": ("STRING",),
             },
             "hidden": {
                 "unique_id": "UNIQUE_ID",
