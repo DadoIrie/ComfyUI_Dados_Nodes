@@ -140,10 +140,11 @@ class DN_WildcardPromptEditorNode:
                 brace_count += 1
             elif char == '}':
                 brace_count -= 1
-            elif char == '|' and brace_count == 0:
-                options.append(current_option.strip())
-                current_option = ""
-                continue
+            elif char == '|':
+                if brace_count == 0:
+                    options.append(current_option.strip())
+                    current_option = ""
+                    continue
             
             current_option += char
         
@@ -599,10 +600,7 @@ async def handle_wildcard_prompt_editor_operations(request):
         ]
         
         if operation not in valid_operations:
-            return web.json_response(
-                {"status": "error", "message": f"Unknown operation: {operation}"}, 
-                status=400
-            )
+            return None  # ← Let other handlers try
         
         node_id = str(data.get('id', ''))
         payload = data.get('payload', {})
