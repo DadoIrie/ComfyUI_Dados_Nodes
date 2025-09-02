@@ -80,7 +80,7 @@
 #wildcard-selector-composer-v2-modal.sidebar-hidden > .sidebar {
     width: 0%;
     transform: scaleX(0);
-    transition: width var(--wc-modal-animation-duration-long) ease,
+    transition: width var(--wc-modal-animation-duration) ease,
                 transform var(--wc-modal-animation-duration-long) ease;
 }
 
