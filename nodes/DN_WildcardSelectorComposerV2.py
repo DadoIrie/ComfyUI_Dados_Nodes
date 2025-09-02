@@ -41,28 +41,24 @@ class DN_WildcardSelectorComposerV2:
         return random.randint(1, 1000000)
 
 @register_operation_handler
-async def handle_wildcard_selector_composer_operations(request):  # ← New unique name
+async def handle_wildcard_selector_composer_operations(request):
     try:
         data = await request.json()
         operation = data.get('operation')
         
-        # ← ONLY handle your specific operation, return None for others
         if operation != 'update_clean_wildcards_prompt':
-            return None  # ← Let other handlers try
+            return None
             
-        node_id = str(data.get('id', ''))  # ← Use 'id' like CSV node
-        payload = data.get('payload', {})   # ← Get payload like CSV node
+        node_id = str(data.get('id', ''))
+        payload = data.get('payload', {})
         
-        # Extract content from payload like the CSV node does
-        content = payload.get('content', '')  # ← Get from payload
+        content = payload.get('content', '')
         
-        # Store the content in node state
         if node_id:
             DN_WildcardSelectorComposerV2.node_state[node_id] = {
                 'wildcards_prompt': content
             }
         
-        # Return proper response
         return web.json_response({
             "status": "success", 
             "message": "Content updated successfully",
@@ -70,7 +66,6 @@ async def handle_wildcard_selector_composer_operations(request):  # ← New uniq
         })
         
     except Exception as e:
-        print(f"Error in wildcard handler: {e}")  # Debug
         return web.json_response(
             {"status": "error", "message": str(e)},
             status=500

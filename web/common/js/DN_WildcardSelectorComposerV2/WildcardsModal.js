@@ -2,7 +2,7 @@ import { getIcon } from "../svg_icons.js";
 import { fetchSend } from "../utils.js";
 import { WildcardsProcessor } from './NodeDataProcessor.js';
 
-export class WildcardModal {
+export class WildcardsModal {
     constructor(node, constants) {
         this.node = node;
         this.constants = constants;
@@ -165,20 +165,17 @@ export class WildcardModal {
         const content = this.getContent();
         
         try {
-            // Update node widgets
             this.nodeDataProcessor.updateNodeData({
                 wildcards_prompt: content
             });
             
-            // Notify backend - send content in payload like CSV node
             const response = await fetchSend(
                 this.constants.MESSAGE_ROUTE, 
                 this.node.id, 
                 "update_clean_wildcards_prompt", 
-                { content: content }  // ← This creates the payload
+                { content: content }
             );
             
-            // Visual feedback
             const originalText = this.saveBtn.textContent;
             this.saveBtn.textContent = "Saved!";
             setTimeout(() => {
