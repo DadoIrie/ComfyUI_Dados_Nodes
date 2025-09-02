@@ -2,6 +2,9 @@
     --wc-modal-z-index: 10000;
     --wc-modal-textbox-width: 75%;
     --wc-modal-sidebar-width: 25%;
+    --wc-modal-animation-duration: 0.15s;
+    --wc-modal-animation-duration-long: 0.3s;
+    --wc-modal-animation-timing: cubic-bezier(.25,.8,.25,1);
 }
 
 #wildcard-selector-composer-v2-overlay {
@@ -15,7 +18,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    animation: fadeIn 0.15s ease forwards;
+    animation: fadeIn var(--wc-modal-animation-duration) ease forwards;
 }
 
 #wildcard-selector-composer-v2-modal {
@@ -34,7 +37,8 @@
     transform: scaleX(0);
     transform-origin: left center;
     position: relative;
-    transition: width 0.3s ease 0.15s, transform 0.15s ease 0.3s;
+    transition: width var(--wc-modal-animation-duration-long) ease var(--wc-modal-animation-duration),
+                transform var(--wc-modal-animation-duration) ease calc(var(--wc-modal-animation-duration-long) + var(--wc-modal-animation-duration));
     box-shadow: inset 8px 0 16px -8px rgba(0,0,0,0.55);
 }
 
@@ -53,7 +57,7 @@
     width: var(--wc-modal-textbox-width);
     background: rgb(25, 25, 25);
     position: relative;
-    transition: width 0.3s ease;
+    transition: width var(--wc-modal-animation-duration-long) ease;
     display: flex;
     flex-direction: column;
     height: 100%;
@@ -66,52 +70,53 @@
 
 #wildcard-selector-composer-v2-modal:not(.closing) > .textbox {
     opacity: 0;
-    animation: fadeIn 0.15s cubic-bezier(.25,.8,.25,1) forwards;
+    animation: fadeIn var(--wc-modal-animation-duration) var(--wc-modal-animation-timing) forwards;
 }
 
 #wildcard-selector-composer-v2-modal:not(.sidebar-hidden) > .sidebar {
-    animation: growWidth 0.15s cubic-bezier(.25,.8,.25,1) 0.150s forwards;
+    animation: growWidth var(--wc-modal-animation-duration) var(--wc-modal-animation-timing) var(--wc-modal-animation-duration) forwards;
 }
 
 #wildcard-selector-composer-v2-modal.sidebar-hidden > .sidebar {
     width: 0%;
     transform: scaleX(0);
-    transition: width 0.3s ease, transform 0.3s ease;
+    transition: width var(--wc-modal-animation-duration-long) ease,
+                transform var(--wc-modal-animation-duration-long) ease;
 }
 
 #wildcard-selector-composer-v2-modal.sidebar-hidden > .textbox {
     width: 100%;
-    transition: width 0.3s ease 0.15s;
+    transition: width var(--wc-modal-animation-duration-long) ease var(--wc-modal-animation-duration);
 }
 
 #wildcard-selector-composer-v2-modal.sidebar-animating-out > .sidebar {
-    animation: shrinkWidth 0.15s cubic-bezier(.25,.8,.25,1) forwards;
+    animation: shrinkWidth var(--wc-modal-animation-duration) var(--wc-modal-animation-timing) forwards;
 }
 
 #wildcard-selector-composer-v2-modal.sidebar-animating-out > .textbox {
     width: 100%;
-    transition: width 0.3s ease 0.15s;
+    transition: width var(--wc-modal-animation-duration-long) ease var(--wc-modal-animation-duration);
 }
 
 #wildcard-selector-composer-v2-overlay.closing:not(.sidebar-hidden) {
-    animation: fadeOut 0.15s ease 0.200s forwards;
+    animation: fadeOut var(--wc-modal-animation-duration) ease calc(var(--wc-modal-animation-duration) * 1.33) forwards;
 }
 
 #wildcard-selector-composer-v2-modal.closing:not(.sidebar-hidden) .textbox {
     opacity: 1;
-    animation: fadeOut 0.15s cubic-bezier(.25,.8,.25,1) 0.150s forwards;
+    animation: fadeOut var(--wc-modal-animation-duration) var(--wc-modal-animation-timing) var(--wc-modal-animation-duration) forwards;
 }
 
 #wildcard-selector-composer-v2-modal.closing:not(.sidebar-hidden) .sidebar {
-    animation: shrinkWidth 0.15s cubic-bezier(.25,.8,.25,1) forwards;
+    animation: shrinkWidth var(--wc-modal-animation-duration) var(--wc-modal-animation-timing) forwards;
 }
 
 #wildcard-selector-composer-v2-overlay.closing.sidebar-hidden {
-    animation: fadeOut 0.15s ease forwards;
+    animation: fadeOut var(--wc-modal-animation-duration) ease forwards;
 }
 
 #wildcard-selector-composer-v2-modal.closing.sidebar-hidden .textbox {
-    animation: fadeOut 0.15s ease forwards;
+    animation: fadeOut var(--wc-modal-animation-duration) ease forwards;
 }
 
 #wildcard-selector-composer-v2-modal.closing.sidebar-hidden .sidebar {
@@ -176,22 +181,22 @@
 }
 
 @keyframes growWidth {
-    from { 
+    from {
         width: 0%;
         transform: scaleX(0);
     }
-    to { 
+    to {
         width: var(--wc-modal-sidebar-width);
         transform: scaleX(1);
     }
 }
 
 @keyframes shrinkWidth {
-    from { 
+    from {
         width: var(--wc-modal-sidebar-width);
         transform: scaleX(1);
     }
-    to { 
+    to {
         width: 0%;
         transform: scaleX(0);
     }
