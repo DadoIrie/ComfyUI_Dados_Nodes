@@ -69,76 +69,153 @@ class DN_WildcardSelectorComposerV2:
         choices.append(current_choice.strip())
         return choices
     
-    def analyze_wildcard_structure(self, text: str, depth: int = 0) -> List[Dict[str, Any]]:
-        """Recursively analyze wildcard structure and return hierarchical data"""
-        structure = []
-        wildcards = self.find_wildcards(text)
+    def parse_sections(self, prompt: str) -> List[str]:
+        """Parse prompt into sections delimited by commas"""
+        sections = []
+        current_section = ""
+        bracket_depth = 0
         
-        for start, end in wildcards:
-            wildcard_content = text[start:end]  # Keep the outer braces for content
-            choices_content = text[start+1:end-1]  # Remove outer braces for parsing choices
-            choices = self.parse_choices(choices_content)
+        for char in prompt:
+            if char == '{':
+                bracket_depth += 1
+            elif char == '}':
+                bracket_depth -= 1
+            elif char == ',' and bracket_depth == 0:
+                sections.append(current_section.strip())
+                current_section = ""
+                continue
             
-            # Check if any choice contains nested wildcards
-            has_nested = any(self.find_wildcards(choice) for choice in choices)
-            
-            wildcard_data = {
-                'start': start,
-                'end': end,
-                'content': wildcard_content,  # Keep the full wildcard syntax with {}
-                'choices': choices,
-                'depth': depth,
-                'has_nested': has_nested,
-                'children': []
-            }
-            
-            # Recursively analyze nested wildcards in each choice
-            if has_nested:
-                for choice in choices:
-                    child_wildcards = self.analyze_wildcard_structure(choice, depth + 1)
-                    wildcard_data['children'].extend(child_wildcards)
-            
-            structure.append(wildcard_data)
+            current_section += char
         
-        return structure
+        # Add the last section if it exists
+        if current_section.strip():
+            sections.append(current_section.strip())
+        
+        return sections
     
-    def generate_structure_data(self, structure: List[Dict[str, Any]]) -> str:
-        """Generate structure data output"""
-        structure_lines = []
+    def analyze_wildcard_structure(self, text: str, depth: int = 0, return_wildcards_only: bool = False) -> Dict[str, Any]:
+        """Recursively analyze wildcard structure and return hierarchical data with hashed keys"""
+        # Parse sections (only for top-level input)
+        if depth == 0:
+            sections = self.parse_sections(text)
+        else:
+            # For nested input, treat as a single section
+            sections = [text]
         
-        for i, wildcard in enumerate(structure):
-            if wildcard['depth'] == 0:
-                if i > 0:
-                    structure_lines.append("------")
-                
-                structure_lines.append(f"ROOT: {wildcard['content']}")
-                structure_lines.append(", ".join(wildcard['choices']))
-                
-                # Process children recursively
-                self._add_children_structure(wildcard['children'], structure_lines, 1)
+        # If returning wildcards only, don't wrap in section data
+        if return_wildcards_only:
+            result = {}
+        else:
+            result = {}
+        
+        for section in sections:
+            # Hash the entire section string
+            # For top-level sections that are just a single wildcard, use a different hash to avoid collision
+            if depth == 0 and not return_wildcards_only:
+                # Check if this section is exactly one wildcard that spans the entire section
+                section_wildcards = self.find_wildcards(section)
+                if (len(section_wildcards) == 1 and
+                        section_wildcards[0][0] == 0 and
+                        section_wildcards[0][1] == len(section)):
+                    # This is a top-level section that is just a single wildcard
+                    # Use a different hash to distinguish it from the wildcard itself
+                    section_hash = "s_" + xxhash.xxh32(section.encode()).hexdigest()[:7]
+                else:
+                    # Normal section hash
+                    section_hash = xxhash.xxh32(section.encode()).hexdigest()[:8]
             else:
-                # Handle nested wildcards that aren't direct children of root
-                self._add_wildcard_structure(wildcard, structure_lines)
-        
-        return "\n".join(structure_lines)
-    
-    def _add_children_structure(self, children: List[Dict[str, Any]], structure_lines: List[str], level: int):
-        """Add structure data for child wildcards"""
-        for child in children:
-            structure_lines.append(f"CHILD {level}: {child['content']}")
-            structure_lines.append(", ".join(child['choices']))
+                # For nested sections or when returning wildcards only, use normal hash
+                section_hash = xxhash.xxh32(section.encode()).hexdigest()[:8]
             
-            # Recursively process deeper children
-            if child['children']:
-                self._add_children_structure(child['children'], structure_lines, level + 1)
-    
-    def _add_wildcard_structure(self, wildcard: Dict[str, Any], structure_lines: List[str]):
-        """Add structure data for a single wildcard at any level"""
-        structure_lines.append(f"CHILD {wildcard['depth']}: {wildcard['content']}")
-        structure_lines.append(", ".join(wildcard['choices']))
+            # Create section object with raw text (only when not returning wildcards only)
+            if return_wildcards_only:
+                section_data = result  # Use result directly when returning wildcards only
+            else:
+                section_data = {
+                    "raw": section
+                }
+            
+            # Find wildcards in this section
+            wildcards = self.find_wildcards(section)
+            
+            # Process each wildcard in the section
+            for start, end in wildcards:
+                wildcard_content = section[start:end]  # Keep the outer braces for content
+                choices_content = section[start+1:end-1]  # Remove outer braces for parsing choices
+                choices = self.parse_choices(choices_content)
+                
+                # Hash the wildcard content
+                wildcard_hash = xxhash.xxh32(wildcard_content.encode()).hexdigest()[:8]
+                
+                # Process choices to handle nested wildcards
+                processed_choices = []
+                nested_wildcard_data = {}  # Collect nested wildcard data separately
+                for choice in choices:
+                    # Check if choice contains nested wildcards
+                    nested_wildcards = self.find_wildcards(choice)
+                    if nested_wildcards:
+                        # Process nested wildcards recursively, returning only wildcard data
+                        nested_wildcard_dict = self.analyze_wildcard_structure(choice, depth + 1, return_wildcards_only=True)
+                        # Add nested wildcards to processed choices and collect their data
+                        for nested_hash, nested_data in nested_wildcard_dict.items():
+                            processed_choices.append(nested_hash)
+                            nested_wildcard_data[nested_hash] = nested_data
+                    else:
+                        processed_choices.append(choice)
+                
+                # Create wildcard object
+                # For nested wildcards, use only the text around the wildcard as raw text
+                if depth > 0:
+                    # Find the text around this wildcard in the section (choice)
+                    # Look for delimiters ({, }, or ,) before and after the wildcard
+                    wildcard_start = start
+                    wildcard_end = end
+                    
+                    # Find previous delimiter
+                    prev_delim_pos = -1
+                    for i in range(wildcard_start - 1, -1, -1):
+                        if section[i] in '{},':
+                            prev_delim_pos = i
+                            break
+                    
+                    # Find next delimiter
+                    next_delim_pos = len(section)
+                    for i in range(wildcard_end, len(section)):
+                        if section[i] in '{},':
+                            next_delim_pos = i
+                            break
+                    
+                    # Extract the text around the wildcard
+                    wildcard_raw = section[prev_delim_pos + 1:next_delim_pos].strip()
+                else:
+                    wildcard_raw = wildcard_content
+                
+                wildcard_data = {
+                    "raw": wildcard_raw,
+                    "options": processed_choices,
+                    "selected": "nothing selected"
+                }
+                
+                # Add collected nested wildcard data to the parent wildcard's data
+                for nested_hash, nested_data in nested_wildcard_data.items():
+                    wildcard_data[nested_hash] = nested_data
+                
+                # Add wildcard to section data or result directly
+                if return_wildcards_only:
+                    result[wildcard_hash] = wildcard_data
+                else:
+                    section_data[wildcard_hash] = wildcard_data
+            
+            # Add section to result (only when not returning wildcards only)
+            if not return_wildcards_only:
+                result[section_hash] = section_data
         
-        if wildcard['children']:
-            self._add_children_structure(wildcard['children'], structure_lines, wildcard['depth'] + 1)
+        return result
+    
+    def generate_structure_data(self, structure: Dict[str, Any]) -> str:
+        """Generate structure data output in JSON format"""
+        import json
+        return json.dumps(structure, indent=2)
     
     def process_prompt(self, wildcards_prompt="", wildcards_structure_data="", seed=-1, unique_id=None):
         marked_prompt = ""
