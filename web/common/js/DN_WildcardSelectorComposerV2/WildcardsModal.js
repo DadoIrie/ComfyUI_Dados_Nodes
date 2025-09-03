@@ -15,7 +15,6 @@ export class WildcardsModal {
 
     async show() {
         await this.ensureCSSLoaded();
-        await this.loadStructureData(); // Load structure data
         this.createElements();
         this.setupEventHandlers();
         document.body.appendChild(this.overlay);
@@ -41,11 +40,6 @@ export class WildcardsModal {
             
             document.head.appendChild(link);
         });
-    }
-
-    async loadStructureData() {
-        this.structureData = await this.nodeDataProcessor.loadStructureData(this.constants);
-        console.log("Loaded structure data:", this.structureData);
     }
 
     createElements() {
@@ -89,9 +83,9 @@ export class WildcardsModal {
         this.textboxContent.className = "textbox-content";
         this.textboxContent.placeholder = "Type here...";
         
-        const nodeData = this.nodeDataProcessor.getNodeData();
-        if (nodeData && nodeData.wildcards_prompt) {
-            this.textboxContent.value = nodeData.wildcards_prompt;
+        const wildcardsPrompt = this.nodeDataProcessor.getWildcardsPrompt();
+        if (wildcardsPrompt) {
+            this.textboxContent.value = wildcardsPrompt;
         }
         
         this.textbox.appendChild(this.textboxContent);
@@ -172,35 +166,25 @@ export class WildcardsModal {
         const content = this.getContent();
         
         try {
-            // Update prompt content
             this.nodeDataProcessor.updateNodeData({
                 wildcards_prompt: content
             });
             
-            // Save prompt content to backend and get structure data
             const response = await fetchSend(
                 this.constants.MESSAGE_ROUTE, 
                 this.node.id, 
-                "update_clean_wildcards_prompt", 
+                "update_wildcards_prompt", 
                 { content: content }
             );
             
-            // Update structure data from response
-            if (response.status === 'success' && response.structure_data) {
-                this.structureData = response.structure_data;
-                
-                // Save structure data to widget
-                await this.nodeDataProcessor.saveStructureData(this.structureData, this.constants);
+            if (response.status === 'success' && response.wildcard_structure_data !== undefined) {
+                this.nodeDataProcessor.updateNodeData({
+                    wildcards_structure_data: response.wildcard_structure_data
+                });
             }
             
-            // **REFRESH CANVAS - This triggers node re-execution**
             this.node.setDirtyCanvas(true, true);
             
-            // Alternative methods for canvas refresh:
-            // app.graph.setDirtyCanvas(true, true); // Global canvas refresh
-            // this.node.onResize?.(this.node.size); // Force node resize/redraw
-            
-            // Show success feedback
             this.showSuccessMessage("Saved!");
             
         } catch (error) {

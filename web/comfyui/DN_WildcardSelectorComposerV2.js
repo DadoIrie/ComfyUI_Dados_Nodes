@@ -18,7 +18,7 @@ class DN_WildcardSelectorComposerV2 {
 
     initializeHiddenInputs() {
             const wildcardPromptWidget = this.node.widgets?.find(w => w.name === "wildcards_prompt");
-            const wildcardSelectionsWidget = this.node.widgets?.find(w => w.name === "wildcard_structure_data");
+            const wildcardSelectionsWidget = this.node.widgets?.find(w => w.name === "wildcards_structure_data");
             
 /*             if (wildcardPromptWidget && wildcardSelectionsWidget) {
                 wildcardPromptWidget.computeSize = () => [0, -4];

@@ -27,23 +27,24 @@ export class WildcardsProcessor {
         }
     }
 
-    getNodeData() {
-        return {
-            wildcards_prompt: this.getHiddenWidgetValue("wildcards_prompt"),
-            wildcard_structure_data: this.getHiddenWidgetValue("wildcard_structure_data") // Renamed!
-        };
+    getWildcardsPrompt() {
+        return this.getHiddenWidgetValue("wildcards_prompt")
+    }
+
+    getWildcardsStructure() {
+        return this.getHiddenWidgetValue("wildcards_structure_data")
     }
 
     updateNodeData(data) {
         if (data.wildcards_prompt !== undefined) {
             this.updateHiddenWidget("wildcards_prompt", data.wildcards_prompt);
         }
-        if (data.wildcard_structure_data !== undefined) {
-            this.updateHiddenWidget("wildcard_structure_data", data.wildcard_structure_data); // Renamed!
+        if (data.wildcards_structure_data !== undefined) {
+            this.updateHiddenWidget("wildcards_structure_data", data.wildcards_structure_data);
         }
     }
 
-    // NEW: Load structure data from backend
+/*     // NEW: Load structure data from backend
     async loadStructureData(constants) {
         try {
             const response = await fetchSend(
@@ -69,7 +70,7 @@ export class WildcardsProcessor {
             
             // Update widget
             this.updateNodeData({
-                wildcard_structure_data: JSON.stringify(structureData)
+                wildcards_structure_data: JSON.stringify(structureData)
             });
             
             // Send to backend
@@ -85,5 +86,5 @@ export class WildcardsProcessor {
             console.error("Error saving structure data:", error);
             return false;
         }
-    }
+    } */
 }
