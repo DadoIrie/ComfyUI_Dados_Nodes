@@ -93,8 +93,11 @@ class DN_WildcardSelectorComposerV2:
         
         return sections
     
-    def analyze_wildcard_structure(self, text: str, depth: int = 0, return_wildcards_only: bool = False) -> Dict[str, Any]:
+    def analyze_wildcard_structure(self, text: str, depth: int = 0, return_wildcards_only: bool = False, target_path: List[str] = None) -> Dict[str, Any]:
         """Recursively analyze wildcard structure and return hierarchical data with hashed keys"""
+        if target_path is None:
+            target_path = []
+        
         # Parse sections (only for top-level input)
         if depth == 0:
             sections = self.parse_sections(text)
@@ -127,12 +130,18 @@ class DN_WildcardSelectorComposerV2:
                 # For nested sections or when returning wildcards only, use normal hash
                 section_hash = xxhash.xxh32(section.encode()).hexdigest()[:8]
             
+            # Create the target path for this section
+            section_target_path = target_path.copy()
+            if depth == 0 and not return_wildcards_only:
+                section_target_path = [section_hash]
+            
             # Create section object with raw text (only when not returning wildcards only)
             if return_wildcards_only:
                 section_data = result  # Use result directly when returning wildcards only
             else:
                 section_data = {
-                    "raw": section
+                    "raw": section,
+                    "target": section_target_path
                 }
             
             # Find wildcards in this section
@@ -155,7 +164,7 @@ class DN_WildcardSelectorComposerV2:
                     nested_wildcards = self.find_wildcards(choice)
                     if nested_wildcards:
                         # Process nested wildcards recursively, returning only wildcard data
-                        nested_wildcard_dict = self.analyze_wildcard_structure(choice, depth + 1, return_wildcards_only=True)
+                        nested_wildcard_dict = self.analyze_wildcard_structure(choice, depth + 1, return_wildcards_only=True, target_path=section_target_path + [wildcard_hash])
                         # Add nested wildcards to processed choices and collect their data
                         for nested_hash, nested_data in nested_wildcard_dict.items():
                             processed_choices.append(nested_hash)
@@ -193,7 +202,8 @@ class DN_WildcardSelectorComposerV2:
                 wildcard_data = {
                     "raw": wildcard_raw,
                     "options": processed_choices,
-                    "selected": "nothing selected"
+                    "selected": "nothing selected",
+                    "target": section_target_path + [wildcard_hash]
                 }
                 
                 # Add collected nested wildcard data to the parent wildcard's data
