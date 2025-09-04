@@ -54,6 +54,7 @@
     align-items: center;
     box-shadow: 0 2px 8px 0 rgba(0,0,0,0.35);
     flex: 0 0 2.5rem;
+    position: relative;
 }
 
 .sidebar > .wildcard-dropdown-container {
@@ -377,4 +378,28 @@
 .custom-dropdown:not(.open) .custom-dropdown-button {
     background: rgba(20, 20, 20, 0.98);
     color: #ccc;
+}
+
+.sidebar-apply-btn {
+    position: absolute;
+    left: 70%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    padding: 0.4rem 2.4rem;
+    border: none;
+    font-size: 1rem;
+    font-family: inherit;
+    background: #232323;
+    color: #e0e0e0;
+    box-shadow: 0 2px 6px 0 rgba(0,0,0,0.12);
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    display: flex;
+    align-items: center;
+    height: 1.7rem;
+}
+
+.sidebar-apply-btn:hover {
+    background: #1b5e20;
+    color: #c8e6c9;
 }

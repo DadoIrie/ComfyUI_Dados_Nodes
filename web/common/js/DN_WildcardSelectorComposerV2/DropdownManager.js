@@ -66,10 +66,12 @@ export class DropdownManager {
 
         const selectedValue = wildcard.selected;
         let displayText;
-        if (selectedValue && wildcard.options.includes(selectedValue)) {
+        if (!selectedValue) {
+            displayText = 'nothing selected (random selection)';
+        } else if (wildcard.options.includes(selectedValue)) {
             displayText = this.truncateOption(wildcard[selectedValue]?.raw || selectedValue);
         } else {
-            displayText = selectedValue || '';
+            displayText = selectedValue;
         }
         textSpan.textContent = displayText;
 
@@ -189,10 +191,13 @@ export class DropdownManager {
     _handleCustomDropdownSelection(container, wildcard, selectedOption, selectedIndex) {
         const button = container.querySelector('.custom-dropdown-button');
         const options = container.querySelectorAll('.custom-dropdown-option');
-        const displayText = selectedIndex === -1 
-            ? (wildcard.selected || '') 
-            : this.truncateOption(wildcard[selectedOption]?.raw || selectedOption);
-        
+        let displayText;
+        if (selectedIndex === -1) {
+            displayText = 'nothing selected (random selection)';
+        } else {
+            displayText = this.truncateOption(wildcard[selectedOption]?.raw || selectedOption);
+        }
+
         const textSpan = button.querySelector('.custom-dropdown-text');
         textSpan.textContent = displayText;
 
@@ -206,9 +211,17 @@ export class DropdownManager {
 
         const selectedValue = selectedIndex === -1 ? '' : selectedOption;
         const dropdownContainer = container.closest('.wildcard-dropdown-container');
-        // Store the selection in the correct object using the breadcrumb trail
+        // Store the selection as a pending change in 'apply?'
         if (wildcard.target) {
-            this._setSelectedByTarget(wildcard.target, selectedValue);
+            if (!this.structureData["apply?"]) {
+                this.structureData["apply?"] = {};
+            }
+            if (!this.structureData["apply?"]["selectionChange"]) {
+                this.structureData["apply?"]["selectionChange"] = {};
+            }
+            this.structureData["apply?"]["selectionChange"].origin = Array.isArray(wildcard.target) ? [...wildcard.target] : wildcard.target;
+            this.structureData["apply?"]["selectionChange"].destination = Array.isArray(wildcard.target) ? [...wildcard.target] : wildcard.target;
+            this.structureData["apply?"]["selectionChange"].selected = selectedIndex;
             // Persist the structure using the processor
             if (this.processor) {
                 this.processor.updateNodeData({

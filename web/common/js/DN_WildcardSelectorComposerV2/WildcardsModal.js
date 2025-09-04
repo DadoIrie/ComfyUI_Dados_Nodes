@@ -66,6 +66,14 @@ export class WildcardsModal {
         this.sidebar.className = "sidebar";
         const sidebarTopbar = document.createElement("div");
         sidebarTopbar.className = "topbar";
+
+        // --- ADD APPLY BUTTON ---
+        this.applyBtn = document.createElement("button");
+        this.applyBtn.className = "sidebar-apply-btn";
+        this.applyBtn.textContent = "Apply";
+        sidebarTopbar.appendChild(this.applyBtn);
+        // --- END APPLY BUTTON ---
+
         this.sidebar.appendChild(sidebarTopbar);
 
         // Add scrollable container for dropdowns
@@ -212,6 +220,14 @@ export class WildcardsModal {
             await this.saveAndSync();
         });
 
+        // --- APPLY BUTTON HANDLER ---
+        if (this.applyBtn) {
+            this.applyBtn.addEventListener("click", () => {
+                this.processApplyTasks();
+            });
+        }
+        // --- END APPLY BUTTON HANDLER ---
+
         const closeAnimationHandler = (event) => {
             if (event.target === this.overlay && event.animationName === 'fadeOut') {
                 this.overlay.removeEventListener("animationend", closeAnimationHandler);
@@ -224,6 +240,21 @@ export class WildcardsModal {
                 (event.type === "click" && event.target === this.overlay) ||
                 (event.type === "keydown" && event.key === "Escape")
             ) {
+                // Only show popup if there is a pending selectionChange
+                if (this.structureData && this.structureData["apply?"] && this.structureData["apply?"]["selectionChange"]) {
+                    if (Object.keys(this.structureData["apply?"]).length > 0) {
+                        if (confirm("You have unapplied changes. Apply them before closing?\nOK = Apply, Cancel = Discard")) {
+                            this.processApplyTasks();
+                        } else {
+                            delete this.structureData["apply?"];
+                            if (this.dropdownManager) {
+                                this.dropdownManager.structureData = this.structureData;
+                            }
+                        }
+                    }
+                }
+                // --- END HOOK ---
+
                 this.overlay.classList.add("closing");
                 this.modal.classList.add("closing");
                 if (this.modal.classList.contains("sidebar-hidden")) {
@@ -249,5 +280,49 @@ export class WildcardsModal {
 
     showErrorMessage(message) {
         alert(message);
+    }
+
+    processApplyTasks() {
+        if (!this.structureData || !this.structureData["apply?"]) return;
+        const applyObj = this.structureData["apply?"];
+        while (applyObj["selectionChange"]) {
+            const selChange = applyObj["selectionChange"];
+            let obj = this.structureData;
+            if (Array.isArray(selChange.origin)) {
+                for (let i = 0; i < selChange.origin.length; i++) {
+                    obj = obj[selChange.origin[i]];
+                }
+                if (Array.isArray(obj.options) && typeof selChange.selected === "number" && selChange.selected >= 0) {
+                    obj.selected = obj.options[selChange.selected];
+                } else {
+                    obj.selected = "";
+                }
+            }
+            delete applyObj["selectionChange"];
+        }
+        delete this.structureData["apply?"];
+        this.nodeDataProcessor.updateNodeData({
+            wildcards_structure_data: JSON.stringify(this.structureData)
+        });
+
+        // --- FULLY RESET DROPDOWN MANAGER ---
+        if (this.dropdownManager) {
+            // Remove old dropdowns from the sidebar
+            while (this.sidebarDropdownsScroll.firstChild) {
+                this.sidebarDropdownsScroll.removeChild(this.sidebarDropdownsScroll.firstChild);
+            }
+            // Create a new instance
+            this.dropdownManager = new DropdownManager(
+                this.sidebarDropdownsScroll,
+                this.structureData,
+                this.nodeDataProcessor
+            );
+            this.dropdownManager.createDropdowns();
+        }
+        // --- END RESET ---
+
+        if (this.node && typeof this.node.setDirtyCanvas === 'function') {
+            this.node.setDirtyCanvas(true, true);
+        }
     }
 }
