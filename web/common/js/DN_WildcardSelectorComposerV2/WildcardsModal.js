@@ -1,12 +1,14 @@
 import { getIcon } from "../svg_icons.js";
 import { fetchSend } from "../utils.js";
 import { WildcardsProcessor } from './NodeDataProcessor.js';
+import { DropdownManager } from './DropdownManager.js';
 
 export class WildcardsModal {
     constructor(node, constants) {
         this.node = node;
         this.constants = constants;
         this.nodeDataProcessor = new WildcardsProcessor(node);
+        this.dropdownManager = null;
         this.overlay = null;
         this.modal = null;
         this.textboxContent = null;
@@ -17,6 +19,7 @@ export class WildcardsModal {
         await this.ensureCSSLoaded();
         this.createElements();
         this.setupEventHandlers();
+        this.initializeDropdowns();
         document.body.appendChild(this.overlay);
     }
 
@@ -162,6 +165,33 @@ export class WildcardsModal {
         return this.textboxContent ? this.textboxContent.value : "";
     }
     
+            /**
+             * Initialize dropdowns with structure data
+             */
+            initializeDropdowns() {
+                // Get structure data from node
+                const structureDataStr = this.nodeDataProcessor.getWildcardsStructure();
+                
+                if (structureDataStr) {
+                    try {
+                        this.structureData = JSON.parse(structureDataStr);
+                        
+                        // Create dropdown manager if it doesn't exist
+                        if (!this.dropdownManager) {
+                            this.dropdownManager = new DropdownManager(this.sidebar, this.structureData);
+                        } else {
+                            // Update structure data in existing manager
+                            this.dropdownManager.structureData = this.structureData;
+                        }
+                        
+                        // Create dropdowns
+                        this.dropdownManager.createDropdowns();
+                    } catch (e) {
+                        console.error("Error parsing structure data:", e);
+                    }
+                }
+            }
+            
     async saveAndSync() {
         const content = this.getContent();
         
@@ -181,6 +211,10 @@ export class WildcardsModal {
                 this.nodeDataProcessor.updateNodeData({
                     wildcards_structure_data: response.wildcard_structure_data
                 });
+                
+                // Update dropdowns with new structure data
+                this.structureData = JSON.parse(response.wildcard_structure_data);
+                this.initializeDropdowns();
             }
             
             this.node.setDirtyCanvas(true, true);
@@ -220,12 +254,17 @@ export class WildcardsModal {
                 
                 if (this.modal.classList.contains("sidebar-hidden")) {
                     this.overlay.classList.add("sidebar-hidden");
-                }
+               }
+               
+
                 
                 this.overlay.removeEventListener("click", closeHandler);
                 document.removeEventListener("keydown", closeHandler);
                 this.overlay.addEventListener("animationend", closeAnimationHandler);
             }
+            
+
+        
         };
 
         this.overlay.addEventListener("click", closeHandler);

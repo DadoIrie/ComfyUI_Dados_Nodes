@@ -163,12 +163,29 @@ class DN_WildcardSelectorComposerV2:
                     # Check if choice contains nested wildcards
                     nested_wildcards = self.find_wildcards(choice)
                     if nested_wildcards:
-                        # Process nested wildcards recursively, returning only wildcard data
-                        nested_wildcard_dict = self.analyze_wildcard_structure(choice, depth + 1, return_wildcards_only=True, target_path=section_target_path + [wildcard_hash])
-                        # Add nested wildcards to processed choices and collect their data
+                        # For choices with nested wildcards, we need to create a hash for the choice itself
+                        # and then process the nested wildcards
+                        choice_hash = xxhash.xxh32(choice.encode()).hexdigest()[:8]
+                        processed_choices.append(choice_hash)
+                        # Process nested wildcards recursively
+                        nested_wildcard_dict = self.analyze_wildcard_structure(choice, depth + 1, return_wildcards_only=True, target_path=section_target_path + [wildcard_hash, choice_hash])
+                        # Create a data structure for this choice
+                        choice_data = {
+                            "raw": choice,
+                            "options": [],
+                            "selected": "nothing selected",
+                            "target": section_target_path + [wildcard_hash, choice_hash]
+                        }
+                        # Add nested wildcard data to the choice data and collect direct children
+                        direct_children = []
                         for nested_hash, nested_data in nested_wildcard_dict.items():
-                            processed_choices.append(nested_hash)
-                            nested_wildcard_data[nested_hash] = nested_data
+                            choice_data[nested_hash] = nested_data
+                            # Only add direct children to options
+                            if len(nested_data.get("target", [])) == len(choice_data["target"]) + 1:
+                                direct_children.append(nested_hash)
+                        choice_data["options"] = direct_children
+                        # Add the choice data to nested_wildcard_data
+                        nested_wildcard_data[choice_hash] = choice_data
                     else:
                         processed_choices.append(choice)
                 
