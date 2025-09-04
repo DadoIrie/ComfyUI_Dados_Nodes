@@ -12,7 +12,9 @@ export class WildcardsModal {
         this.overlay = null;
         this.modal = null;
         this.textboxContent = null;
-        this.structureData = null; // Store structure data
+        this.structureData = null;
+        this.clearBtn = null;
+        this.saveBtn = null;
     }
 
     async show() {
@@ -25,22 +27,13 @@ export class WildcardsModal {
 
     async ensureCSSLoaded() {
         const cssHref = `/extensions/${this.constants.EXTENSION_NAME}/common/css/DN_WildcardSelectorComposerV2.css`;
-        
-        if (document.querySelector(`link[href="${cssHref}"]`)) {
-            return Promise.resolve();
-        }
-        
-        return new Promise((resolve, reject) => {
+        if (document.querySelector(`link[href="${cssHref}"]`)) return;
+        await new Promise(resolve => {
             const link = document.createElement('link');
             link.rel = 'stylesheet';
             link.href = cssHref;
-            
-            link.onload = () => resolve();
-            link.onerror = () => {
-                console.warn(`Failed to load CSS: ${cssHref}`);
-                resolve();
-            };
-            
+            link.onload = resolve;
+            link.onerror = () => { console.warn(`Failed to load CSS: ${cssHref}`); resolve(); };
             document.head.appendChild(link);
         });
     }
@@ -51,6 +44,10 @@ export class WildcardsModal {
         this.createTextbox();
         this.createSidebar();
         this.createActionButtons();
+
+        this.modal.appendChild(this.textbox);
+        this.modal.appendChild(this.sidebar);
+        this.overlay.appendChild(this.modal);
     }
 
     createOverlay() {
@@ -67,7 +64,6 @@ export class WildcardsModal {
     createSidebar() {
         this.sidebar = document.createElement("div");
         this.sidebar.className = "sidebar";
-        
         const sidebarTopbar = document.createElement("div");
         sidebarTopbar.className = "topbar";
         this.sidebar.appendChild(sidebarTopbar);
@@ -85,12 +81,8 @@ export class WildcardsModal {
         this.textboxContent = document.createElement("textarea");
         this.textboxContent.className = "textbox-content";
         this.textboxContent.placeholder = "Type here...";
-        
         const wildcardsPrompt = this.nodeDataProcessor.getWildcardsPrompt();
-        if (wildcardsPrompt) {
-            this.textboxContent.value = wildcardsPrompt;
-        }
-        
+        if (wildcardsPrompt) this.textboxContent.value = wildcardsPrompt;
         this.textbox.appendChild(this.textboxContent);
     }
 
@@ -98,19 +90,11 @@ export class WildcardsModal {
         const actionBar = document.createElement("div");
         actionBar.className = "textbox-action-bar";
 
-        const clearBtn = document.createElement("button");
-        clearBtn.className = "textbox-action-btn clear";
-        clearBtn.textContent = "Clear";
+        this.clearBtn = this._createActionButton("Clear", "clear");
+        this.saveBtn = this._createActionButton("Save", "save");
 
-        const saveBtn = document.createElement("button");
-        saveBtn.className = "textbox-action-btn save";
-        saveBtn.textContent = "Save";
-
-        this.clearBtn = clearBtn;
-        this.saveBtn = saveBtn;
-
-        actionBar.appendChild(clearBtn);
-        actionBar.appendChild(saveBtn);
+        actionBar.appendChild(this.clearBtn);
+        actionBar.appendChild(this.saveBtn);
         this.textbox.appendChild(actionBar);
 
         // ! DUMMY BUTTON TO TOGGLE SIDEBAR START
@@ -118,14 +102,12 @@ export class WildcardsModal {
 
         const toggleBtn = document.createElement("button");
         toggleBtn.textContent = "Toggle Sidebar";
-
         toggleBtn.onclick = () => {
             if (!FORCE_SIDEBAR_HIDDEN) {
                 if (this.modal.classList.contains("sidebar-hidden")) {
                     this.modal.classList.remove("sidebar-hidden");
                 } else {
                     this.modal.classList.add("sidebar-animating-out");
-                    
                     setTimeout(() => {
                         this.modal.classList.remove("sidebar-animating-out");
                         this.modal.classList.add("sidebar-hidden");
@@ -133,7 +115,6 @@ export class WildcardsModal {
                 }
             }
         };
-
         toggleBtn.style.cssText = `
             position: absolute;
             bottom: 20px;
@@ -146,7 +127,6 @@ export class WildcardsModal {
             border-radius: 4px;
             cursor: pointer;
         `;
-
         if (FORCE_SIDEBAR_HIDDEN) {
             this.modal.classList.add("sidebar-hidden");
             toggleBtn.disabled = true;
@@ -154,73 +134,56 @@ export class WildcardsModal {
         }
         // ! DUMMY BUTTON TO TOGGLE SIDEBAR END
 
-        this.modal.appendChild(this.textbox);
-        this.modal.appendChild(this.sidebar);
-        this.overlay.appendChild(this.modal);
-        
         this.overlay.appendChild(toggleBtn); // ! Add to overlay instead of modal DEV NOTE
+    }
+
+    _createActionButton(text, className) {
+        const btn = document.createElement("button");
+        btn.className = `textbox-action-btn ${className}`;
+        btn.textContent = text;
+        return btn;
     }
 
     getContent() {
         return this.textboxContent ? this.textboxContent.value : "";
     }
-    
-            /**
-             * Initialize dropdowns with structure data
-             */
-            initializeDropdowns() {
-                // Get structure data from node
-                const structureDataStr = this.nodeDataProcessor.getWildcardsStructure();
-                
-                if (structureDataStr) {
-                    try {
-                        this.structureData = JSON.parse(structureDataStr);
-                        
-                        // Create dropdown manager if it doesn't exist
-                        if (!this.dropdownManager) {
-                            this.dropdownManager = new DropdownManager(this.sidebar, this.structureData);
-                        } else {
-                            // Update structure data in existing manager
-                            this.dropdownManager.structureData = this.structureData;
-                        }
-                        
-                        // Create dropdowns
-                        this.dropdownManager.createDropdowns();
-                    } catch (e) {
-                        console.error("Error parsing structure data:", e);
-                    }
+
+    initializeDropdowns() {
+        const structureDataStr = this.nodeDataProcessor.getWildcardsStructure();
+        if (structureDataStr) {
+            try {
+                this.structureData = JSON.parse(structureDataStr);
+                if (!this.dropdownManager) {
+                    this.dropdownManager = new DropdownManager(this.sidebar, this.structureData);
+                } else {
+                    this.dropdownManager.structureData = this.structureData;
                 }
+                this.dropdownManager.createDropdowns();
+            } catch (e) {
+                console.error("Error parsing structure data:", e);
             }
-            
+        }
+    }
+
     async saveAndSync() {
         const content = this.getContent();
-        
         try {
-            this.nodeDataProcessor.updateNodeData({
-                wildcards_prompt: content
-            });
-            
+            this.nodeDataProcessor.updateNodeData({ wildcards_prompt: content });
             const response = await fetchSend(
-                this.constants.MESSAGE_ROUTE, 
-                this.node.id, 
-                "update_wildcards_prompt", 
-                { content: content }
+                this.constants.MESSAGE_ROUTE,
+                this.node.id,
+                "update_wildcards_prompt",
+                { content }
             );
-            
             if (response.status === 'success' && response.wildcard_structure_data !== undefined) {
                 this.nodeDataProcessor.updateNodeData({
                     wildcards_structure_data: response.wildcard_structure_data
                 });
-                
-                // Update dropdowns with new structure data
                 this.structureData = JSON.parse(response.wildcard_structure_data);
                 this.initializeDropdowns();
             }
-            
             this.node.setDirtyCanvas(true, true);
-            
             this.showSuccessMessage("Saved!");
-            
         } catch (error) {
             console.error("Error saving content:", error);
             this.showErrorMessage("Save failed");
@@ -251,20 +214,13 @@ export class WildcardsModal {
             ) {
                 this.overlay.classList.add("closing");
                 this.modal.classList.add("closing");
-                
                 if (this.modal.classList.contains("sidebar-hidden")) {
                     this.overlay.classList.add("sidebar-hidden");
-               }
-               
-
-                
+                }
                 this.overlay.removeEventListener("click", closeHandler);
                 document.removeEventListener("keydown", closeHandler);
                 this.overlay.addEventListener("animationend", closeAnimationHandler);
             }
-            
-
-        
         };
 
         this.overlay.addEventListener("click", closeHandler);
