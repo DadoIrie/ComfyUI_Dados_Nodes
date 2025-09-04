@@ -59,15 +59,10 @@ export class DropdownManager {
         button.className = 'custom-dropdown-button';
         button.type = 'button';
 
-        const arrow = document.createElement('div');
-        arrow.className = 'custom-dropdown-arrow';
-        arrow.innerHTML = `
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="6,9 12,15 18,9"></polyline>
-            </svg>
-        `;
+        // Use a span for the text
+        const textSpan = document.createElement('span');
+        textSpan.className = 'custom-dropdown-text';
 
-        // Always use the actual selected value from the object
         let selectedValue = wildcard.selected;
         let displayText;
         if (selectedValue && wildcard.options.includes(selectedValue)) {
@@ -75,20 +70,30 @@ export class DropdownManager {
         } else {
             displayText = selectedValue;
         }
-        const selectedIndex = selectedValue ? wildcard.options.indexOf(selectedValue) : -1;
-        button.textContent = displayText;
+        textSpan.textContent = displayText;
 
-        const optionsContainer = this._renderOptions(wildcard, selectedIndex, (option, index) => {
+        // Arrow
+        const arrow = document.createElement('span');
+        arrow.className = 'custom-dropdown-arrow';
+        arrow.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6,9 12,15 18,9"></polyline>
+            </svg>
+        `;
+
+        button.appendChild(textSpan);
+        button.appendChild(arrow);
+
+        const optionsContainer = this._renderOptions(wildcard, wildcard.options.indexOf(selectedValue), (option, index) => {
             this._handleCustomDropdownSelection(container, wildcard, option, index);
         });
 
-        button.addEventListener('click', e => {
+        button.addEventListener('mousedown', e => {
             e.stopPropagation();
             this._toggleCustomDropdown(container);
         });
 
         container.appendChild(button);
-        container.appendChild(arrow);
         container.appendChild(optionsContainer);
         container.dataset.wildcardId = this._generateWildcardId(wildcard);
 
@@ -99,26 +104,26 @@ export class DropdownManager {
         const optionsContainer = document.createElement('div');
         optionsContainer.className = 'custom-dropdown-options';
 
-        // Use the object's selected value for display
-        const notSelectedOption = document.createElement('div');
-        notSelectedOption.className = 'custom-dropdown-option not-selected';
-        notSelectedOption.dataset.value = '';
-        notSelectedOption.dataset.index = -1;
-        notSelectedOption.textContent = wildcard.selected;
-        if (selectedIndex === -1) notSelectedOption.classList.add('selected');
-        notSelectedOption.addEventListener('click', e => {
+        // "nothing selected" as the first entry
+        const resetOption = document.createElement('div');
+        resetOption.className = 'custom-dropdown-option';
+        resetOption.dataset.value = '';
+        resetOption.dataset.index = -1;
+        resetOption.textContent = 'nothing selected (random selection)';
+        resetOption.addEventListener('click', e => {
             e.stopPropagation();
             onSelect('', -1);
         });
-        optionsContainer.appendChild(notSelectedOption);
+        optionsContainer.appendChild(resetOption);
 
+        // Add all other options
         wildcard.options.forEach((option, index) => {
             const optionElement = document.createElement('div');
             optionElement.className = 'custom-dropdown-option';
             optionElement.dataset.value = option;
             optionElement.dataset.index = index;
             optionElement.textContent = this.truncateOption(wildcard[option]?.raw || option);
-            if (index === selectedIndex) optionElement.classList.add('selected');
+
             optionElement.addEventListener('click', e => {
                 e.stopPropagation();
                 onSelect(option, index);
@@ -140,9 +145,8 @@ export class DropdownManager {
     _toggleCustomDropdown(container) {
         const isOpen = container.classList.contains('open');
         this._closeAllCustomDropdowns();
-        if (isOpen) {
-            this._closeCustomDropdown(container);
-        } else {
+        // Always open the clicked dropdown after closing others
+        if (!isOpen) {
             this._openCustomDropdown(container);
         }
     }
@@ -150,6 +154,12 @@ export class DropdownManager {
     _openCustomDropdown(container) {
         container.classList.add('open');
         this.activeOverlay = container;
+
+        // Animate height for options
+        const options = container.querySelector('.custom-dropdown-options');
+        if (options) {
+            options.style.maxHeight = options.scrollHeight + 'px';
+        }
     }
 
     _closeCustomDropdown(container) {
@@ -157,9 +167,14 @@ export class DropdownManager {
         if (this.activeOverlay === container) {
             this.activeOverlay = null;
         }
-
         const button = container.querySelector('.custom-dropdown-button');
         if (button) button.blur();
+
+        // Collapse options
+        const options = container.querySelector('.custom-dropdown-options');
+        if (options) {
+            options.style.maxHeight = '0px';
+        }
     }
 
     _closeAllCustomDropdowns() {
@@ -179,13 +194,15 @@ export class DropdownManager {
     _handleCustomDropdownSelection(container, wildcard, selectedOption, selectedIndex) {
         const button = container.querySelector('.custom-dropdown-button');
         const options = container.querySelectorAll('.custom-dropdown-option');
-        // Always use the actual selected value from the object
+        // Display text logic
         const displayText =
             selectedIndex === -1
                 ? wildcard.selected
                 : this.truncateOption(wildcard[selectedOption]?.raw || selectedOption);
-        button.textContent = displayText;
+        const textSpan = button.querySelector('.custom-dropdown-text');
+        textSpan.textContent = displayText;
 
+        // Option highlighting (can be removed if not needed)
         options.forEach(opt => opt.classList.remove('selected'));
         if (selectedIndex === -1) {
             options[0].classList.add('selected');
@@ -200,11 +217,6 @@ export class DropdownManager {
         if (dropdownContainer) {
             this.handleDropdownChange(wildcard, selectedValue, dropdownContainer);
         }
-    }
-
-    truncateOption(option) {
-        const maxLength = 50;
-        return option.length <= maxLength ? option : option.substring(0, maxLength) + '...';
     }
 
     handleDropdownChange(wildcard, selectedValue, dropdownContainer) {
@@ -233,16 +245,20 @@ export class DropdownManager {
             if (dropdown.parent === parentContainer) {
                 element.remove();
                 this.dropdowns.delete(element);
-                this.removeChildDropdowns(element);
             }
         }
     }
 
     clearDropdowns() {
-        this._closeAllCustomDropdowns();
-        for (const element of this.dropdowns.keys()) {
-            element.remove();
-        }
+        // Remove all dropdown containers from the sidebar
+        this.sidebar.querySelectorAll('.wildcard-dropdown-container').forEach(el => el.remove());
         this.dropdowns.clear();
+    }
+
+    truncateOption(option) {
+        if (typeof option === 'string' && option.length > 40) {
+            return option.slice(0, 40) + '...';
+        }
+        return option;
     }
 }

@@ -83,6 +83,8 @@
     position: relative;
     min-width: 0;
     margin-bottom: 0;
+    transition: height 0.25s cubic-bezier(.25,.8,.25,1);
+    overflow: visible; /* allow expansion */
 }
 
 #wildcard-selector-composer-v2-modal > .textbox {
@@ -264,30 +266,25 @@
     position: relative;
     min-width: 0;
     margin-bottom: 0;
+    transition: height 0.25s cubic-bezier(.25,.8,.25,1);
+    overflow: visible; /* allow expansion */
 }
 
 .custom-dropdown-options {
-    position: absolute;
-    top: 100%;
-    left: 0;
+    position: static; /* not absolute! */
     width: 100%;
-    min-width: 220px;
-    max-width: 400px;
-    background: rgba(20, 20, 20, 0.98);
-    margin-top: 2px;
-    max-height: 200px;
-    overflow-y: auto;
-    z-index: calc(var(--wc-modal-z-index) + 2);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    max-height: 0;
     opacity: 0;
     visibility: hidden;
-    transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
+    overflow: hidden;
+    transition: max-height 0.25s cubic-bezier(.25,.8,.25,1), opacity 0.2s;
 }
 
 .custom-dropdown.open .custom-dropdown-options {
+    max-height: 200px; /* or use scrollHeight via JS for dynamic height */
     opacity: 1;
     visibility: visible;
-    transform: none;
+    overflow-y: auto;
 }
 
 .custom-dropdown-arrow {
@@ -295,7 +292,6 @@
     right: 8px;
     top: 50%;
     transform: translateY(-50%);
-    transition: transform 0.2s ease;
     pointer-events: none;
     color: #ccc;
     width: 16px;
@@ -310,6 +306,7 @@
 }
 
 .custom-dropdown-option {
+    width: 100%;
     height: 40px;
     line-height: 40px;
     padding: 0 12px;
@@ -321,20 +318,54 @@
     text-overflow: ellipsis;
     overflow: hidden;
     white-space: nowrap;
+    box-sizing: border-box;
+    display: block;
+    background: rgba(40, 40, 40, 0.92); /* slightly lighter than sidebar */
 }
 
 .custom-dropdown-option:hover {
     background: rgba(40, 40, 40, 0.98);
 }
 
-.custom-dropdown-option.selected {
-    background: rgba(50, 50, 50, 0.98);
-    color: #fff;
-}
-
 .custom-dropdown-option.not-selected {
     color: #999;
     font-style: italic;
+}
+
+.custom-dropdown-button,
+.custom-dropdown-option {
+    padding-right: 40px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.custom-dropdown-button {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 40px;
+    padding-left: 8px;
+    padding-right: 0;
+    background: rgba(20, 20, 20, 0.98);
+    color: #ccc;
+    border: none;
+    font-size: 0.9em;
+    cursor: pointer;
+    text-align: left;
+    position: relative;
+    transition: background-color 0.2s, color 0.2s;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.custom-dropdown-text {
+    flex: 1 1 0%;
+    min-width: 0;
+    margin-right: 40px; /* Space for the arrow */
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 .custom-dropdown-options::-webkit-scrollbar {
@@ -361,28 +392,14 @@
     position: relative;
 }
 
-.custom-dropdown-button {
-    width: 100%;
-    height: 40px;
-    line-height: 40px;
-    padding: 0 8px 0 8px;
-    background: rgba(20, 20, 20, 0.98);
-    color: #ccc;
-    border: none;
-    font-size: 0.9em;
-    cursor: pointer;
-    text-align: left;
-    position: relative;
-    padding-right: 32px;
-    transition: background-color 0.2s ease;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
 .custom-dropdown-button:hover,
 .custom-dropdown-button:focus {
     background: rgba(30, 30, 30, 0.98);
     outline: none;
+}
+
+.custom-dropdown:not(.open) .custom-dropdown-button {
+    background: rgba(20, 20, 20, 0.98);
+    color: #ccc;
 }
 
