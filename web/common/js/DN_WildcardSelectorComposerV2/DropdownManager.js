@@ -211,24 +211,15 @@ export class DropdownManager {
 
         const selectedValue = selectedIndex === -1 ? '' : selectedOption;
         const dropdownContainer = container.closest('.wildcard-dropdown-container');
-        // Store the selection as a pending change in 'apply?'
-        if (wildcard.target) {
-            if (!this.structureData["apply?"]) {
-                this.structureData["apply?"] = {};
-            }
-            if (!this.structureData["apply?"]["selectionChange"]) {
-                this.structureData["apply?"]["selectionChange"] = {};
-            }
-            this.structureData["apply?"]["selectionChange"].origin = Array.isArray(wildcard.target) ? [...wildcard.target] : wildcard.target;
-            this.structureData["apply?"]["selectionChange"].destination = Array.isArray(wildcard.target) ? [...wildcard.target] : wildcard.target;
-            this.structureData["apply?"]["selectionChange"].selected = selectedIndex;
-            // Persist the structure using the processor
-            if (this.processor) {
-                this.processor.updateNodeData({
-                    wildcards_structure_data: JSON.stringify(this.structureData)
-                });
-            }
+
+        // DIRECTLY STORE SELECTION
+        wildcard.selected = selectedValue;
+        if (wildcard.target && this.processor) {
+            this.processor.updateNodeData({
+                wildcards_structure_data: JSON.stringify(this.structureData)
+            });
         }
+
         if (dropdownContainer) {
             this.handleDropdownChange(wildcard, selectedValue, dropdownContainer);
         }
