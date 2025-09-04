@@ -248,8 +248,8 @@ export class DropdownManager {
                 notSelectedOption.classList.add('selected');
             }
         } else {
-            // Select the actual option
-            options[selectedIndex].classList.add('selected');
+            // Select the actual option (shift by 1 because of "(not selected)")
+            options[selectedIndex + 1].classList.add('selected');
         }
         
         // Close dropdown
@@ -278,21 +278,27 @@ export class DropdownManager {
     handleDropdownChange(wildcard, selectedValue, dropdownContainer) {
         // Remove existing child dropdowns
         this.removeChildDropdowns(dropdownContainer);
-        
+
         // If a valid option is selected (not "nothing selected")
         if (selectedValue !== '' && wildcard[selectedValue]) {
             // Get the selected option
             const selectedOption = wildcard[selectedValue];
-            
-            // Create dropdowns for all child wildcards of the selected option
-            for (const key in selectedOption) {
-                if (selectedOption.hasOwnProperty(key) && key !== 'raw' && key !== 'options' && key !== 'selected' && key !== 'target') {
-                    const nestedItem = selectedOption[key];
-                    if (nestedItem && typeof nestedItem === 'object' && nestedItem.options && Array.isArray(nestedItem.options) && nestedItem.options.length > 0) {
+
+            // Iterate in the order of the options array
+            if (selectedOption.options && Array.isArray(selectedOption.options)) {
+                selectedOption.options.forEach(optKey => {
+                    const nestedItem = selectedOption[optKey];
+                    if (
+                        nestedItem &&
+                        typeof nestedItem === 'object' &&
+                        nestedItem.options &&
+                        Array.isArray(nestedItem.options) &&
+                        nestedItem.options.length > 0
+                    ) {
                         // Create dropdown for this nested wildcard
                         this.createDropdownForWildcard(nestedItem, dropdownContainer);
                     }
-                }
+                });
             }
         }
     }
