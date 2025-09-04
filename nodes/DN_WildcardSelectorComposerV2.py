@@ -137,7 +137,7 @@ class DN_WildcardSelectorComposerV2:
                         choice_data = {
                             "raw": choice,
                             "options": [],
-                            "selected": "nothing selected",
+                            "selected": "nothing selected (random selection)",
                             "target": section_target_path + [wildcard_hash, choice_hash]
                         }
                         direct_children = [
@@ -163,7 +163,7 @@ class DN_WildcardSelectorComposerV2:
                 wildcard_data = {
                     "raw": wildcard_raw,
                     "options": processed_choices,
-                    "selected": "nothing selected",
+                    "selected": "nothing selected (random selection)",
                     "target": section_target_path + [wildcard_hash]
                 }
                 for nested_hash, nested_data in nested_wildcard_data.items():

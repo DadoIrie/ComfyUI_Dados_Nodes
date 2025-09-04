@@ -67,9 +67,16 @@ export class DropdownManager {
             </svg>
         `;
 
-        const selectedValue = wildcard.selected || '';
+        // Always use the actual selected value from the object
+        let selectedValue = wildcard.selected;
+        let displayText;
+        if (selectedValue && wildcard.options.includes(selectedValue)) {
+            displayText = this.truncateOption(wildcard[selectedValue]?.raw || selectedValue);
+        } else {
+            displayText = selectedValue;
+        }
         const selectedIndex = selectedValue ? wildcard.options.indexOf(selectedValue) : -1;
-        button.textContent = selectedIndex === -1 ? '(not selected)' : this.truncateOption(wildcard[selectedValue]?.raw || selectedValue);
+        button.textContent = displayText;
 
         const optionsContainer = this._renderOptions(wildcard, selectedIndex, (option, index) => {
             this._handleCustomDropdownSelection(container, wildcard, option, index);
@@ -92,12 +99,12 @@ export class DropdownManager {
         const optionsContainer = document.createElement('div');
         optionsContainer.className = 'custom-dropdown-options';
 
-        // "(not selected)" option
+        // Use the object's selected value for display
         const notSelectedOption = document.createElement('div');
         notSelectedOption.className = 'custom-dropdown-option not-selected';
         notSelectedOption.dataset.value = '';
         notSelectedOption.dataset.index = -1;
-        notSelectedOption.textContent = '(not selected)';
+        notSelectedOption.textContent = wildcard.selected;
         if (selectedIndex === -1) notSelectedOption.classList.add('selected');
         notSelectedOption.addEventListener('click', e => {
             e.stopPropagation();
@@ -150,6 +157,9 @@ export class DropdownManager {
         if (this.activeOverlay === container) {
             this.activeOverlay = null;
         }
+
+        const button = container.querySelector('.custom-dropdown-button');
+        if (button) button.blur();
     }
 
     _closeAllCustomDropdowns() {
@@ -169,7 +179,11 @@ export class DropdownManager {
     _handleCustomDropdownSelection(container, wildcard, selectedOption, selectedIndex) {
         const button = container.querySelector('.custom-dropdown-button');
         const options = container.querySelectorAll('.custom-dropdown-option');
-        const displayText = selectedIndex === -1 ? '(not selected)' : this.truncateOption(wildcard[selectedOption]?.raw || selectedOption);
+        // Always use the actual selected value from the object
+        const displayText =
+            selectedIndex === -1
+                ? wildcard.selected
+                : this.truncateOption(wildcard[selectedOption]?.raw || selectedOption);
         button.textContent = displayText;
 
         options.forEach(opt => opt.classList.remove('selected'));

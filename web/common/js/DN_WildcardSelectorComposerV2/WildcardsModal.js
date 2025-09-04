@@ -67,6 +67,11 @@ export class WildcardsModal {
         const sidebarTopbar = document.createElement("div");
         sidebarTopbar.className = "topbar";
         this.sidebar.appendChild(sidebarTopbar);
+
+        // Add scrollable container for dropdowns
+        this.sidebarDropdownsScroll = document.createElement("div");
+        this.sidebarDropdownsScroll.className = "sidebar-dropdowns-scroll";
+        this.sidebar.appendChild(this.sidebarDropdownsScroll);
     }
 
     createTextbox() {
@@ -154,9 +159,11 @@ export class WildcardsModal {
             try {
                 this.structureData = JSON.parse(structureDataStr);
                 if (!this.dropdownManager) {
-                    this.dropdownManager = new DropdownManager(this.sidebar, this.structureData);
+                    // Pass the scroll container instead of sidebar
+                    this.dropdownManager = new DropdownManager(this.sidebarDropdownsScroll, this.structureData);
                 } else {
                     this.dropdownManager.structureData = this.structureData;
+                    this.dropdownManager.sidebar = this.sidebarDropdownsScroll;
                 }
                 this.dropdownManager.createDropdowns();
             } catch (e) {
