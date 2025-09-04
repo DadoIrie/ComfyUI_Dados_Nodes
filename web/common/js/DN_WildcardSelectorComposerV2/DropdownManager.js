@@ -1,7 +1,8 @@
 export class DropdownManager {
-    constructor(sidebar, structureData) {
+    constructor(sidebar, structureData, processor) {
         this.sidebar = sidebar;
         this.structureData = structureData;
+        this.processor = processor;
         this.dropdowns = new Map();
         this.activeOverlay = null;
         this._setupGlobalClickListener();
@@ -10,12 +11,17 @@ export class DropdownManager {
     createDropdowns() {
         this.clearDropdowns();
         const rootWildcards = this.findRootWildcards(this.structureData);
-        rootWildcards.forEach(wildcard => this.createDropdownForWildcard(wildcard, null));
+        rootWildcards.forEach(wildcard => {
+            const container = this.createDropdownForWildcard(wildcard, null);
+            // Restore child dropdowns if a valid selection is present
+            if (wildcard.selected && wildcard.options.includes(wildcard.selected)) {
+                this.handleDropdownChange(wildcard, wildcard.selected, container);
+            }
+        });
     }
 
     findRootWildcards(data) {
         const wildcards = [];
-        
         for (const key in data) {
             if (data.hasOwnProperty(key) && typeof data[key] === 'object' && data[key] !== null) {
                 for (const nestedKey in data[key]) {
@@ -28,14 +34,12 @@ export class DropdownManager {
                 }
             }
         }
-        
         return wildcards;
     }
 
     createDropdownForWildcard(wildcard, parentElement) {
         const dropdownContainer = document.createElement('div');
         dropdownContainer.className = 'wildcard-dropdown-container';
-        
         const customDropdown = this._createCustomDropdown(wildcard);
         dropdownContainer.appendChild(customDropdown);
 
@@ -62,13 +66,11 @@ export class DropdownManager {
 
         const selectedValue = wildcard.selected;
         let displayText;
-        
         if (selectedValue && wildcard.options.includes(selectedValue)) {
             displayText = this.truncateOption(wildcard[selectedValue]?.raw || selectedValue);
         } else {
             displayText = selectedValue || '';
         }
-        
         textSpan.textContent = displayText;
 
         const arrow = document.createElement('span');
@@ -161,7 +163,6 @@ export class DropdownManager {
         if (this.activeOverlay === container) {
             this.activeOverlay = null;
         }
-        
         const button = container.querySelector('.custom-dropdown-button');
         if (button) button.blur();
 
@@ -205,9 +206,27 @@ export class DropdownManager {
 
         const selectedValue = selectedIndex === -1 ? '' : selectedOption;
         const dropdownContainer = container.closest('.wildcard-dropdown-container');
+        // Store the selection in the correct object using the breadcrumb trail
+        if (wildcard.target) {
+            this._setSelectedByTarget(wildcard.target, selectedValue);
+            // Persist the structure using the processor
+            if (this.processor) {
+                this.processor.updateNodeData({
+                    wildcards_structure_data: JSON.stringify(this.structureData)
+                });
+            }
+        }
         if (dropdownContainer) {
             this.handleDropdownChange(wildcard, selectedValue, dropdownContainer);
         }
+    }
+
+    _setSelectedByTarget(target, value) {
+        let obj = this.structureData;
+        for (let i = 0; i < target.length; i++) {
+            obj = obj[target[i]];
+        }
+        obj.selected = value;
     }
 
     handleDropdownChange(wildcard, selectedValue, dropdownContainer) {

@@ -159,11 +159,16 @@ export class WildcardsModal {
             try {
                 this.structureData = JSON.parse(structureDataStr);
                 if (!this.dropdownManager) {
-                    // Pass the scroll container instead of sidebar
-                    this.dropdownManager = new DropdownManager(this.sidebarDropdownsScroll, this.structureData);
+                    // Pass the scroll container, structureData, and processor
+                    this.dropdownManager = new DropdownManager(
+                        this.sidebarDropdownsScroll,
+                        this.structureData,
+                        this.nodeDataProcessor // <-- pass processor here
+                    );
                 } else {
                     this.dropdownManager.structureData = this.structureData;
                     this.dropdownManager.sidebar = this.sidebarDropdownsScroll;
+                    this.dropdownManager.processor = this.nodeDataProcessor; // <-- update processor reference
                 }
                 this.dropdownManager.createDropdowns();
             } catch (e) {
