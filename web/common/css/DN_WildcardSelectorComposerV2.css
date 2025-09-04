@@ -53,20 +53,15 @@
     display: flex;
     align-items: center;
     box-shadow: 0 2px 8px 0 rgba(0,0,0,0.35);
-    flex: 0 0 2.5rem; /* fixed height for topbar */
+    flex: 0 0 2.5rem;
 }
 
 .sidebar > .wildcard-dropdown-container {
     width: 95%;
     margin: 0 auto 8px auto;
-    max-height: calc(100% - 2.5rem); /* 2.5rem is the topbar height */
+    max-height: calc(100% - 2.5rem);
     overflow-y: auto;
     overflow-x: hidden;
-}
-
-.sidebar > .wildcard-dropdown-container {
-    width: 95%;
-    margin-bottom: 8px;
 }
 
 .wildcard-dropdown-container {
@@ -75,7 +70,7 @@
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: 4px; /* or 0.25rem for a subtle gap between dropdowns */
+    gap: 4px;
 }
 
 .custom-dropdown {
@@ -84,7 +79,7 @@
     min-width: 0;
     margin-bottom: 0;
     transition: height 0.25s cubic-bezier(.25,.8,.25,1);
-    overflow: visible; /* allow expansion */
+    overflow: visible;
 }
 
 #wildcard-selector-composer-v2-modal > .textbox {
@@ -204,11 +199,10 @@
 
 .sidebar-dropdowns-scroll {
     flex: 1 1 auto;
-    height: calc(100% - 2.5rem); /* fill remaining space below topbar */
+    height: calc(100% - 2.5rem);
     overflow-y: auto;
     overflow-x: hidden;
     position: relative;
-    max-height: none; /* remove if present */
 }
 
 .sidebar-dropdowns-scroll > .wildcard-dropdown-container {
@@ -252,26 +246,8 @@
     }
 }
 
-.wildcard-dropdown-container {
-    width: 100%;
-    margin: 0 0 8px 0;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    /* gap: 0px; /* or 0.25rem for a subtle gap between dropdowns */
-}
-
-.custom-dropdown {
-    width: 100%;
-    position: relative;
-    min-width: 0;
-    margin-bottom: 0;
-    transition: height 0.25s cubic-bezier(.25,.8,.25,1);
-    overflow: visible; /* allow expansion */
-}
-
 .custom-dropdown-options {
-    position: static; /* not absolute! */
+    position: static;
     width: 100%;
     max-height: 0;
     opacity: 0;
@@ -281,7 +257,7 @@
 }
 
 .custom-dropdown.open .custom-dropdown-options {
-    max-height: 200px; /* or use scrollHeight via JS for dynamic height */
+    max-height: 200px;
     opacity: 1;
     visibility: visible;
     overflow-y: auto;
@@ -320,7 +296,7 @@
     white-space: nowrap;
     box-sizing: border-box;
     display: block;
-    background: rgba(40, 40, 40, 0.92); /* slightly lighter than sidebar */
+    background: rgba(40, 40, 40, 0.92);
 }
 
 .custom-dropdown-option:hover {
@@ -362,7 +338,7 @@
 .custom-dropdown-text {
     flex: 1 1 0%;
     min-width: 0;
-    margin-right: 40px; /* Space for the arrow */
+    margin-right: 40px;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -402,4 +378,3 @@
     background: rgba(20, 20, 20, 0.98);
     color: #ccc;
 }
-

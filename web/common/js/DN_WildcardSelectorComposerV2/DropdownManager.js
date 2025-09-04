@@ -1,13 +1,8 @@
-const META_KEYS = ['raw', 'options', 'selected', 'target'];
-function isMetaKey(key) {
-    return META_KEYS.includes(key);
-}
-
 export class DropdownManager {
     constructor(sidebar, structureData) {
         this.sidebar = sidebar;
         this.structureData = structureData;
-        this.dropdowns = new Map(); // Map for faster lookup
+        this.dropdowns = new Map();
         this.activeOverlay = null;
         this._setupGlobalClickListener();
     }
@@ -20,24 +15,27 @@ export class DropdownManager {
 
     findRootWildcards(data) {
         const wildcards = [];
+        
         for (const key in data) {
             if (data.hasOwnProperty(key) && typeof data[key] === 'object' && data[key] !== null) {
                 for (const nestedKey in data[key]) {
-                    const nested = data[key][nestedKey];
-                    if (data[key].hasOwnProperty(nestedKey) && typeof nested === 'object' && nested !== null) {
-                        if (Array.isArray(nested.options)) {
+                    if (data[key].hasOwnProperty(nestedKey)) {
+                        const nested = data[key][nestedKey];
+                        if (typeof nested === 'object' && nested !== null && Array.isArray(nested.options)) {
                             wildcards.push(nested);
                         }
                     }
                 }
             }
         }
+        
         return wildcards;
     }
 
     createDropdownForWildcard(wildcard, parentElement) {
         const dropdownContainer = document.createElement('div');
         dropdownContainer.className = 'wildcard-dropdown-container';
+        
         const customDropdown = this._createCustomDropdown(wildcard);
         dropdownContainer.appendChild(customDropdown);
 
@@ -59,20 +57,20 @@ export class DropdownManager {
         button.className = 'custom-dropdown-button';
         button.type = 'button';
 
-        // Use a span for the text
         const textSpan = document.createElement('span');
         textSpan.className = 'custom-dropdown-text';
 
-        let selectedValue = wildcard.selected;
+        const selectedValue = wildcard.selected;
         let displayText;
+        
         if (selectedValue && wildcard.options.includes(selectedValue)) {
             displayText = this.truncateOption(wildcard[selectedValue]?.raw || selectedValue);
         } else {
-            displayText = selectedValue;
+            displayText = selectedValue || '';
         }
+        
         textSpan.textContent = displayText;
 
-        // Arrow
         const arrow = document.createElement('span');
         arrow.className = 'custom-dropdown-arrow';
         arrow.innerHTML = `
@@ -104,7 +102,6 @@ export class DropdownManager {
         const optionsContainer = document.createElement('div');
         optionsContainer.className = 'custom-dropdown-options';
 
-        // "nothing selected" as the first entry
         const resetOption = document.createElement('div');
         resetOption.className = 'custom-dropdown-option';
         resetOption.dataset.value = '';
@@ -116,7 +113,6 @@ export class DropdownManager {
         });
         optionsContainer.appendChild(resetOption);
 
-        // Add all other options
         wildcard.options.forEach((option, index) => {
             const optionElement = document.createElement('div');
             optionElement.className = 'custom-dropdown-option';
@@ -145,7 +141,6 @@ export class DropdownManager {
     _toggleCustomDropdown(container) {
         const isOpen = container.classList.contains('open');
         this._closeAllCustomDropdowns();
-        // Always open the clicked dropdown after closing others
         if (!isOpen) {
             this._openCustomDropdown(container);
         }
@@ -155,7 +150,6 @@ export class DropdownManager {
         container.classList.add('open');
         this.activeOverlay = container;
 
-        // Animate height for options
         const options = container.querySelector('.custom-dropdown-options');
         if (options) {
             options.style.maxHeight = options.scrollHeight + 'px';
@@ -167,10 +161,10 @@ export class DropdownManager {
         if (this.activeOverlay === container) {
             this.activeOverlay = null;
         }
+        
         const button = container.querySelector('.custom-dropdown-button');
         if (button) button.blur();
 
-        // Collapse options
         const options = container.querySelector('.custom-dropdown-options');
         if (options) {
             options.style.maxHeight = '0px';
@@ -194,20 +188,17 @@ export class DropdownManager {
     _handleCustomDropdownSelection(container, wildcard, selectedOption, selectedIndex) {
         const button = container.querySelector('.custom-dropdown-button');
         const options = container.querySelectorAll('.custom-dropdown-option');
-        // Display text logic
-        const displayText =
-            selectedIndex === -1
-                ? wildcard.selected
-                : this.truncateOption(wildcard[selectedOption]?.raw || selectedOption);
+        const displayText = selectedIndex === -1 
+            ? (wildcard.selected || '') 
+            : this.truncateOption(wildcard[selectedOption]?.raw || selectedOption);
+        
         const textSpan = button.querySelector('.custom-dropdown-text');
         textSpan.textContent = displayText;
 
-        // Option highlighting (can be removed if not needed)
         options.forEach(opt => opt.classList.remove('selected'));
-        if (selectedIndex === -1) {
-            options[0].classList.add('selected');
-        } else {
-            options[selectedIndex + 1].classList.add('selected');
+        const selectedOptionElement = selectedIndex === -1 ? options[0] : options[selectedIndex + 1];
+        if (selectedOptionElement) {
+            selectedOptionElement.classList.add('selected');
         }
 
         this._closeCustomDropdown(container);
@@ -227,12 +218,10 @@ export class DropdownManager {
             if (Array.isArray(selectedOption.options)) {
                 selectedOption.options.forEach(optKey => {
                     const nestedItem = selectedOption[optKey];
-                    if (
-                        nestedItem &&
+                    if (nestedItem &&
                         typeof nestedItem === 'object' &&
                         Array.isArray(nestedItem.options) &&
-                        nestedItem.options.length > 0
-                    ) {
+                        nestedItem.options.length > 0) {
                         this.createDropdownForWildcard(nestedItem, dropdownContainer);
                     }
                 });
@@ -241,7 +230,7 @@ export class DropdownManager {
     }
 
     removeChildDropdowns(parentContainer) {
-        for (const [element, dropdown] of Array.from(this.dropdowns.entries())) {
+        for (const [element, dropdown] of this.dropdowns.entries()) {
             if (dropdown.parent === parentContainer) {
                 element.remove();
                 this.dropdowns.delete(element);
@@ -250,7 +239,6 @@ export class DropdownManager {
     }
 
     clearDropdowns() {
-        // Remove all dropdown containers from the sidebar
         this.sidebar.querySelectorAll('.wildcard-dropdown-container').forEach(el => el.remove());
         this.dropdowns.clear();
     }
@@ -259,6 +247,6 @@ export class DropdownManager {
         if (typeof option === 'string' && option.length > 40) {
             return option.slice(0, 40) + '...';
         }
-        return option;
+        return option || '';
     }
 }
