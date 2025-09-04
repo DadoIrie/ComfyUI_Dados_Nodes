@@ -61,8 +61,8 @@ export class DropdownManager {
         
         // Add to sidebar or after parent element
         if (parentElement) {
-            // Find the parent container and insert after it
-            parentElement.after(dropdownContainer);
+            // Insert child dropdown inside parent container
+            parentElement.appendChild(dropdownContainer);
         } else {
             this.sidebar.appendChild(dropdownContainer);
         }
