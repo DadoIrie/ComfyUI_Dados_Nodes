@@ -178,13 +178,15 @@ export class WildcardsModal {
 
     async saveAndSync() {
         const content = this.getContent();
+        // Send both prompt and current structure (with selections) to backend
+        const currentStructure = this.structureData ? JSON.stringify(this.structureData) : "";
         try {
             this.nodeDataProcessor.updateNodeData({ wildcards_prompt: content });
             const response = await fetchSend(
                 this.constants.MESSAGE_ROUTE,
                 this.node.id,
                 "update_wildcards_prompt",
-                { content }
+                { content, wildcards_structure_data: currentStructure }
             );
             if (response.status === 'success' && response.wildcard_structure_data !== undefined) {
                 this.nodeDataProcessor.updateNodeData({
