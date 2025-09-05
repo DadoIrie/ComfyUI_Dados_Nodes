@@ -1,46 +1,25 @@
-export class DropdownManager {
-    constructor(sidebar, structureData, processor) {
+
+// Dropdown UI/UX logic (DOM manipulation, rendering, event handling, animations)
+class DropdownUI {
+    constructor(sidebar, onSelect) {
         this.sidebar = sidebar;
-        this.structureData = structureData;
-        this.processor = processor;
-        this.dropdowns = new Map();
+        this.onSelect = onSelect;
         this.activeOverlay = null;
         this._setupGlobalClickListener();
     }
 
-    createDropdowns() {
+    // Pure renderer: receives dropdownsData (array of wildcards) and renders them
+    render(dropdownsData) {
         this.clearDropdowns();
-        const rootWildcards = this.findRootWildcards(this.structureData);
-        rootWildcards.forEach(wildcard => {
-            const container = this.createDropdownForWildcard(wildcard, null);
-            // Restore child dropdowns if a valid selection is present
-            if (wildcard.selected && wildcard.options.includes(wildcard.selected)) {
-                this.handleDropdownChange(wildcard, wildcard.selected, container);
-            }
+        dropdownsData.forEach(({ wildcard, parent }) => {
+            this.renderDropdownForWildcard(wildcard, parent);
         });
     }
 
-    findRootWildcards(data) {
-        const wildcards = [];
-        for (const key in data) {
-            if (data.hasOwnProperty(key) && typeof data[key] === 'object' && data[key] !== null) {
-                for (const nestedKey in data[key]) {
-                    if (data[key].hasOwnProperty(nestedKey)) {
-                        const nested = data[key][nestedKey];
-                        if (typeof nested === 'object' && nested !== null && Array.isArray(nested.options)) {
-                            wildcards.push(nested);
-                        }
-                    }
-                }
-            }
-        }
-        return wildcards;
-    }
-
-    createDropdownForWildcard(wildcard, parentElement) {
+    renderDropdownForWildcard(wildcard, parentElement) {
         const dropdownContainer = document.createElement('div');
         dropdownContainer.className = 'wildcard-dropdown-container';
-        const customDropdown = this._createCustomDropdown(wildcard);
+        const customDropdown = this.renderCustomDropdown(wildcard);
         dropdownContainer.appendChild(customDropdown);
 
         if (parentElement) {
@@ -49,11 +28,12 @@ export class DropdownManager {
             this.sidebar.appendChild(dropdownContainer);
         }
 
-        this.dropdowns.set(dropdownContainer, { wildcard, parent: parentElement });
+        dropdownContainer._wildcard = wildcard;
+        dropdownContainer._parent = parentElement;
         return dropdownContainer;
     }
 
-    _createCustomDropdown(wildcard) {
+    renderCustomDropdown(wildcard) {
         const container = document.createElement('div');
         container.className = 'custom-dropdown';
 
@@ -69,7 +49,7 @@ export class DropdownManager {
         if (!selectedValue) {
             displayText = 'nothing selected (random selection)';
         } else if (wildcard.options.includes(selectedValue)) {
-            displayText = this.truncateOption(wildcard[selectedValue]?.raw || selectedValue);
+            displayText = DropdownUI.truncateOption(wildcard[selectedValue]?.raw || selectedValue);
         } else {
             displayText = selectedValue;
         }
@@ -86,23 +66,25 @@ export class DropdownManager {
         button.appendChild(textSpan);
         button.appendChild(arrow);
 
-        const optionsContainer = this._renderOptions(wildcard, wildcard.options.indexOf(selectedValue), (option, index) => {
-            this._handleCustomDropdownSelection(container, wildcard, option, index);
+        const optionsContainer = this.renderOptions(wildcard, wildcard.options.indexOf(selectedValue), (option, index) => {
+            if (this.onSelect) {
+                this.onSelect(wildcard, option, index, container);
+            }
         });
 
         button.addEventListener('mousedown', e => {
             e.stopPropagation();
-            this._toggleCustomDropdown(container);
+            this.toggleCustomDropdown(container);
         });
 
         container.appendChild(button);
         container.appendChild(optionsContainer);
-        container.dataset.wildcardId = this._generateWildcardId(wildcard);
+        container.dataset.wildcardId = DropdownUI.generateWildcardId(wildcard);
 
         return container;
     }
 
-    _renderOptions(wildcard, selectedIndex, onSelect) {
+    renderOptions(wildcard, selectedIndex, onSelect) {
         const optionsContainer = document.createElement('div');
         optionsContainer.className = 'custom-dropdown-options';
 
@@ -122,7 +104,7 @@ export class DropdownManager {
             optionElement.className = 'custom-dropdown-option';
             optionElement.dataset.value = option;
             optionElement.dataset.index = index;
-            optionElement.textContent = this.truncateOption(wildcard[option]?.raw || option);
+            optionElement.textContent = DropdownUI.truncateOption(wildcard[option]?.raw || option);
 
             optionElement.addEventListener('click', e => {
                 e.stopPropagation();
@@ -134,7 +116,7 @@ export class DropdownManager {
         return optionsContainer;
     }
 
-    _generateWildcardId(wildcard) {
+    static generateWildcardId(wildcard) {
         return btoa(JSON.stringify({
             raw: wildcard.raw,
             options: wildcard.options,
@@ -142,15 +124,15 @@ export class DropdownManager {
         })).replace(/[^a-zA-Z0-9]/g, '');
     }
 
-    _toggleCustomDropdown(container) {
+    toggleCustomDropdown(container) {
         const isOpen = container.classList.contains('open');
-        this._closeAllCustomDropdowns();
+        this.closeAllCustomDropdowns();
         if (!isOpen) {
-            this._openCustomDropdown(container);
+            this.openCustomDropdown(container);
         }
     }
 
-    _openCustomDropdown(container) {
+    openCustomDropdown(container) {
         container.classList.add('open');
         this.activeOverlay = container;
 
@@ -160,7 +142,7 @@ export class DropdownManager {
         }
     }
 
-    _closeCustomDropdown(container) {
+    closeCustomDropdown(container) {
         container.classList.remove('open');
         if (this.activeOverlay === container) {
             this.activeOverlay = null;
@@ -174,102 +156,143 @@ export class DropdownManager {
         }
     }
 
-    _closeAllCustomDropdowns() {
+    closeAllCustomDropdowns() {
         document.querySelectorAll('.custom-dropdown.open').forEach(dropdown => {
-            this._closeCustomDropdown(dropdown);
+            this.closeCustomDropdown(dropdown);
         });
     }
 
     _setupGlobalClickListener() {
         document.addEventListener('mousedown', e => {
             if (this.activeOverlay && !this.activeOverlay.contains(e.target)) {
-                this._closeCustomDropdown(this.activeOverlay);
+                this.closeCustomDropdown(this.activeOverlay);
             }
         });
     }
 
-    _handleCustomDropdownSelection(container, wildcard, selectedOption, selectedIndex) {
-        const button = container.querySelector('.custom-dropdown-button');
-        const options = container.querySelectorAll('.custom-dropdown-option');
-        let displayText;
-        if (selectedIndex === -1) {
-            displayText = 'nothing selected (random selection)';
-        } else {
-            displayText = this.truncateOption(wildcard[selectedOption]?.raw || selectedOption);
+    static truncateOption(option) {
+        if (typeof option === 'string' && option.length > 40) {
+            return option.slice(0, 40) + '...';
         }
+        return option || '';
+    }
 
-        const textSpan = button.querySelector('.custom-dropdown-text');
-        textSpan.textContent = displayText;
+    clearDropdowns() {
+        this.sidebar.querySelectorAll('.wildcard-dropdown-container').forEach(el => el.remove());
+    }
+}
 
-        options.forEach(opt => opt.classList.remove('selected'));
-        const selectedOptionElement = selectedIndex === -1 ? options[0] : options[selectedIndex + 1];
-        if (selectedOptionElement) {
-            selectedOptionElement.classList.add('selected');
-        }
+// Dropdown management logic (data/state management, structure updates, selection logic)
+export class DropdownManager {
+    constructor(sidebar, structureData, processor) {
+        this.sidebar = sidebar;
+        this.structureData = structureData;
+        this.processor = processor;
+        this.ui = new DropdownUI(sidebar, (wildcard, selectedValue, selectedIndex, container) => {
+            this.handleUserSelection(wildcard, selectedValue, selectedIndex, container);
+        });
+        this.observers = [];
+        this._init();
+    }
 
-        this._closeCustomDropdown(container);
+    _init() {
+        this._notifyObservers = this._notifyObservers.bind(this);
+        this.addObserver(() => {
+            this.render();
+        });
+        this.render();
+    }
 
-        const selectedValue = selectedIndex === -1 ? '' : selectedOption;
-        const dropdownContainer = container.closest('.wildcard-dropdown-container');
+    // Observer pattern
+    addObserver(fn) {
+        this.observers.push(fn);
+    }
 
-        // DIRECTLY STORE SELECTION
+    removeObserver(fn) {
+        this.observers = this.observers.filter(obs => obs !== fn);
+    }
+
+    _notifyObservers() {
+        this.observers.forEach(fn => fn());
+    }
+
+    // Centralized state change for selection
+    handleUserSelection(wildcard, selectedValue, selectedIndex, container) {
+        this.setSelected(wildcard, selectedValue);
+    }
+
+    setSelected(wildcard, selectedValue) {
         wildcard.selected = selectedValue;
         if (wildcard.target && this.processor) {
             this.processor.updateNodeData({
                 wildcards_structure_data: JSON.stringify(this.structureData)
             });
         }
-
-        if (dropdownContainer) {
-            this.handleDropdownChange(wildcard, selectedValue, dropdownContainer);
-        }
+        this._notifyObservers();
     }
 
-    _setSelectedByTarget(target, value) {
+    // Programmatic API for updating dropdowns
+    setSelectedByTarget(target, value) {
         let obj = this.structureData;
         for (let i = 0; i < target.length; i++) {
             obj = obj[target[i]];
         }
         obj.selected = value;
+        this._notifyObservers();
     }
 
-    handleDropdownChange(wildcard, selectedValue, dropdownContainer) {
-        this.removeChildDropdowns(dropdownContainer);
+    // Find all root wildcards for initial rendering
+    findRootWildcards(data) {
+        const wildcards = [];
+        for (const key in data) {
+            if (data.hasOwnProperty(key) && typeof data[key] === 'object' && data[key] !== null) {
+                for (const nestedKey in data[key]) {
+                    if (data[key].hasOwnProperty(nestedKey)) {
+                        const nested = data[key][nestedKey];
+                        if (typeof nested === 'object' && nested !== null && Array.isArray(nested.options)) {
+                            wildcards.push(nested);
+                        }
+                    }
+                }
+            }
+        }
+        return wildcards;
+    }
 
+    // Build dropdowns data for UI rendering
+    buildDropdownsData() {
+        const dropdownsData = [];
+        const rootWildcards = this.findRootWildcards(this.structureData);
+        rootWildcards.forEach(wildcard => {
+            dropdownsData.push({ wildcard, parent: null });
+            this._collectChildDropdowns(wildcard, wildcard.selected, dropdownsData, null);
+        });
+        return dropdownsData;
+    }
+
+    _collectChildDropdowns(wildcard, selectedValue, dropdownsData, parentContainer) {
         if (selectedValue !== '' && wildcard[selectedValue]) {
             const selectedOption = wildcard[selectedValue];
             if (Array.isArray(selectedOption.options)) {
                 selectedOption.options.forEach(optKey => {
                     const nestedItem = selectedOption[optKey];
-                    if (nestedItem &&
-                        typeof nestedItem === 'object' &&
-                        Array.isArray(nestedItem.options) &&
-                        nestedItem.options.length > 0) {
-                        this.createDropdownForWildcard(nestedItem, dropdownContainer);
+                    if (nestedItem && typeof nestedItem === 'object' && Array.isArray(nestedItem.options) && nestedItem.options.length > 0) {
+                        dropdownsData.push({ wildcard: nestedItem, parent: parentContainer });
+                        this._collectChildDropdowns(nestedItem, nestedItem.selected, dropdownsData, parentContainer);
                     }
                 });
             }
         }
     }
 
-    removeChildDropdowns(parentContainer) {
-        for (const [element, dropdown] of this.dropdowns.entries()) {
-            if (dropdown.parent === parentContainer) {
-                element.remove();
-                this.dropdowns.delete(element);
-            }
-        }
+    // UI rendering delegation
+    render() {
+        const dropdownsData = this.buildDropdownsData();
+        this.ui.render(dropdownsData);
     }
 
-    clearDropdowns() {
-        this.sidebar.querySelectorAll('.wildcard-dropdown-container').forEach(el => el.remove());
-        this.dropdowns.clear();
-    }
-
-    truncateOption(option) {
-        if (typeof option === 'string' && option.length > 40) {
-            return option.slice(0, 40) + '...';
-        }
-        return option || '';
+    // Programmatic API to refresh UI
+    refresh() {
+        this._notifyObservers();
     }
 }

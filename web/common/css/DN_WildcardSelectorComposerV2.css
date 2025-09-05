@@ -301,7 +301,7 @@
 }
 
 .custom-dropdown-option:hover {
-    background: rgba(40, 40, 40, 0.98);
+    background: rgb(30, 30, 30);
 }
 
 .custom-dropdown-option.not-selected {
@@ -345,20 +345,14 @@
     text-overflow: ellipsis;
 }
 
+
 .custom-dropdown-options::-webkit-scrollbar {
-    width: 6px;
+    display: none;
 }
 
-.custom-dropdown-options::-webkit-scrollbar-track {
-    background: rgba(40, 40, 40, 0.5);
-}
-
-.custom-dropdown-options::-webkit-scrollbar-thumb {
-    background: rgba(80, 80, 80, 0.8);
-}
-
-.custom-dropdown-options::-webkit-scrollbar-thumb:hover {
-    background: rgba(100, 100, 100, 0.8);
+.custom-dropdown-options {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
 }
 
 .wildcard-dropdown-row {
@@ -369,13 +363,14 @@
     position: relative;
 }
 
+
 .custom-dropdown-button:hover,
 .custom-dropdown-button:focus {
     background: rgba(30, 30, 30, 0.98);
     outline: none;
 }
 
-.custom-dropdown:not(.open) .custom-dropdown-button {
+.custom-dropdown .custom-dropdown-button {
     background: rgba(20, 20, 20, 0.98);
     color: #ccc;
 }
