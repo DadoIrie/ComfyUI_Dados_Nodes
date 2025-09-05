@@ -8,11 +8,48 @@ class DropdownUI {
         this._setupGlobalClickListener();
     }
 
-    // Pure renderer: receives dropdownsData (array of wildcards) and renders them
+    // Reactive renderer: updates DOM to reflect dropdownsData (array of wildcards)
     render(dropdownsData) {
-        this.clearDropdowns();
-        dropdownsData.forEach(({ wildcard, parent }) => {
-            this.renderDropdownForWildcard(wildcard, parent);
+        // Map current DOM containers by wildcardId
+        const containerMap = new Map();
+        this.sidebar.querySelectorAll('.wildcard-dropdown-container').forEach(container => {
+            const id = container.querySelector('.custom-dropdown')?.dataset.wildcardId;
+            if (id) containerMap.set(id, container);
+        });
+
+        // Build new order and set of ids
+        const newIds = dropdownsData.map(({ wildcard }) => DropdownUI.generateWildcardId(wildcard));
+
+        // Remove containers not in newIds
+        containerMap.forEach((container, id) => {
+            if (!newIds.includes(id)) {
+                container.remove();
+            }
+        });
+
+        // Insert/update containers in correct order
+        let lastInserted = null;
+        newIds.forEach((id, idx) => {
+            const { wildcard, parent } = dropdownsData[idx];
+            let container = containerMap.get(id);
+            if (!container) {
+                container = this.renderDropdownForWildcard(wildcard, parent);
+            } else {
+                // Always update the contents of the container
+                container.innerHTML = '';
+                const customDropdown = this.renderCustomDropdown(wildcard);
+                container.appendChild(customDropdown);
+            }
+            // Ensure correct order in sidebar
+            if (parent) {
+                if (!parent.contains(container)) {
+                    parent.appendChild(container);
+                }
+            } else {
+                if (this.sidebar.children[idx] !== container) {
+                    this.sidebar.insertBefore(container, this.sidebar.children[idx] || null);
+                }
+            }
         });
     }
 
@@ -178,6 +215,7 @@ class DropdownUI {
     }
 
     clearDropdowns() {
+        // Remove all dropdown containers from sidebar
         this.sidebar.querySelectorAll('.wildcard-dropdown-container').forEach(el => el.remove());
     }
 }

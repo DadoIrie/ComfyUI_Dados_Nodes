@@ -169,7 +169,7 @@ export class WildcardsModal {
                     this.dropdownManager.sidebar = this.sidebarDropdownsScroll;
                     this.dropdownManager.processor = this.nodeDataProcessor; // <-- update processor reference
                 }
-                this.dropdownManager.createDropdowns();
+                this.dropdownManager.refresh();
             } catch (e) {
                 console.error("Error parsing structure data:", e);
             }
@@ -207,6 +207,14 @@ export class WildcardsModal {
         this.clearBtn.addEventListener("click", () => {
             this.textboxContent.value = "";
             this.textboxContent.focus();
+            // Clear structureData and widget
+            this.structureData = {};
+            this.nodeDataProcessor.updateNodeData({ wildcards_structure_data: "{}" });
+            // Refresh dropdowns sidebar
+            if (this.dropdownManager) {
+                this.dropdownManager.structureData = this.structureData;
+                this.dropdownManager.refresh();
+            }
         });
 
         this.saveBtn.addEventListener("click", async () => {
