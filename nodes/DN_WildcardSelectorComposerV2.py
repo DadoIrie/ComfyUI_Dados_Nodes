@@ -212,7 +212,6 @@ async def handle_wildcard_selector_composer_operations(request):
                 instance = DN_WildcardSelectorComposerV2()
                 new_structure = instance.analyze_wildcard_structure(content)
 
-                # Merge previous selections into new structure
                 def merge_selected(old, new):
                     if not isinstance(old, dict) or not isinstance(new, dict):
                         return
@@ -224,15 +223,14 @@ async def handle_wildcard_selector_composer_operations(request):
                                 if isinstance(old_v, dict) and 'selected' in old_v:
                                     v['selected'] = old_v.get('selected', v['selected'])
                             merge_selected(old.get(k, {}), v)
-
                 try:
-                    import json
                     old_structure = json.loads(old_structure_json) if old_structure_json else {}
                     merge_selected(old_structure, new_structure)
                 except Exception:
                     pass  # If merging fails, just use new_structure
-
                 structure_data = instance.generate_structure_data(new_structure)
+            else:
+                structure_data = "{}"
 
             return web.json_response({
                 "status": "success",
