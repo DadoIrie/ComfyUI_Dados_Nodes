@@ -10,7 +10,7 @@ import random
 import time
 # from server import PromptServer  # type: ignore pylint: disable=import-error
 from aiohttp import web
-from ..utils.api_routes import register_operation_handler
+from .utils.api_routes import register_operation_handler
 
 class DN_TextDropDownNode:
     """

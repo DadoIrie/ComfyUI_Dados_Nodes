@@ -9,7 +9,7 @@ import json
 import random
 import time
 from aiohttp import web
-from ..utils.api_routes import register_operation_handler
+from .utils.api_routes import register_operation_handler
 
 class DN_CSVMultiDropDownNode:
     """

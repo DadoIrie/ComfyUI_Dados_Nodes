@@ -3,7 +3,7 @@ import json
 import random
 from typing import Dict, Any, ClassVar, Optional, Tuple
 from aiohttp import web
-from ..utils.api_routes import register_operation_handler
+from .utils.api_routes import register_operation_handler
 
 class DN_WildcardPromptEditorNode:
     file_cache: ClassVar[Dict[str, str]] = {}

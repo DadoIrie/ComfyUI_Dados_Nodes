@@ -3,7 +3,7 @@ import os
 from typing import Any, Dict, Optional, Callable, List
 from aiohttp import web
 from server import PromptServer
-from .. import constants, MESSAGE_ROUTE, EXTENSION_NAME  # Import from root __init__.py
+from ... import constants, MESSAGE_ROUTE, EXTENSION_NAME  # Import from root __init__.py
 
 class TimedOutException(Exception):
     """Exception raised when waiting for a message times out"""

@@ -3,14 +3,14 @@ import json
 from typing import Any, Dict, Optional, Tuple, List
 from aiohttp import web, ClientSession
 import asyncio
-from ..utils.api_routes import register_operation_handler
-from ..utils.api_routes import send_message
+from .utils.api_routes import register_operation_handler
+from .utils.api_routes import send_message
 
-from ..utils.pinterest_token import (
+from .utils.pinterest_token import (
     construct_oauth_url, is_token_expired, has_token,
     get_token, exchange_token, create_token_request, store_token
 )
-from ..utils.pinterest_oauth import (
+from .utils.pinterest_oauth import (
     authenticate_pinterest, refresh_pinterest_token
 )
 
