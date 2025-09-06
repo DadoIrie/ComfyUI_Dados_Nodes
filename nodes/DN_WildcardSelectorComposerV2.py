@@ -30,6 +30,48 @@ class DN_WildcardSelectorComposerV2:
     FUNCTION = "process_prompt"
     CATEGORY = "Dado's Nodes/Text"
 
+    def process_prompt(self, wildcards_prompt="", wildcards_structure_data="", seed=-1, unique_id=None):
+        marked_prompt = ""
+        if unique_id and unique_id in self.node_state:
+            wildcards_prompt = self.node_state[unique_id].get('wildcards_prompt', wildcards_prompt)
+        return (wildcards_prompt, marked_prompt)
+    
+    @classmethod
+    def update_wildcards_prompt(cls, node_id: str, content: str, old_structure_json: str = "") -> str:
+        """Handles updating the wildcards prompt and merging selected values."""
+        if node_id:
+            cls.node_state[node_id] = {
+                'wildcards_prompt': content
+            }
+
+        structure_data = ""
+        if content:
+            instance = cls()
+            new_structure = instance.analyze_wildcard_structure(content)
+            try:
+                old_structure = json.loads(old_structure_json) if old_structure_json else {}
+                cls.merge_selected(old_structure, new_structure)
+            except Exception:
+                pass  # If merging fails, just use new_structure
+            structure_data = instance.generate_structure_data(new_structure)
+        else:
+            structure_data = "{}"
+        return structure_data
+
+    @staticmethod
+    def merge_selected(old, new):
+        """Recursively merge 'selected' values from old structure into new structure."""
+        if not isinstance(old, dict) or not isinstance(new, dict):
+            return
+        for k, v in new.items():
+            if isinstance(v, dict):
+                # If this is a wildcard dict with 'selected'
+                if 'selected' in v:
+                    old_v = old.get(k, {})
+                    if isinstance(old_v, dict) and 'selected' in old_v:
+                        v['selected'] = old_v.get('selected', v['selected'])
+                DN_WildcardSelectorComposerV2.merge_selected(old.get(k, {}), v)
+
     @staticmethod
     def find_wildcards(text: str) -> List[Tuple[int, int]]:
         """Find all wildcard boundaries in the text"""
@@ -86,6 +128,11 @@ class DN_WildcardSelectorComposerV2:
         if current_section.strip():
             sections.append(current_section.strip())
         return sections
+    
+    @staticmethod
+    def generate_structure_data(structure: Dict[str, Any]) -> str:
+        """Generate structure data output in JSON format"""
+        return json.dumps(structure, indent=2)
 
     def analyze_wildcard_structure(
         self,
@@ -179,17 +226,6 @@ class DN_WildcardSelectorComposerV2:
 
         return result
 
-    @staticmethod
-    def generate_structure_data(structure: Dict[str, Any]) -> str:
-        """Generate structure data output in JSON format"""
-        return json.dumps(structure, indent=2)
-
-    def process_prompt(self, wildcards_prompt="", wildcards_structure_data="", seed=-1, unique_id=None):
-        marked_prompt = ""
-        if unique_id and unique_id in self.node_state:
-            wildcards_prompt = self.node_state[unique_id].get('wildcards_prompt', wildcards_prompt)
-        return (wildcards_prompt, marked_prompt)
-
 @register_operation_handler
 async def handle_wildcard_selector_composer_operations(request):
     try:
@@ -202,35 +238,7 @@ async def handle_wildcard_selector_composer_operations(request):
             content = payload.get('content', '')
             old_structure_json = payload.get('wildcards_structure_data', '')
 
-            if node_id:
-                DN_WildcardSelectorComposerV2.node_state[node_id] = {
-                    'wildcards_prompt': content
-                }
-
-            structure_data = ""
-            if content:
-                instance = DN_WildcardSelectorComposerV2()
-                new_structure = instance.analyze_wildcard_structure(content)
-
-                def merge_selected(old, new):
-                    if not isinstance(old, dict) or not isinstance(new, dict):
-                        return
-                    for k, v in new.items():
-                        if isinstance(v, dict):
-                            # If this is a wildcard dict with 'selected'
-                            if 'selected' in v:
-                                old_v = old.get(k, {})
-                                if isinstance(old_v, dict) and 'selected' in old_v:
-                                    v['selected'] = old_v.get('selected', v['selected'])
-                            merge_selected(old.get(k, {}), v)
-                try:
-                    old_structure = json.loads(old_structure_json) if old_structure_json else {}
-                    merge_selected(old_structure, new_structure)
-                except Exception:
-                    pass  # If merging fails, just use new_structure
-                structure_data = instance.generate_structure_data(new_structure)
-            else:
-                structure_data = "{}"
+            structure_data = DN_WildcardSelectorComposerV2.update_wildcards_prompt(node_id, content, old_structure_json)
 
             return web.json_response({
                 "status": "success",
