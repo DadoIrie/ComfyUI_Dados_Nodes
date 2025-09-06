@@ -60,7 +60,8 @@ export class WildcardsModal {
             onStructureUpdate: (newStructure) => {
                 this.structureData = newStructure;
                 this.initializeDropdowns();
-            }
+            },
+            lineWrapping: true
         });
         // Return the promise for the textbox node
         return this.textbox.createTextbox();
@@ -134,7 +135,8 @@ export class WildcardsModal {
                     this.dropdownManager = new DropdownManager(
                         this.sidebarDropdownsScroll,
                         this.structureData,
-                        this.nodeDataProcessor
+                        this.nodeDataProcessor,
+                        this.textbox
                     );
                 } else {
                     this.dropdownManager.structureData = this.structureData;

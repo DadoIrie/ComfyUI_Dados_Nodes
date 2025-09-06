@@ -1,7 +1,8 @@
 class DropdownUI {
-    constructor(sidebar, onSelect) {
+    constructor(sidebar, onSelect, textbox) {
         this.sidebar = sidebar;
         this.onSelect = onSelect;
+        this.textbox = textbox;
         this.activeOverlay = null;
         this._setupGlobalClickListener();
     }
@@ -61,8 +62,9 @@ class DropdownUI {
     }
 
     renderCustomDropdown(wildcard) {
-        const container = document.createElement('div');
-        container.className = 'custom-dropdown';
+    const container = document.createElement('div');
+    container.className = 'custom-dropdown';
+    container._wildcard = wildcard;
 
         const button = document.createElement('button');
         button.className = 'custom-dropdown-button';
@@ -164,6 +166,10 @@ class DropdownUI {
         this.activeOverlay = container;
 
         const options = container.querySelector('.custom-dropdown-options');
+        const wildcard = container._wildcard;
+        if (wildcard && typeof wildcard.raw === 'string') {
+            this.textbox.mark(wildcard.raw);
+        }
         if (options) {
             options.style.maxHeight = options.scrollHeight + 'px';
             const onTransitionEnd = () => {
@@ -222,13 +228,14 @@ class DropdownUI {
 }
 
 export class DropdownManager {
-    constructor(sidebar, structureData, processor) {
+    constructor(sidebar, structureData, processor, textbox) {
         this.sidebar = sidebar;
         this.structureData = structureData;
         this.processor = processor;
+        this.textbox = textbox;
         this.ui = new DropdownUI(sidebar, (wildcard, selectedValue, selectedIndex, container) => {
             this.handleUserSelection(wildcard, selectedValue, selectedIndex, container);
-        });
+        }, textbox);
         this.observers = [];
         this._init();
     }

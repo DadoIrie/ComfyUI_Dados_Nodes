@@ -2,7 +2,7 @@
 import { fetchSend } from "../utils.js";
 
 export class Textbox {
-    constructor(node, nodeDataProcessor, { constants = {}, onStructureUpdate } = {}) {
+    constructor(node, nodeDataProcessor, { constants = {}, onStructureUpdate, lineWrapping } = {}) {
         this.node = node;
         this.nodeDataProcessor = nodeDataProcessor;
         this.constants = constants;
@@ -13,6 +13,7 @@ export class Textbox {
         this.clearBtn = null;
         this.saveBtn = null;
         this.searchBtn = null;
+        this.lineWrapping = lineWrapping; // flag for CodeMirror word wrap
     }
 
     async createTextbox() {
@@ -21,6 +22,24 @@ export class Textbox {
         this._setupEditorFeatures();
         this._setupActionBar();
         return this.textbox;
+    }
+
+    mark(str) {
+        this.unmark();
+        if (!str || !this.cmEditor) return;
+        const cursor = this.cmEditor.getSearchCursor(str);
+        if (cursor.findNext()) {
+            this.cmEditor.setSelection(cursor.from(), cursor.to());
+            this.cmEditor.scrollIntoView({from: cursor.from(), to: cursor.to()});
+        }
+    }
+
+    unmark() {
+        if (this.cmEditor) {
+            const doc = this.cmEditor.getDoc();
+            const cursor = doc.getCursor();
+            doc.setSelection(cursor, cursor);
+        }
     }
 
     _createTextboxElement() {
@@ -61,7 +80,8 @@ export class Textbox {
             spellcheck: false,
             autofocus: true,
             autoRefresh: true,
-            styleSelectedText: true 
+            styleSelectedText: true,
+            lineWrapping: this.lineWrapping // set word wrap flag
         });
         setTimeout(() => {
             this.cmEditor.refresh();
