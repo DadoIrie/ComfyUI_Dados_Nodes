@@ -11,7 +11,7 @@ class DN_PromptSectionsExtractor:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("text",)
     FUNCTION = "extract_marked_sections"
-    CATEGORY = "Dado's Nodes/Text"
+    CATEGORY = "Dado's Nodes/Text & Prompt"
 
     @classmethod
     def INPUT_TYPES(s) -> Dict[str, dict]:

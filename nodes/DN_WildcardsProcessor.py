@@ -19,7 +19,7 @@ class DN_WildcardsProcessor:
     RETURN_TYPES = ("STRING", "INT",)
     RETURN_NAMES = ("processed_text", "seed",)
     FUNCTION = "process_wildcards"
-    CATEGORY = "Dado's Nodes/Text"
+    CATEGORY = "Dado's Nodes/Text & Prompt"
     
     def process_wildcards(self, text, seed, use_attention):
         if not text:

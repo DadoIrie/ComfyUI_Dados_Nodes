@@ -9,7 +9,7 @@ class DN_MultilineString:
 
     RETURN_TYPES = ("STRING",)
     FUNCTION = "process_text"
-    CATEGORY = "Dado's Nodes/Text"
+    CATEGORY = "Dado's Nodes/Text & Prompt"
 
     def process_text(self, text):
         return (text,)

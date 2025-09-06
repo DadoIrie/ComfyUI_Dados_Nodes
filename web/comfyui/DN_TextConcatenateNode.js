@@ -58,7 +58,7 @@ app.registerExtension({
                                 let maxNumber = 0;
                                 for(const slot of this.inputs) {
                                     if (slot.name.startsWith(_PREFIX)) {
-                                        const match = slot.name.match(/text_(\d+)/);
+                                        const match = slot.name.match(/Text & Prompt_(\d+)/);
                                         if (match) {
                                             maxNumber = Math.max(maxNumber, parseInt(match[1]));
                                         }

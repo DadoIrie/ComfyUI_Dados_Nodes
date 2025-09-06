@@ -10,7 +10,7 @@ class DN_TextConcatenateNode:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("text",)
     FUNCTION = "concatenate"
-    CATEGORY = "Dado's Nodes/Text"
+    CATEGORY = "Dado's Nodes/Text & Prompt"
 
     @classmethod
     def INPUT_TYPES(s) -> Dict[str, dict]:

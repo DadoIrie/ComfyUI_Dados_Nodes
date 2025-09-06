@@ -28,7 +28,7 @@ class DN_WildcardSelectorComposerV2:
     RETURN_TYPES = ("STRING", "STRING")
     RETURN_NAMES = ("clean_prompt", "marked_prompt")
     FUNCTION = "process_prompt"
-    CATEGORY = "Dado's Nodes/Text"
+    CATEGORY = "Dado's Nodes/Text & Prompt"
 
     def process_prompt(self, wildcards_prompt="", wildcards_structure_data="", seed=-1, unique_id=None):
         marked_prompt = ""

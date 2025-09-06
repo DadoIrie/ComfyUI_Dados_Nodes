@@ -19,7 +19,7 @@ class DN_TextDropDownNode:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("text",)
     FUNCTION = "process"
-    CATEGORY = "Dado's Nodes/Text"
+    CATEGORY = "Dado's Nodes/Text & Prompt"
 
     selections: ClassVar[Dict[str, str]] = {}
     entries_map: ClassVar[Dict[str, List[str]]] = {}

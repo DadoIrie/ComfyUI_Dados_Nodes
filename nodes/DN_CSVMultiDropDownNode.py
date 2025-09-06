@@ -18,7 +18,7 @@ class DN_CSVMultiDropDownNode:
     RETURN_TYPES = ("STRING",) * 31
     RETURN_NAMES = ("combined_selections",) + tuple(str(i) for i in range(1, 31))
     FUNCTION = "process"
-    CATEGORY = "Dado's Nodes/Text"
+    CATEGORY = "Dado's Nodes/Text & Prompt"
 
     selections: ClassVar[Dict[str, Dict[str, str]]] = {}
     entries_map: ClassVar[Dict[str, Dict[str, List[str]]]] = {}

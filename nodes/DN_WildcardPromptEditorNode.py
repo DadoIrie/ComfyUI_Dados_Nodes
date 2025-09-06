@@ -24,7 +24,7 @@ class DN_WildcardPromptEditorNode:
     RETURN_TYPES = ("STRING",) * 2
     RETURN_NAMES = ("clean_prompt", "marked_prompt")
     FUNCTION = "process_prompt"
-    CATEGORY = "Dado's Nodes/Text"
+    CATEGORY = "Dado's Nodes/Text & Prompt"
     
     def parse_wildcards(self, clean_prompt: str) -> list:
         return self._parse_wildcards_recursive(clean_prompt, "")
