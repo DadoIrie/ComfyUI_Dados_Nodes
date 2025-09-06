@@ -22,7 +22,6 @@ class DropdownUI {
             }
         });
 
-        let lastInserted = null;
         newIds.forEach((id, idx) => {
             const { wildcard, parent } = dropdownsData[idx];
             let container = containerMap.get(id);
@@ -113,7 +112,7 @@ class DropdownUI {
         return container;
     }
 
-    renderOptions(wildcard, selectedIndex, onSelect) {
+    renderOptions(wildcard, onSelect) {
         const optionsContainer = document.createElement('div');
         optionsContainer.className = 'custom-dropdown-options';
 
@@ -255,7 +254,7 @@ export class DropdownManager {
         this.observers.forEach(fn => fn());
     }
 
-    handleUserSelection(wildcard, selectedValue, selectedIndex, container) {
+    handleUserSelection(wildcard, selectedValue) {
         this.setSelected(wildcard, selectedValue);
     }
 
