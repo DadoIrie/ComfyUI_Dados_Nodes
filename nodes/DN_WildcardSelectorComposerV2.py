@@ -3,7 +3,7 @@
 @author: Dado
 @description: Processes and catalogs sections and wildcards, mapping their structure and relationships for UI representation.
 """
-import xxhash
+import uuid
 import json
 from typing import Dict, Any, ClassVar, List, Tuple
 from aiohttp import web
@@ -141,7 +141,7 @@ class DN_WildcardSelectorComposerV2:
         return_wildcards_only: bool = False,
         target_path: List[str] = None
     ) -> Dict[str, Any]:
-        """Recursively analyze wildcard structure and return hierarchical data with hashed keys"""
+        """Recursively analyze wildcard structure and return hierarchical data with ided keys"""
         if target_path is None:
             target_path = []
 
@@ -150,15 +150,15 @@ class DN_WildcardSelectorComposerV2:
 
         for section in sections:
             section_wildcards = self.find_wildcards(section)
-            # Top-level section hash logic
+            # Top-level section UUID logic
             if depth == 0 and not return_wildcards_only and len(section_wildcards) == 1 and section_wildcards[0][0] == 0 and section_wildcards[0][1] == len(section):
-                section_hash = "s_" + xxhash.xxh32(section.encode()).hexdigest()[:7]
+                section_id = "s_" + str(uuid.uuid4())[:7]
             else:
-                section_hash = xxhash.xxh32(section.encode()).hexdigest()[:8]
+                section_id = str(uuid.uuid4())[:8]
 
             section_target_path = target_path.copy()
             if depth == 0 and not return_wildcards_only:
-                section_target_path = [section_hash]
+                section_target_path = [section_id]
 
             section_data = result if return_wildcards_only else {
                 "raw": section,
@@ -169,32 +169,32 @@ class DN_WildcardSelectorComposerV2:
                 wildcard_content = section[start:end]
                 choices_content = section[start+1:end-1]
                 choices = self.parse_choices(choices_content)
-                wildcard_hash = xxhash.xxh32(wildcard_content.encode()).hexdigest()[:8]
+                wildcard_id = str(uuid.uuid4())[:8]
 
                 processed_choices = []
                 nested_wildcard_data = {}
                 for choice in choices:
                     nested_wildcards = self.find_wildcards(choice)
                     if nested_wildcards:
-                        choice_hash = xxhash.xxh32(choice.encode()).hexdigest()[:8]
-                        processed_choices.append(choice_hash)
+                        choice_id = str(uuid.uuid4())[:8]
+                        processed_choices.append(choice_id)
                         nested_wildcard_dict = self.analyze_wildcard_structure(
-                            choice, depth + 1, True, section_target_path + [wildcard_hash, choice_hash]
+                            choice, depth + 1, True, section_target_path + [wildcard_id, choice_id]
                         )
                         choice_data = {
                             "raw": choice,
                             "options": [],
                             "selected": "nothing selected (random selection)",
-                            "target": section_target_path + [wildcard_hash, choice_hash]
+                            "target": section_target_path + [wildcard_id, choice_id]
                         }
                         direct_children = [
                             nh for nh, nd in nested_wildcard_dict.items()
                             if len(nd.get("target", [])) == len(choice_data["target"]) + 1
                         ]
                         choice_data["options"] = direct_children
-                        for nested_hash, nested_data in nested_wildcard_dict.items():
-                            choice_data[nested_hash] = nested_data
-                        nested_wildcard_data[choice_hash] = choice_data
+                        for nested_id, nested_data in nested_wildcard_dict.items():
+                            choice_data[nested_id] = nested_data
+                        nested_wildcard_data[choice_id] = choice_data
                     else:
                         processed_choices.append(choice)
 
@@ -211,18 +211,18 @@ class DN_WildcardSelectorComposerV2:
                     "raw": wildcard_raw,
                     "options": processed_choices,
                     "selected": "nothing selected (random selection)",
-                    "target": section_target_path + [wildcard_hash]
+                    "target": section_target_path + [wildcard_id]
                 }
-                for nested_hash, nested_data in nested_wildcard_data.items():
-                    wildcard_data[nested_hash] = nested_data
+                for nested_id, nested_data in nested_wildcard_data.items():
+                    wildcard_data[nested_id] = nested_data
 
                 if return_wildcards_only:
-                    result[wildcard_hash] = wildcard_data
+                    result[wildcard_id] = wildcard_data
                 else:
-                    section_data[wildcard_hash] = wildcard_data
+                    section_data[wildcard_id] = wildcard_data
 
             if not return_wildcards_only:
-                result[section_hash] = section_data
+                result[section_id] = section_data
 
         return result
 
