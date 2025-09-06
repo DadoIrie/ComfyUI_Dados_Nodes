@@ -176,6 +176,18 @@ class DropdownUI {
         const options = container.querySelector('.custom-dropdown-options');
         if (options) {
             options.style.maxHeight = options.scrollHeight + 'px';
+            const onTransitionEnd = () => {
+                options.removeEventListener('transitionend', onTransitionEnd);
+                const scrollContainer = this.sidebar.querySelector('.sidebar-dropdowns-scroll') || this.sidebar;
+                const scrollRect = scrollContainer.getBoundingClientRect();
+                const optionsRect = options.getBoundingClientRect();
+                const extraScroll = 32;
+                if (optionsRect.bottom > scrollRect.bottom) {
+                    const scrollAmount = optionsRect.bottom - scrollRect.bottom + extraScroll;
+                    scrollContainer.scrollBy({top: scrollAmount, behavior: 'smooth'});
+                }
+            };
+            options.addEventListener('transitionend', onTransitionEnd);
         }
     }
 

@@ -21,6 +21,8 @@ class DN_WildcardSelectorComposerV2 {
             const wildcardStructureWidget = this.node.widgets?.find(w => w.name === "wildcards_structure_data");
             
 /*             if (wildcardPromptWidget && wildcardStructureWidget) {
+                wildcardPromptWidget.hidden = true;
+                wildcardStructureWidget.hidden = true;
                 wildcardPromptWidget.computeSize = () => [0, -4];
                 wildcardStructureWidget.computeSize = () => [0, -4];
             } */
