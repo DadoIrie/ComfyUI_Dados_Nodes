@@ -139,6 +139,13 @@ class DropdownUI {
                 e.stopPropagation();
                 onSelect(option, index);
             });
+            optionElement.addEventListener('mouseenter', () => {
+                if (wildcard[option] && typeof wildcard[option].raw === 'string') {
+                    console.log(wildcard[option].raw);
+                } else {
+                    console.log(option);
+                }
+            });
             optionsContainer.appendChild(optionElement);
         });
 
@@ -191,6 +198,9 @@ class DropdownUI {
         container.classList.remove('open');
         if (this.activeOverlay === container) {
             this.activeOverlay = null;
+        }
+        if (this.textbox) {
+            this.textbox.unmark();
         }
         const button = container.querySelector('.custom-dropdown-button');
         if (button) button.blur();
