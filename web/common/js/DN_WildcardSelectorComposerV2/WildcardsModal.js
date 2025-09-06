@@ -23,6 +23,8 @@ export class WildcardsModal {
     async show() {
         await this.ensureCSSLoaded();
         this.createElements();
+        this.initializeTextbox();
+        this.modal.appendChild(this.sidebar);
         this.initializeDropdowns();
         document.body.appendChild(this.overlay);
     }
@@ -44,20 +46,20 @@ export class WildcardsModal {
         this.createOverlay();
         this.createModal();
         this.createSidebar();
-        // Initialize textbox as submodule
+        this.overlay.appendChild(this.modal);
+        this.createSidebarToggleButton();
+        this.setupOverlayCloseHandlers();
+    }
+
+    initializeTextbox() {
         this.textbox = new Textbox(this.node, this.nodeDataProcessor, {
             constants: this.constants,
             onStructureUpdate: (newStructure) => {
-                // Update structureData and refresh dropdowns if needed
                 this.structureData = newStructure;
                 this.initializeDropdowns();
             }
         });
         this.modal.appendChild(this.textbox.createTextbox());
-        this.modal.appendChild(this.sidebar);
-        this.overlay.appendChild(this.modal);
-        this.createSidebarToggleButton();
-        this.setupOverlayCloseHandlers();
     }
 
     createOverlay() {
@@ -76,14 +78,12 @@ export class WildcardsModal {
         this.sidebar.className = "sidebar";
         const sidebarTopbar = document.createElement("div");
         sidebarTopbar.className = "topbar";
-        // REMOVE APPLY BUTTON
         this.sidebar.appendChild(sidebarTopbar);
         this.sidebarDropdownsScroll = document.createElement("div");
         this.sidebarDropdownsScroll.className = "sidebar-dropdowns-scroll";
         this.sidebar.appendChild(this.sidebarDropdownsScroll);
     }
 
-    // Sidebar toggle button logic moved to its own method
     createSidebarToggleButton() {
         const FORCE_SIDEBAR_HIDDEN = false;
         const toggleBtn = document.createElement("button");
