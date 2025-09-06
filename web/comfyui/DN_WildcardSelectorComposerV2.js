@@ -18,11 +18,11 @@ class DN_WildcardSelectorComposerV2 {
 
     initializeHiddenInputs() {
             const wildcardPromptWidget = this.node.widgets?.find(w => w.name === "wildcards_prompt");
-            const wildcardSelectionsWidget = this.node.widgets?.find(w => w.name === "wildcards_structure_data");
+            const wildcardStructureWidget = this.node.widgets?.find(w => w.name === "wildcards_structure_data");
             
-/*             if (wildcardPromptWidget && wildcardSelectionsWidget) {
+/*             if (wildcardPromptWidget && wildcardStructureWidget) {
                 wildcardPromptWidget.computeSize = () => [0, -4];
-                wildcardSelectionsWidget.computeSize = () => [0, -4];
+                wildcardStructureWidget.computeSize = () => [0, -4];
             } */
     }
 
