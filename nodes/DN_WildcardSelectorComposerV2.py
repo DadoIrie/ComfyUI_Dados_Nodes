@@ -47,7 +47,7 @@ class DN_WildcardSelectorComposerV2:
         structure_data = ""
         if content:
             instance = cls()
-            new_structure = instance.analyze_wildcard_structure(content)
+            new_structure = instance.create_json_structure(content)
             try:
                 old_structure = json.loads(old_structure_json) if old_structure_json else {}
                 cls.merge_selected(old_structure, new_structure)
@@ -134,7 +134,7 @@ class DN_WildcardSelectorComposerV2:
         """Generate structure data output in JSON format"""
         return json.dumps(structure, indent=2)
 
-    def analyze_wildcard_structure(
+    def create_json_structure(
         self,
         text: str,
         depth: int = 0,
@@ -178,7 +178,7 @@ class DN_WildcardSelectorComposerV2:
                     if nested_wildcards:
                         choice_hash = xxhash.xxh32(choice.encode()).hexdigest()[:8]
                         processed_choices.append(choice_hash)
-                        nested_wildcard_dict = self.analyze_wildcard_structure(
+                        nested_wildcard_dict = self.create_json_structure(
                             choice, depth + 1, True, section_target_path + [wildcard_hash, choice_hash]
                         )
                         choice_data = {
