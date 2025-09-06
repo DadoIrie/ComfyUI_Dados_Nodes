@@ -26,25 +26,43 @@ export class Textbox {
         await this.loadCodeMirrorCDN();
 
         // Create CodeMirror container
-        const cmContainer = document.createElement("div");
-        cmContainer.className = "textbox-content";
-        cmContainer.style.height = "200px";
-        this.textbox.appendChild(cmContainer);
+    const cmContainer = document.createElement("div");
+    cmContainer.className = "textbox-content";
+    cmContainer.style.height = "100%";
+    this.textbox.appendChild(cmContainer);
 
         // Get initial value
         const wildcardsPrompt = this.nodeDataProcessor.getWildcardsPrompt() || "";
 
-        // Initialize CodeMirror
+        // Restore custom comment mode, using python's comment behavior
+        if (!window.CodeMirror.modes["wildcards"]) {
+            window.CodeMirror.defineMode("wildcards", function() {
+                return {
+                    token: function(stream) {
+                        if (stream.match(/^#.*/)) {
+                            return "comment";
+                        }
+                        stream.next();
+                        return null;
+                    }
+                };
+            });
+        }
         this.cmEditor = window.CodeMirror(cmContainer, {
             value: wildcardsPrompt,
-            mode: "text",
-            lineNumbers: true,
+            mode: "wildcards",
+            lineNumbers: false,
             theme: "default",
             viewportMargin: Infinity,
             spellcheck: false,
+            autofocus: true,
+            autoRefresh: true,
+            styleSelectedText: true 
         });
+        setTimeout(() => {
+            this.cmEditor.refresh();
+        }, 1);
 
-        // Custom { } insertion on "{" key
         this.cmEditor.on("keydown", (cm, event) => {
             if (event.key === "{" && !event.ctrlKey && !event.altKey && !event.metaKey) {
                 event.preventDefault();
@@ -67,14 +85,27 @@ export class Textbox {
         actionBar.className = "textbox-action-bar";
         this.clearBtn = this.createActionButton("Clear", "clear");
         this.saveBtn = this.createActionButton("Save", "save");
+        // Proof-of-concept: Add a search button
+        this.searchBtn = this.createActionButton("Search 'test'", "search");
         actionBar.appendChild(this.clearBtn);
         actionBar.appendChild(this.saveBtn);
+        actionBar.appendChild(this.searchBtn);
         this.textbox.appendChild(actionBar);
+
+        // Search button logic: highlight first occurrence of 'test'
+        this.searchBtn.addEventListener("click", () => {
+            const cursor = this.cmEditor.getSearchCursor("test");
+            if (cursor.findNext()) {
+                this.cmEditor.setSelection(cursor.from(), cursor.to());
+                this.cmEditor.scrollIntoView({from: cursor.from(), to: cursor.to()});
+            } else {
+                alert("No match found for 'test'.");
+            }
+        });
 
         this.clearBtn.addEventListener("click", () => {
             this.cmEditor.setValue("");
             this.cmEditor.focus();
-            // Clear structureData and widget
             this.structureData = {};
             this.nodeDataProcessor.updateNodeData({ wildcards_structure_data: "{}" });
             if (this.onStructureUpdate) {
@@ -102,6 +133,10 @@ export class Textbox {
         }
         // Load JS
         await this.loadScript("https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js");
+
+            // Load addons (require CodeMirror to be present)
+        await this.loadScript("https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/mark-selection.min.js");
+        await this.loadScript("https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js");
     }
 
     loadScript(src) {

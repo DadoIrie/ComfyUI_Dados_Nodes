@@ -21,12 +21,15 @@ export class WildcardsModal {
     }
 
     async show() {
-        await this.ensureCSSLoaded();
-        this.createElements();
-        this.initializeTextbox();
-        this.modal.appendChild(this.sidebar);
-        this.initializeDropdowns();
-        document.body.appendChild(this.overlay);
+    await this.ensureCSSLoaded();
+    this.createElements();
+    // Await textbox creation and append it first
+    const textboxNode = await this.initializeTextbox();
+    this.modal.appendChild(textboxNode);
+    // Then append sidebar after textbox
+    this.modal.appendChild(this.sidebar);
+    this.initializeDropdowns();
+    document.body.appendChild(this.overlay);
     }
 
     async ensureCSSLoaded() {
@@ -59,7 +62,8 @@ export class WildcardsModal {
                 this.initializeDropdowns();
             }
         });
-        this.modal.appendChild(this.textbox.createTextbox());
+        // Return the promise for the textbox node
+        return this.textbox.createTextbox();
     }
 
     createOverlay() {
@@ -145,10 +149,19 @@ export class WildcardsModal {
     }
 
     setupOverlayCloseHandlers() {
-        this.overlay.addEventListener("click", (event) => {
+        let mouseDownOnOverlay = false;
+        this.overlay.addEventListener("mousedown", (event) => {
             if (event.target === this.overlay) {
+                mouseDownOnOverlay = true;
+            } else {
+                mouseDownOnOverlay = false;
+            }
+        });
+        this.overlay.addEventListener("mouseup", (event) => {
+            if (mouseDownOnOverlay && event.target === this.overlay) {
                 this.overlay.remove();
             }
+            mouseDownOnOverlay = false;
         });
         document.addEventListener("keydown", (event) => {
             if (event.key === "Escape") {
