@@ -1,5 +1,4 @@
 
-// Dropdown UI/UX logic (DOM manipulation, rendering, event handling, animations)
 class DropdownUI {
     constructor(sidebar, onSelect) {
         this.sidebar = sidebar;
@@ -8,26 +7,21 @@ class DropdownUI {
         this._setupGlobalClickListener();
     }
 
-    // Reactive renderer: updates DOM to reflect dropdownsData (array of wildcards)
     render(dropdownsData) {
-        // Map current DOM containers by wildcardId
         const containerMap = new Map();
         this.sidebar.querySelectorAll('.wildcard-dropdown-container').forEach(container => {
             const id = container.querySelector('.custom-dropdown')?.dataset.wildcardId;
             if (id) containerMap.set(id, container);
         });
 
-        // Build new order and set of ids
         const newIds = dropdownsData.map(({ wildcard }) => DropdownUI.generateWildcardId(wildcard));
 
-        // Remove containers not in newIds
         containerMap.forEach((container, id) => {
             if (!newIds.includes(id)) {
                 container.remove();
             }
         });
 
-        // Insert/update containers in correct order
         let lastInserted = null;
         newIds.forEach((id, idx) => {
             const { wildcard, parent } = dropdownsData[idx];
@@ -35,12 +29,10 @@ class DropdownUI {
             if (!container) {
                 container = this.renderDropdownForWildcard(wildcard, parent);
             } else {
-                // Always update the contents of the container
                 container.innerHTML = '';
                 const customDropdown = this.renderCustomDropdown(wildcard);
                 container.appendChild(customDropdown);
             }
-            // Ensure correct order in sidebar
             if (parent) {
                 if (!parent.contains(container)) {
                     parent.appendChild(container);
@@ -227,12 +219,10 @@ class DropdownUI {
     }
 
     clearDropdowns() {
-        // Remove all dropdown containers from sidebar
         this.sidebar.querySelectorAll('.wildcard-dropdown-container').forEach(el => el.remove());
     }
 }
 
-// Dropdown management logic (data/state management, structure updates, selection logic)
 export class DropdownManager {
     constructor(sidebar, structureData, processor) {
         this.sidebar = sidebar;
@@ -253,7 +243,6 @@ export class DropdownManager {
         this.render();
     }
 
-    // Observer pattern
     addObserver(fn) {
         this.observers.push(fn);
     }
@@ -266,7 +255,6 @@ export class DropdownManager {
         this.observers.forEach(fn => fn());
     }
 
-    // Centralized state change for selection
     handleUserSelection(wildcard, selectedValue, selectedIndex, container) {
         this.setSelected(wildcard, selectedValue);
     }
@@ -281,7 +269,6 @@ export class DropdownManager {
         this._notifyObservers();
     }
 
-    // Programmatic API for updating dropdowns
     setSelectedByTarget(target, value) {
         let obj = this.structureData;
         for (let i = 0; i < target.length; i++) {
@@ -291,7 +278,6 @@ export class DropdownManager {
         this._notifyObservers();
     }
 
-    // Find all root wildcards for initial rendering
     findRootWildcards(data) {
         const wildcards = [];
         for (const key in data) {
@@ -309,7 +295,6 @@ export class DropdownManager {
         return wildcards;
     }
 
-    // Build dropdowns data for UI rendering
     buildDropdownsData() {
         const dropdownsData = [];
         const rootWildcards = this.findRootWildcards(this.structureData);
@@ -335,13 +320,11 @@ export class DropdownManager {
         }
     }
 
-    // UI rendering delegation
     render() {
         const dropdownsData = this.buildDropdownsData();
         this.ui.render(dropdownsData);
     }
 
-    // Programmatic API to refresh UI
     refresh() {
         this._notifyObservers();
     }
