@@ -1,3 +1,4 @@
+
 import { fetchSend } from "../utils.js";
 
 export class Textbox {
@@ -5,36 +6,39 @@ export class Textbox {
         this.node = node;
         this.nodeDataProcessor = nodeDataProcessor;
         this.constants = constants;
-        this.textbox = null;
-        this.textboxContent = null;
-        this.clearBtn = null;
-        this.saveBtn = null;
         this.onStructureUpdate = onStructureUpdate;
         this.structureData = null;
+        this.textbox = null;
+        this.cmEditor = null;
+        this.clearBtn = null;
+        this.saveBtn = null;
+        this.searchBtn = null;
     }
 
     async createTextbox() {
+        this._createTextboxElement();
+        await this._initCodeMirror();
+        this._setupEditorFeatures();
+        this._setupActionBar();
+        return this.textbox;
+    }
+
+    _createTextboxElement() {
         this.textbox = document.createElement("div");
         this.textbox.className = "textbox";
-
         const textboxTopbar = document.createElement("div");
         textboxTopbar.className = "topbar";
         textboxTopbar.textContent = this.node.title;
         this.textbox.appendChild(textboxTopbar);
+        this.cmContainer = document.createElement("div");
+        this.cmContainer.className = "textbox-content";
+        this.cmContainer.style.height = "100%";
+        this.textbox.appendChild(this.cmContainer);
+    }
 
-        // Dynamically load CodeMirror via CDN if not already loaded
+    async _initCodeMirror() {
         await this.loadCodeMirrorCDN();
-
-        // Create CodeMirror container
-    const cmContainer = document.createElement("div");
-    cmContainer.className = "textbox-content";
-    cmContainer.style.height = "100%";
-    this.textbox.appendChild(cmContainer);
-
-        // Get initial value
         const wildcardsPrompt = this.nodeDataProcessor.getWildcardsPrompt() || "";
-
-        // Restore custom comment mode, using python's comment behavior
         if (!window.CodeMirror.modes["wildcards"]) {
             window.CodeMirror.defineMode("wildcards", function() {
                 return {
@@ -48,7 +52,7 @@ export class Textbox {
                 };
             });
         }
-        this.cmEditor = window.CodeMirror(cmContainer, {
+        this.cmEditor = window.CodeMirror(this.cmContainer, {
             value: wildcardsPrompt,
             mode: "wildcards",
             lineNumbers: false,
@@ -62,7 +66,9 @@ export class Textbox {
         setTimeout(() => {
             this.cmEditor.refresh();
         }, 1);
+    }
 
+    _setupEditorFeatures() {
         this.cmEditor.on("keydown", (cm, event) => {
             if (event.key === "{" && !event.ctrlKey && !event.altKey && !event.metaKey) {
                 event.preventDefault();
@@ -80,28 +86,16 @@ export class Textbox {
                 }
             }
         });
+    }
 
+    _setupActionBar() {
         const actionBar = document.createElement("div");
         actionBar.className = "textbox-action-bar";
         this.clearBtn = this.createActionButton("Clear", "clear");
         this.saveBtn = this.createActionButton("Save", "save");
-        // Proof-of-concept: Add a search button
-        this.searchBtn = this.createActionButton("Search 'test'", "search");
-        actionBar.appendChild(this.clearBtn);
-        actionBar.appendChild(this.saveBtn);
-        actionBar.appendChild(this.searchBtn);
-        this.textbox.appendChild(actionBar);
-
-        // Search button logic: highlight first occurrence of 'test'
-        this.searchBtn.addEventListener("click", () => {
-            const cursor = this.cmEditor.getSearchCursor("test");
-            if (cursor.findNext()) {
-                this.cmEditor.setSelection(cursor.from(), cursor.to());
-                this.cmEditor.scrollIntoView({from: cursor.from(), to: cursor.to()});
-            } else {
-                alert("No match found for 'test'.");
-            }
-        });
+    actionBar.appendChild(this.clearBtn);
+    actionBar.appendChild(this.saveBtn);
+    this.textbox.appendChild(actionBar);
 
         this.clearBtn.addEventListener("click", () => {
             this.cmEditor.setValue("");
@@ -116,14 +110,10 @@ export class Textbox {
         this.saveBtn.addEventListener("click", async () => {
             await this.saveAndSync();
         });
-
-        return this.textbox;
     }
 
     async loadCodeMirrorCDN() {
-        // Only load if not already loaded
         if (window.CodeMirror) return;
-        // Load CSS
         if (!document.getElementById("cm-css")) {
             const link = document.createElement("link");
             link.id = "cm-css";
@@ -131,10 +121,7 @@ export class Textbox {
             link.href = "https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css";
             document.head.appendChild(link);
         }
-        // Load JS
         await this.loadScript("https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js");
-
-            // Load addons (require CodeMirror to be present)
         await this.loadScript("https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/mark-selection.min.js");
         await this.loadScript("https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js");
     }
@@ -159,7 +146,6 @@ export class Textbox {
 
     async saveAndSync() {
         const content = this.getContent();
-        // Send both prompt and current structure (with selections) to backend
         const structureDataStr = this.nodeDataProcessor.getWildcardsStructure();
         this.structureData = structureDataStr ? JSON.parse(structureDataStr) : {};
         const currentStructure = this.structureData ? JSON.stringify(this.structureData) : "";
