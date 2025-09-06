@@ -37,11 +37,8 @@ class DN_WildcardSelectorComposerV2 {
     async handleEditContent() {
         try {
             const constants = { EXTENSION_NAME, MESSAGE_ROUTE };
-            const { showWildcardSelectorModal } = await import(`/extensions/${EXTENSION_NAME}/common/js/DN_WildcardSelectorComposerV2/modal_init.js`);
-            showWildcardSelectorModal(
-                this.node, 
-                constants,
-            );
+            const { showWildcardSelectorModal } = await import(`/extensions/${EXTENSION_NAME}/common/js/DN_WildcardSelectorComposerV2/WildcardsModal.js`);
+            await showWildcardSelectorModal(this.node, constants);
         } catch (error) {
             console.error("Error loading content:", error);
         }
