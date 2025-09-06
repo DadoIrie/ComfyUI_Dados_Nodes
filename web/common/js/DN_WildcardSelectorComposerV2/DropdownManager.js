@@ -1,4 +1,3 @@
-
 class DropdownUI {
     constructor(sidebar, onSelect) {
         this.sidebar = sidebar;
