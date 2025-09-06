@@ -13,7 +13,7 @@ export class Textbox {
         this.structureData = null;
     }
 
-    createTextbox() {
+    async createTextbox() {
         this.textbox = document.createElement("div");
         this.textbox.className = "textbox";
 
@@ -22,31 +22,43 @@ export class Textbox {
         textboxTopbar.textContent = this.node.title;
         this.textbox.appendChild(textboxTopbar);
 
-        this.textboxContent = document.createElement("textarea");
-        this.textboxContent.className = "textbox-content";
-        this.textboxContent.placeholder = "Type here...";
-        this.textboxContent.spellcheck = false;
-        const wildcardsPrompt = this.nodeDataProcessor.getWildcardsPrompt();
-        if (wildcardsPrompt) this.textboxContent.value = wildcardsPrompt;
-        this.textbox.appendChild(this.textboxContent);
+        // Dynamically load CodeMirror via CDN if not already loaded
+        await this.loadCodeMirrorCDN();
 
-        this.textboxContent.addEventListener("keydown", (event) => {
+        // Create CodeMirror container
+        const cmContainer = document.createElement("div");
+        cmContainer.className = "textbox-content";
+        cmContainer.style.height = "200px";
+        this.textbox.appendChild(cmContainer);
+
+        // Get initial value
+        const wildcardsPrompt = this.nodeDataProcessor.getWildcardsPrompt() || "";
+
+        // Initialize CodeMirror
+        this.cmEditor = window.CodeMirror(cmContainer, {
+            value: wildcardsPrompt,
+            mode: "text",
+            lineNumbers: true,
+            theme: "default",
+            viewportMargin: Infinity,
+            spellcheck: false,
+        });
+
+        // Custom { } insertion on "{" key
+        this.cmEditor.on("keydown", (cm, event) => {
             if (event.key === "{" && !event.ctrlKey && !event.altKey && !event.metaKey) {
-                const textarea = event.target;
-                const start = textarea.selectionStart;
-                const end = textarea.selectionEnd;
                 event.preventDefault();
-                textarea.focus();
-                const scrollTop = textarea.scrollTop;
-                if (start === end) {
-                    document.execCommand('insertText', false, '{}');
-                    textarea.selectionStart = textarea.selectionEnd = start + 1;
-                    textarea.scrollTop = scrollTop;
+                const doc = cm.getDoc();
+                const selections = doc.listSelections();
+                if (selections.length === 1 && selections[0].empty()) {
+                    doc.replaceSelection("{}", "around");
+                    const cursor = doc.getCursor();
+                    doc.setCursor({ line: cursor.line, ch: cursor.ch - 1 });
                 } else {
-                    const selected = textarea.value.slice(start, end);
-                    document.execCommand('insertText', false, '{' + selected + '}');
-                    textarea.selectionStart = start;
-                    textarea.selectionEnd = start + selected.length + 2;
+                    selections.forEach(sel => {
+                        const selected = doc.getRange(sel.anchor, sel.head);
+                        doc.replaceRange("{" + selected + "}", sel.anchor, sel.head);
+                    });
                 }
             }
         });
@@ -60,8 +72,8 @@ export class Textbox {
         this.textbox.appendChild(actionBar);
 
         this.clearBtn.addEventListener("click", () => {
-            this.textboxContent.value = "";
-            this.textboxContent.focus();
+            this.cmEditor.setValue("");
+            this.cmEditor.focus();
             // Clear structureData and widget
             this.structureData = {};
             this.nodeDataProcessor.updateNodeData({ wildcards_structure_data: "{}" });
@@ -77,8 +89,37 @@ export class Textbox {
         return this.textbox;
     }
 
+    async loadCodeMirrorCDN() {
+        // Only load if not already loaded
+        if (window.CodeMirror) return;
+        // Load CSS
+        if (!document.getElementById("cm-css")) {
+            const link = document.createElement("link");
+            link.id = "cm-css";
+            link.rel = "stylesheet";
+            link.href = "https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css";
+            document.head.appendChild(link);
+        }
+        // Load JS
+        await this.loadScript("https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js");
+    }
+
+    loadScript(src) {
+        return new Promise((resolve, reject) => {
+            if (document.querySelector(`script[src='${src}']`)) {
+                resolve();
+                return;
+            }
+            const script = document.createElement("script");
+            script.src = src;
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
+
     getContent() {
-        return this.textboxContent ? this.textboxContent.value : "";
+        return this.cmEditor ? this.cmEditor.getValue() : "";
     }
 
     async saveAndSync() {

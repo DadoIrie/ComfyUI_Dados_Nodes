@@ -93,7 +93,7 @@ class DropdownUI {
         button.appendChild(textSpan);
         button.appendChild(arrow);
 
-        const optionsContainer = this.renderOptions(wildcard, wildcard.options.indexOf(selectedValue), (option, index) => {
+        const optionsContainer = this.renderOptions(wildcard, (option, index) => {
             if (this.onSelect) {
                 this.onSelect(wildcard, option, index, container);
             }

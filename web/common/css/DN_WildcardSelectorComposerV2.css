@@ -398,3 +398,7 @@
     background: #1b5e20;
     color: #c8e6c9;
 }
+
+.comment-highlight {
+    color: #888 !important;
+}
