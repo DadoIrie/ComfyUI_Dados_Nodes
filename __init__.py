@@ -58,7 +58,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "DN_TextConcatenateNode": "Dynamic Text Concatenate",
     "DN_TextDropDownNode": "Text DropDown",
     "DN_CSVMultiDropDownNode": "CSV MultiDropDown",
-    "DN_WildcardPromptEditorNode": "Wildcard Prompt Editor",
+    "DN_WildcardPromptEditorNode": "Wildcard Prompt Editor (deprecation pending)",
     "DN_WildcardSelectorComposerV2": "Wildcard Selector/Composer",
     "DN_PromptSectionsExtractor": "Prompt Sections Extractor",
     "DN_WildcardsProcessor": "Wildcards Processor",
