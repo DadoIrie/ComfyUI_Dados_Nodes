@@ -64,14 +64,12 @@ class DN_WildcardSelectorComposerV2:
             return
         for k, v in new.items():
             if isinstance(v, dict):
-                # If this is a wildcard dict with 'selected'
                 if 'selected' in v:
                     old_v = old.get(k, {})
                     if isinstance(old_v, dict) and 'selected' in old_v:
                         v['selected'] = old_v.get('selected', v['selected'])
                 DN_WildcardSelectorComposerV2.merge_selected(old.get(k, {}), v)
 
-    # Structure creation logic moved to WildcardStructureUtils
 
 @register_operation_handler
 async def handle_wildcard_selector_composer_operations(request):
