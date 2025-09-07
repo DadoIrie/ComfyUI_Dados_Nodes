@@ -1,4 +1,3 @@
-
 import { fetchSend } from "../utils.js";
 
 export class Textbox {
@@ -24,15 +23,45 @@ export class Textbox {
         return this.textbox;
     }
 
-    mark(str, type = 'button') {
+    // Mark only within the provided start/end bounds
+    mark(str, type = 'button', start = null, end = null) {
         this.unmark(type);
         if (!str || !this.cmEditor) return;
-        const cursor = this.cmEditor.getSearchCursor(str);
-        if (cursor.findNext()) {
-            this.cmEditor.setSelection(cursor.from(), cursor.to());
-            this.cmEditor.scrollIntoView({from: cursor.from(), to: cursor.to()});
+        const doc = this.cmEditor.getDoc();
+        const value = doc.getValue();
+        let markStart = 0;
+        let markEnd = value.length;
+        if (typeof start === 'number' && typeof end === 'number' && start >= 0 && end > start) {
+            markStart = start;
+            markEnd = end;
+        }
+        // Log the start and end values for debugging
+        console.log(`[Textbox.mark] type: ${type}, str: '${str}', startingAt: ${start}, endingAt: ${end}`);
+        // Find first occurrence of str within bounds
+        let re = new RegExp(str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+        let match;
+        let found = null;
+        while ((match = re.exec(value)) !== null) {
+            if (match.index >= markStart && match.index + str.length <= markEnd) {
+                found = {start: match.index, end: match.index + str.length};
+                break;
+            }
+        }
+        // If not found, fall back to first global occurrence
+        if (!found) {
+            re.lastIndex = 0;
+            match = re.exec(value);
+            if (match) {
+                found = {start: match.index, end: match.index + str.length};
+            }
+        }
+        if (found) {
+            const from = doc.posFromIndex(found.start);
+            const to = doc.posFromIndex(found.end);
+            doc.setSelection(from, to);
             const className = type === 'option' ? 'option-mark' : 'wildcard-mark';
-            this.cmEditor.getDoc().markText(cursor.from(), cursor.to(), { className });
+            doc.markText(from, to, { className });
+            this.cmEditor.scrollIntoView({from, to});
         }
     }
 
@@ -98,20 +127,101 @@ export class Textbox {
     }
 
     _setupEditorFeatures() {
+        const pairs = { '{': '}', '(': ')', '[': ']' };
+        const openKeys = Object.keys(pairs);
+        const closeKeys = Object.values(pairs);
         this.cmEditor.on("keydown", (cm, event) => {
-            if (event.key === "{" && !event.ctrlKey && !event.altKey && !event.metaKey) {
+            const doc = cm.getDoc();
+            const selections = doc.listSelections();
+            if (openKeys.includes(event.key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
                 event.preventDefault();
-                const doc = cm.getDoc();
-                const selections = doc.listSelections();
-                if (selections.length === 1 && selections[0].empty()) {
-                    doc.replaceSelection("{}", "around");
+                const open = event.key;
+                const close = pairs[open];
+                if (selections.some(sel => !sel.empty())) {
+                    let newSelections = [];
+                    for (let i = selections.length - 1; i >= 0; i--) {
+                        const sel = selections[i];
+                        const from = sel.anchor;
+                        const to = sel.head;
+                        const ordered = CodeMirror.cmpPos(from, to) <= 0 ? {start: from, end: to} : {start: to, end: from};
+                        const selected = doc.getRange(ordered.start, ordered.end);
+                        doc.replaceRange(open + selected + close, ordered.start, ordered.end);
+                        let start = { line: ordered.start.line, ch: ordered.start.ch + 1 };
+                        let end = { line: ordered.end.line, ch: ordered.end.ch + 1 };
+                        if (CodeMirror.cmpPos(from, to) > 0) {
+                            newSelections.unshift({ anchor: end, head: start });
+                        } else {
+                            newSelections.unshift({ anchor: start, head: end });
+                        }
+                    }
+                    doc.setSelections(newSelections);
+                } else {
+                    doc.replaceSelection(open + close, "around");
                     const cursor = doc.getCursor();
                     doc.setCursor({ line: cursor.line, ch: cursor.ch - 1 });
+                }
+            } else if (closeKeys.includes(event.key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
+                const close = event.key;
+                if (selections.some(sel => !sel.empty())) {
+                    event.preventDefault();
+                    let newSelections = [];
+                    for (let i = selections.length - 1; i >= 0; i--) {
+                        const sel = selections[i];
+                        const from = sel.anchor;
+                        const to = sel.head;
+                        const ordered = CodeMirror.cmpPos(from, to) <= 0 ? {start: from, end: to} : {start: to, end: from};
+                        let afterClose = { line: ordered.end.line, ch: ordered.end.ch };
+                        const lineContent = doc.getLine(afterClose.line);
+                        if (lineContent[afterClose.ch] === close) {
+                            afterClose = { line: afterClose.line, ch: afterClose.ch + 1 };
+                        }
+                        newSelections.unshift({ anchor: afterClose, head: afterClose });
+                    }
+                    doc.setSelections(newSelections);
                 } else {
-                    selections.forEach(sel => {
-                        const selected = doc.getRange(sel.anchor, sel.head);
-                        doc.replaceRange("{" + selected + "}", sel.anchor, sel.head);
-                    });
+                    const cursor = doc.getCursor();
+                    const lineContent = doc.getLine(cursor.line);
+                    if (lineContent[cursor.ch] === close) {
+                        event.preventDefault();
+                        doc.setCursor({ line: cursor.line, ch: cursor.ch + 1 });
+                    }
+                }
+            } else if (event.key === "Enter" && !event.ctrlKey && !event.altKey && !event.metaKey) {
+                const cursor = doc.getCursor();
+                const lineContent = doc.getLine(cursor.line);
+                const prevChar = cursor.ch > 0 ? lineContent[cursor.ch - 1] : "";
+                if (openKeys.includes(prevChar)) {
+                    event.preventDefault();
+                    const close = pairs[prevChar];
+                    const openLine = cursor.line;
+                    const openCh = cursor.ch - 1;
+                    let spaceCount = 0;
+                    for (let i = 0; i < openCh; i++) {
+                        if (lineContent[i] === " ") spaceCount++;
+                        else break;
+                    }
+                    let cursorSpaces = "";
+                    for (let i = 0; i < spaceCount + 2; i++) cursorSpaces += " ";
+                    let closeSpaces = "";
+                    for (let i = 0; i < openCh; i++) closeSpaces += " ";
+                    let middleLine = cursorSpaces;
+                    doc.replaceRange("\n" + middleLine + "\n", cursor, cursor);
+                    let closeLine = openLine + 2;
+                    let targetLineContent = doc.getLine(closeLine);
+                    let expectedClose = closeSpaces + close;
+                    // Remove any closing character at the start of the target line if present
+                    if (targetLineContent.startsWith(close)) {
+                        doc.replaceRange("", { line: closeLine, ch: 0 }, { line: closeLine, ch: 1 });
+                        targetLineContent = doc.getLine(closeLine);
+                    }
+                    // Only insert if not already present at the correct position
+                    if (!targetLineContent.startsWith(expectedClose)) {
+                        doc.replaceRange(expectedClose, { line: closeLine, ch: 0 }, { line: closeLine, ch: 0 });
+                    }
+                    doc.setCursor({ line: openLine + 1, ch: middleLine.length });
+                } else {
+                    // Default enter behavior
+                    return;
                 }
             }
         });

@@ -99,7 +99,7 @@ class DropdownUI {
             if (this.onSelect) {
                 this.onSelect(wildcard, option, index, container);
             }
-        });
+        }, wildcard);
 
         button.addEventListener('mousedown', e => {
             e.stopPropagation();
@@ -113,7 +113,7 @@ class DropdownUI {
         return container;
     }
 
-    renderOptions(wildcard, onSelect) {
+    renderOptions(wildcard, onSelect, parentWildcard) {
         const optionsContainer = document.createElement('div');
         optionsContainer.className = 'custom-dropdown-options';
 
@@ -142,13 +142,18 @@ class DropdownUI {
             optionElement.addEventListener('mouseenter', () => {
                 if (this.textbox) {
                     this.textbox.unmark();
-                    this.textbox.mark(wildcard[option]?.raw || option, 'button');
+                    // Use startingAt/endingAt for marking
+                    const start = parentWildcard.startingAt;
+                    const end = parentWildcard.endingAt;
+                    this.textbox.mark(wildcard[option]?.raw || option, 'button', start, end);
                 }
             });
             optionElement.addEventListener('mouseleave', () => {
                 if (this.textbox) {
                     this.textbox.unmark();
-                    this.textbox.mark(wildcard.raw, 'button');
+                    const start = parentWildcard.startingAt;
+                    const end = parentWildcard.endingAt;
+                    this.textbox.mark(wildcard.raw, 'button', start, end);
                 }
             });
             optionsContainer.appendChild(optionElement);
@@ -180,7 +185,10 @@ class DropdownUI {
         const options = container.querySelector('.custom-dropdown-options');
         const wildcard = container._wildcard;
         if (wildcard && typeof wildcard.raw === 'string') {
-            this.textbox.mark(wildcard.raw, 'button');
+            // Use startingAt/endingAt for marking
+            const start = wildcard.startingAt;
+            const end = wildcard.endingAt;
+            this.textbox.mark(wildcard.raw, 'button', start, end);
         }
         if (options) {
             options.style.maxHeight = options.scrollHeight + 'px';
