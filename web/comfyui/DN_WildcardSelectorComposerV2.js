@@ -1,5 +1,39 @@
 import { app } from "../../scripts/app.js"
 
+// Factory pattern for settings
+const settingsList = [
+    {
+        id: "linewrap",
+        name: "Line Wrap",
+        type: "boolean",
+        defaultValue: true,
+        tooltip: "Enable or disable line wrapping in the textbox."
+    },
+    {
+        id: "tab_spaces",
+        name: "Tab Spaces",
+        type: "combo",
+        defaultValue: 4,
+        options: [
+            { text: "2 spaces", value: 2 },
+            { text: "4 spaces", value: 4 }
+        ],
+        tooltip: "Number of spaces to insert when Tab is pressed."
+    }
+];
+
+function createSettings() {
+    return settingsList.map(settingDef => ({
+        id: `wildcard_selector.${settingDef.id}`,
+        name: settingDef.name,
+        type: settingDef.type,
+        defaultValue: settingDef.defaultValue,
+        category: ["Dado's Nodes", "Wildcard Selector", `Wildcard Selector ${settingDef.name}`],
+        ...(settingDef.tooltip && { tooltip: settingDef.tooltip }),
+        ...(settingDef.options && { options: settingDef.options })
+    }));
+}
+
 let EXTENSION_NAME, MESSAGE_ROUTE, chainCallback, fetchSend;
 (async () => {
   const constants = await fetch('/dadosConstants').then(response => response.json());
@@ -47,6 +81,7 @@ class DN_WildcardSelectorComposerV2 {
 
 app.registerExtension({
     name: "DN_WildcardSelectorComposerV2",
+    settings: createSettings(),
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         if (nodeData.name !== "DN_WildcardSelectorComposerV2") {
             return;

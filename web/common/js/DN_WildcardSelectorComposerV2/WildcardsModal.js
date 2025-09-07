@@ -58,8 +58,7 @@ export class WildcardsModal {
             onStructureUpdate: (newStructure) => {
                 this.structureData = newStructure;
                 this.initializeDropdowns();
-            },
-            lineWrapping: false
+            }
         });
         // Return the promise for the textbox node
         return this.textbox.createTextbox();

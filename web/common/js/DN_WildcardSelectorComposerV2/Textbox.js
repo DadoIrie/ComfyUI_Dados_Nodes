@@ -1,7 +1,7 @@
 import { fetchSend } from "../utils.js";
 
 export class Textbox {
-    constructor(node, nodeDataProcessor, { constants = {}, onStructureUpdate, lineWrapping } = {}) {
+    constructor(node, nodeDataProcessor, { constants = {}, onStructureUpdate } = {}) {
         this.node = node;
         this.nodeDataProcessor = nodeDataProcessor;
         this.constants = constants;
@@ -12,7 +12,6 @@ export class Textbox {
         this.clearBtn = null;
         this.saveBtn = null;
         this.searchBtn = null;
-        this.lineWrapping = lineWrapping;
     }
 
     async createTextbox() {
@@ -115,7 +114,7 @@ export class Textbox {
             autofocus: true,
             autoRefresh: true,
             styleSelectedText: true,
-            lineWrapping: this.lineWrapping
+            lineWrapping: await window.app.extensionManager.setting.get("wildcard_selector.linewrap")
         });
         setTimeout(() => {
             this.cmEditor.refresh();
@@ -126,16 +125,17 @@ export class Textbox {
         const pairs = { '{': '}', '(': ')', '[': ']' };
         const openKeys = Object.keys(pairs);
         const closeKeys = Object.values(pairs);
-        this.cmEditor.on("keydown", (cm, event) => {
+        this.cmEditor.on("keydown", async (cm, event) => {
             const doc = cm.getDoc();
             const selections = doc.listSelections();
             if (event.key === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey) {
                 event.preventDefault();
-                // Only insert spaces if no selection
+                // Directly retrieve tab_spaces setting
+                const tabSpaces = await window.app.extensionManager.setting.get("wildcard_selector.tab_spaces");
+                const spaces = " ".repeat(tabSpaces);
                 if (selections.length === 1 && selections[0].empty()) {
-                    doc.replaceSelection("    ", "end");
+                    doc.replaceSelection(spaces, "end");
                 } else {
-                    // Let CodeMirror handle indent for selection
                     cm.execCommand("defaultTab");
                 }
                 return;
@@ -267,12 +267,17 @@ export class Textbox {
             const link = document.createElement("link");
             link.id = "cm-css";
             link.rel = "stylesheet";
-            link.href = "https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css";
+            link.href = `/extensions/${this.constants.EXTENSION_NAME}/common/vendor/css/codemirror/codemirror.min.css`;
             document.head.appendChild(link);
         }
-        await this.loadScript("https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js");
-        await this.loadScript("https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/mark-selection.min.js");
-        await this.loadScript("https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js");
+        const basePath = `/extensions/${this.constants.EXTENSION_NAME}/common/vendor/js/codemirror/`;
+        // Load codemirror core first
+        await this.loadScript(`${basePath}codemirror.min.js`);
+        // Then load addons
+        await Promise.all([
+            this.loadScript(`${basePath}mark-selection.min.js`),
+            this.loadScript(`${basePath}searchcursor.min.js`)
+        ]);
     }
 
     loadScript(src) {
