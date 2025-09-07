@@ -221,4 +221,51 @@ export class Textbox {
     showErrorMessage(message) {
         alert(message);
     }
+    // Mark the first occurrence of an option string, preferring parent context, fallback to global
+    markOptionByWildcard(wildcard, optionStr) {
+        this.unmark('option');
+        if (!this.cmEditor || !optionStr) return;
+        const doc = this.cmEditor.getDoc();
+        const value = doc.getValue();
+
+        // Try to find parent context
+        let parentRaw = wildcard.raw;
+        let parentStart = 0;
+        let parentEnd = value.length;
+        if (parentRaw && typeof parentRaw === 'string') {
+            const parentIdx = value.indexOf(parentRaw);
+            if (parentIdx !== -1) {
+                parentStart = parentIdx;
+                parentEnd = parentIdx + parentRaw.length;
+            }
+        }
+
+        // Find first occurrence of optionStr within parent bounds
+        let re = new RegExp(optionStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+        let match;
+        let found = null;
+        while ((match = re.exec(value)) !== null) {
+            if (match.index >= parentStart && match.index + optionStr.length <= parentEnd) {
+                found = {start: match.index, end: match.index + optionStr.length};
+                break;
+            }
+        }
+
+        // If not found in parent, fall back to first global occurrence
+        if (!found) {
+            re.lastIndex = 0;
+            match = re.exec(value);
+            if (match) {
+                found = {start: match.index, end: match.index + optionStr.length};
+            }
+        }
+
+        if (found) {
+            const start = doc.posFromIndex(found.start);
+            const end = doc.posFromIndex(found.end);
+            doc.setSelection(start, end);
+            doc.markText(start, end, { className: 'option-mark' });
+            this.cmEditor.scrollIntoView({from: start, to: end});
+        }
+    }
 }

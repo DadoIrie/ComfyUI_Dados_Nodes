@@ -139,12 +139,21 @@ class DropdownUI {
                 e.stopPropagation();
                 onSelect(option, index);
             });
-            optionElement.addEventListener('mouseenter', () => {
-                if (this.textbox) {
-                    this.textbox.unmark();
-                    this.textbox.mark(wildcard[option]?.raw || option, 'button');
-                }
-            });
+                optionElement.addEventListener('mouseenter', () => {
+                    if (this.textbox) {
+                        this.textbox.unmark();
+                        // Always pass the correct string for marking
+                        let markStr;
+                        if (typeof option === 'string') {
+                            markStr = option;
+                        } else if (option && typeof option === 'object' && option.raw) {
+                            markStr = option.raw;
+                        } else {
+                            markStr = '';
+                        }
+                        this.textbox.markOptionByWildcard(wildcard, markStr);
+                    }
+                });
             optionElement.addEventListener('mouseleave', () => {
                 if (this.textbox) {
                     this.textbox.unmark();
