@@ -23,10 +23,8 @@ export class WildcardsModal {
     async show() {
     await this.ensureCSSLoaded();
     this.createElements();
-    // Await textbox creation and append it first
     const textboxNode = await this.initializeTextbox();
     this.modal.appendChild(textboxNode);
-    // Then append sidebar after textbox
     this.modal.appendChild(this.sidebar);
     this.initializeDropdowns();
     document.body.appendChild(this.overlay);
@@ -61,7 +59,7 @@ export class WildcardsModal {
                 this.structureData = newStructure;
                 this.initializeDropdowns();
             },
-            lineWrapping: true
+            lineWrapping: false
         });
         // Return the promise for the textbox node
         return this.textbox.createTextbox();

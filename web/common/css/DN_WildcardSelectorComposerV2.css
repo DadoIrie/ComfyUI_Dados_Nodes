@@ -204,6 +204,14 @@
     background: #444 !important;
 }
 
+.option-mark {
+    background-color: #b6fcb6 !important;
+}
+
+.wildcard-mark {
+    background-color: #444444 !important;
+}
+
 .CodeMirror .CodeMirror-selected {
   display: none !important;
 }

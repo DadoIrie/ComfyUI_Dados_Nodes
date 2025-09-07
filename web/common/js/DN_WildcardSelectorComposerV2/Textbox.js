@@ -24,18 +24,27 @@ export class Textbox {
         return this.textbox;
     }
 
-    mark(str) {
-        this.unmark();
+    mark(str, type = 'button') {
+        this.unmark(type);
         if (!str || !this.cmEditor) return;
         const cursor = this.cmEditor.getSearchCursor(str);
         if (cursor.findNext()) {
             this.cmEditor.setSelection(cursor.from(), cursor.to());
             this.cmEditor.scrollIntoView({from: cursor.from(), to: cursor.to()});
+            const className = type === 'option' ? 'option-mark' : 'wildcard-mark';
+            this.cmEditor.getDoc().markText(cursor.from(), cursor.to(), { className });
         }
     }
 
-    unmark() {
+    unmark(type = 'button') {
         if (this.cmEditor) {
+            const marks = this.cmEditor.getDoc().getAllMarks();
+            const className = type === 'option' ? 'option-mark' : 'wildcard-mark';
+            marks.forEach(mark => {
+                if (mark.className === className) {
+                    mark.clear();
+                }
+            });
             const doc = this.cmEditor.getDoc();
             const cursor = doc.getCursor();
             doc.setSelection(cursor, cursor);

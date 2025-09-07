@@ -140,10 +140,15 @@ class DropdownUI {
                 onSelect(option, index);
             });
             optionElement.addEventListener('mouseenter', () => {
-                if (wildcard[option] && typeof wildcard[option].raw === 'string') {
-                    console.log(wildcard[option].raw);
-                } else {
-                    console.log(option);
+                if (this.textbox) {
+                    this.textbox.unmark();
+                    this.textbox.mark(wildcard[option]?.raw || option, 'button');
+                }
+            });
+            optionElement.addEventListener('mouseleave', () => {
+                if (this.textbox) {
+                    this.textbox.unmark();
+                    this.textbox.mark(wildcard.raw, 'button');
                 }
             });
             optionsContainer.appendChild(optionElement);
@@ -175,7 +180,7 @@ class DropdownUI {
         const options = container.querySelector('.custom-dropdown-options');
         const wildcard = container._wildcard;
         if (wildcard && typeof wildcard.raw === 'string') {
-            this.textbox.mark(wildcard.raw);
+            this.textbox.mark(wildcard.raw, 'button');
         }
         if (options) {
             options.style.maxHeight = options.scrollHeight + 'px';
@@ -200,7 +205,8 @@ class DropdownUI {
             this.activeOverlay = null;
         }
         if (this.textbox) {
-            this.textbox.unmark();
+            this.textbox.unmark('button');
+            this.textbox.unmark('option');
         }
         const button = container.querySelector('.custom-dropdown-button');
         if (button) button.blur();
