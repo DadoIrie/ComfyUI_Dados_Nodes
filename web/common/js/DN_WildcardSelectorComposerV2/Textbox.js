@@ -12,7 +12,7 @@ export class Textbox {
         this.clearBtn = null;
         this.saveBtn = null;
         this.searchBtn = null;
-        this.lineWrapping = lineWrapping; // flag for CodeMirror word wrap
+        this.lineWrapping = lineWrapping;
     }
 
     async createTextbox() {
@@ -23,7 +23,6 @@ export class Textbox {
         return this.textbox;
     }
 
-    // Mark only within the provided start/end bounds
     mark(str, type = 'button', start = null, end = null) {
         this.unmark(type);
         if (!str || !this.cmEditor) return;
@@ -35,9 +34,7 @@ export class Textbox {
             markStart = start;
             markEnd = end;
         }
-        // Log the start and end values for debugging
         console.log(`[Textbox.mark] type: ${type}, str: '${str}', startingAt: ${start}, endingAt: ${end}`);
-        // Find first occurrence of str within bounds
         let re = new RegExp(str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
         let match;
         let found = null;
@@ -47,7 +44,6 @@ export class Textbox {
                 break;
             }
         }
-        // If not found, fall back to first global occurrence
         if (!found) {
             re.lastIndex = 0;
             match = re.exec(value);
@@ -119,7 +115,7 @@ export class Textbox {
             autofocus: true,
             autoRefresh: true,
             styleSelectedText: true,
-            lineWrapping: this.lineWrapping // set word wrap flag
+            lineWrapping: this.lineWrapping
         });
         setTimeout(() => {
             this.cmEditor.refresh();
@@ -133,6 +129,17 @@ export class Textbox {
         this.cmEditor.on("keydown", (cm, event) => {
             const doc = cm.getDoc();
             const selections = doc.listSelections();
+            if (event.key === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey) {
+                event.preventDefault();
+                // Only insert spaces if no selection
+                if (selections.length === 1 && selections[0].empty()) {
+                    doc.replaceSelection("    ", "end");
+                } else {
+                    // Let CodeMirror handle indent for selection
+                    cm.execCommand("defaultTab");
+                }
+                return;
+            }
             if (openKeys.includes(event.key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
                 event.preventDefault();
                 const open = event.key;
@@ -160,7 +167,9 @@ export class Textbox {
                     const cursor = doc.getCursor();
                     doc.setCursor({ line: cursor.line, ch: cursor.ch - 1 });
                 }
-            } else if (closeKeys.includes(event.key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
+                return;
+            }
+            if (closeKeys.includes(event.key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
                 const close = event.key;
                 if (selections.some(sel => !sel.empty())) {
                     event.preventDefault();
@@ -186,11 +195,16 @@ export class Textbox {
                         doc.setCursor({ line: cursor.line, ch: cursor.ch + 1 });
                     }
                 }
-            } else if (event.key === "Enter" && !event.ctrlKey && !event.altKey && !event.metaKey) {
+                return;
+            }
+            if (event.key === "Enter" && !event.ctrlKey && !event.altKey && !event.metaKey) {
                 const cursor = doc.getCursor();
                 const lineContent = doc.getLine(cursor.line);
                 const prevChar = cursor.ch > 0 ? lineContent[cursor.ch - 1] : "";
-                if (openKeys.includes(prevChar)) {
+                if (
+                    openKeys.includes(prevChar) &&
+                    lineContent[cursor.ch] === pairs[prevChar]
+                ) {
                     event.preventDefault();
                     const close = pairs[prevChar];
                     const openLine = cursor.line;
@@ -209,20 +223,16 @@ export class Textbox {
                     let closeLine = openLine + 2;
                     let targetLineContent = doc.getLine(closeLine);
                     let expectedClose = closeSpaces + close;
-                    // Remove any closing character at the start of the target line if present
                     if (targetLineContent.startsWith(close)) {
                         doc.replaceRange("", { line: closeLine, ch: 0 }, { line: closeLine, ch: 1 });
                         targetLineContent = doc.getLine(closeLine);
                     }
-                    // Only insert if not already present at the correct position
                     if (!targetLineContent.startsWith(expectedClose)) {
                         doc.replaceRange(expectedClose, { line: closeLine, ch: 0 }, { line: closeLine, ch: 0 });
                     }
                     doc.setCursor({ line: openLine + 1, ch: middleLine.length });
-                } else {
-                    // Default enter behavior
-                    return;
                 }
+                return;
             }
         });
     }
