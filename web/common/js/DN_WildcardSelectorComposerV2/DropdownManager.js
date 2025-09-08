@@ -142,10 +142,11 @@ class DropdownUI {
             optionElement.addEventListener('mouseenter', () => {
                 if (this.textbox) {
                     this.textbox.unmark();
-                    // Use startingAt/endingAt for marking
-                    const start = parentWildcard.startingAt;
-                    const end = parentWildcard.endingAt;
-                    this.textbox.mark(wildcard[option]?.raw || option, 'button', start, end);
+                    // Use option's own startingAt/endingAt if present
+                    const optionData = wildcard[option];
+                    const start = optionData?.startingAt ?? parentWildcard.startingAt;
+                    const end = optionData?.endingAt ?? parentWildcard.endingAt;
+                    this.textbox.mark(optionData?.raw || option, 'button', start, end);
                 }
             });
             optionElement.addEventListener('mouseleave', () => {
