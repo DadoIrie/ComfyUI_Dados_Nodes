@@ -142,7 +142,6 @@ class DropdownUI {
             optionElement.addEventListener('mouseenter', () => {
                 if (this.textbox) {
                     this.textbox.unmark();
-                    // Use startingAt/endingAt for marking
                     const start = parentWildcard.startingAt;
                     const end = parentWildcard.endingAt;
                     this.textbox.mark(wildcard[option]?.raw || option, 'button', start, end);
@@ -185,7 +184,6 @@ class DropdownUI {
         const options = container.querySelector('.custom-dropdown-options');
         const wildcard = container._wildcard;
         if (wildcard && typeof wildcard.raw === 'string') {
-            // Use startingAt/endingAt for marking
             const start = wildcard.startingAt;
             const end = wildcard.endingAt;
             this.textbox.mark(wildcard.raw, 'button', start, end);
