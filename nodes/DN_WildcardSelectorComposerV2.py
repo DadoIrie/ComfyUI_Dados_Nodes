@@ -6,6 +6,7 @@
 import json
 from typing import Dict, Any, ClassVar
 from aiohttp import web
+from dynamicprompts.generators import RandomPromptGenerator
 from .utils.api_routes import register_operation_handler
 from .wildcardselector.structure_utils import WildcardStructureCreation
 
@@ -25,24 +26,29 @@ class DN_WildcardSelectorComposerV2:
             }
         }
 
-    RETURN_TYPES = ("STRING", "STRING")
-    RETURN_NAMES = ("clean_prompt", "marked_prompt")
+    RETURN_TYPES = ("STRING",) * 3
+    RETURN_NAMES = ("clean_prompt", "marked_prompt", "processed_prompt")
     FUNCTION = "process_prompt"
     CATEGORY = "Dado's Nodes/Text & Prompt"
 
-    def process_prompt(self, wildcards_prompt="", wildcards_structure_data="", seed=-1, unique_id=None):
+    def process_prompt(self, unique_id, seed=None, wildcards_prompt="", wildcards_structure_data=""):
         marked_prompt = ""
-        if unique_id and unique_id in self.node_state:
-            wildcards_prompt = self.node_state[unique_id].get('wildcards_prompt', wildcards_prompt)
-        return (wildcards_prompt, marked_prompt)
+        processed_prompt = ""
+
+        process_wildcards = self.node_state.get(unique_id, {}).get("process_wildcards", False)
+
+        if process_wildcards and wildcards_prompt:
+            generator = RandomPromptGenerator()
+            processed_prompt = generator.generate(wildcards_prompt)[0]
+
+        return (wildcards_prompt, marked_prompt, processed_prompt)
+    
+    # ! IS_CHANGED is missing in order to force node execution even if inputs don't change
     
     @classmethod
     def update_wildcards_prompt(cls, node_id: str, content: str, old_structure_json: str = "") -> str:
         """Handles updating the wildcards prompt and merging selected values."""
-        if node_id:
-            cls.node_state[node_id] = {
-                'wildcards_prompt': content
-            }
+        cls.node_state[node_id]['wildcards_prompt'] = content
 
         structure_data = ""
         if content:
@@ -78,6 +84,16 @@ async def handle_wildcard_selector_composer_operations(request):
         operation = data.get('operation')
         node_id = str(data.get('id', ''))
 
+        valid_operations = [
+            'update_wildcards_prompt', 'process_wildcards'
+        ]
+        
+        if operation not in valid_operations:
+            return None
+
+        if node_id not in DN_WildcardSelectorComposerV2.node_state:
+            DN_WildcardSelectorComposerV2.node_state[node_id] = {}
+
         if operation == 'update_wildcards_prompt':
             payload = data.get('payload', {})
             content = payload.get('content', '')
@@ -90,6 +106,13 @@ async def handle_wildcard_selector_composer_operations(request):
                 "message": "Content updated successfully",
                 "wildcard_structure_data": structure_data
             })
+
+        if operation == 'process_wildcards':
+            print("Toggling process_wildcards state...")
+            payload = data.get('payload', {})
+            state = bool(payload.get('state'))
+            DN_WildcardSelectorComposerV2.node_state[node_id]["process_wildcards"] = state
+            return web.json_response({"status": "success", "process_wildcards": state})
 
     except Exception as e:
         return web.json_response(

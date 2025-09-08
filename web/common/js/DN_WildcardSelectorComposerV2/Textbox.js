@@ -114,7 +114,7 @@ export class Textbox {
             autofocus: true,
             autoRefresh: true,
             styleSelectedText: true,
-            lineWrapping: await window.app.extensionManager.setting.get("wildcard_selector.linewrap")
+            lineWrapping: await window.app.extensionManager.setting.get("wildcard_selector.lineWrap")
         });
         setTimeout(() => {
             this.cmEditor.refresh();

@@ -1,9 +1,8 @@
 import { app } from "../../scripts/app.js"
 
-// Factory pattern for settings
 const settingsList = [
     {
-        id: "linewrap",
+        id: "lineWrap",
         name: "Line Wrap",
         type: "boolean",
         defaultValue: true,
@@ -48,6 +47,7 @@ class DN_WildcardSelectorComposerV2 {
     constructor(node) {
         this.node = node;
         this.initializeHiddenInputs();
+        this.createEditContentButton();
     }
 
     initializeHiddenInputs() {
@@ -77,6 +77,16 @@ class DN_WildcardSelectorComposerV2 {
             console.error("Error loading content:", error);
         }
     }
+
+    updateProcessedPromptState(isConnected) {
+        console.log("isConnected pass from listener", isConnected);
+        fetchSend(
+            MESSAGE_ROUTE,
+            this.node.id,
+            "process_wildcards",
+            { state: isConnected }
+        );
+    }
 }
 
 app.registerExtension({
@@ -90,29 +100,30 @@ app.registerExtension({
         chainCallback(nodeType.prototype, "onNodeCreated", function() {
             const textLoader = new DN_WildcardSelectorComposerV2(this);
             this.textLoader = textLoader;
-            textLoader.createEditContentButton();
-
-            console.log(this.title);
 
             setTimeout(() => {
                 if (this.inputs) {
                     for (let i = 0; i < this.inputs.length; i++) {
                         const input = this.inputs[i];
-                        // Exclude inputs named 'seed' from color changes
-                        console.log(input.name);
-                        console.log(input);
                         if (input.name !== "seed") {
                             input.color_on = "#00000000";
                             input.color_off = "#00000000";
                         }
                     }
                 }
+                const processedPromptOutput = this.outputs?.find(o => o.name === "processed_prompt");
+                if (processedPromptOutput) {
+                    textLoader.updateProcessedPromptState(processedPromptOutput.isConnected);
+                }
             }, 0);
         });
 
         const onConnectionsChange = nodeType.prototype.onConnectionsChange;
         nodeType.prototype.onConnectionsChange = function(slotType, slot_idx, event, link_info, node_slot) {
-            // Exclude inputs named 'seed' from restrictions
+            if (slotType === 2 && node_slot?.name === "processed_prompt") {
+                this.textLoader?.updateProcessedPromptState(node_slot.isConnected);
+            }
+
             const input = this.inputs?.[slot_idx];
             if (slotType === 1 && event === true && input?.name !== "seed") {
                 if (link_info) {
