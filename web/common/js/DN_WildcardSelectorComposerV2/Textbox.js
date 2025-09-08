@@ -32,10 +32,8 @@ export class Textbox {
         let found = null;
         
         if (optionIndex !== null && optionIndex >= 0 && typeof start === 'number' && typeof end === 'number') {
-            // Calculate the exact position of the option within the wildcard
             found = this._calculateOptionPosition(value, str, start, end, optionIndex);
         } else {
-            // Original logic for non-duplicate cases or when optionIndex is not provided
             let markStart = 0;
             let markEnd = value.length;
             if (typeof start === 'number' && typeof end === 'number' && start >= 0 && end > start) {
@@ -72,55 +70,43 @@ export class Textbox {
     }
 
     _calculateOptionPosition(fullText, optionText, wildcardStart, wildcardEnd, optionIndex) {
-        // Extract the wildcard content (without the braces)
         const wildcardContent = fullText.substring(wildcardStart + 1, wildcardEnd - 1);
         
-        // Parse the wildcard content into options, treating nested wildcards as single options
         const options = this._parseWildcardOptions(wildcardContent);
         
-        // Check if the option index is valid
         if (optionIndex < 0 || optionIndex >= options.length) {
             return null;
         }
         
-        // Calculate the position of the requested option
-        let currentPos = wildcardStart + 1; // Start after the opening {
+        let currentPos = wildcardStart + 1;
         
-        // Add the lengths of all previous options plus the | separators
         for (let i = 0; i < optionIndex; i++) {
             currentPos += options[i].length;
-            // Find the position of the next | separator
             let pipePos = currentPos;
             while (pipePos < wildcardEnd - 1 && fullText.charAt(pipePos) !== '|') {
                 pipePos++;
             }
             if (fullText.charAt(pipePos) === '|') {
-                currentPos = pipePos + 1; // Move past the | separator
+                currentPos = pipePos + 1;
             }
         }
         
-        // Find the actual option text in the original text (with spaces)
         const actualOptionText = options[optionIndex];
         
-        // Find the exact position of this option in the original text
         let searchPos = currentPos;
         let optionStart = -1;
         let optionEnd = -1;
         
-        // Skip leading whitespace
         while (searchPos < wildcardEnd - 1 && /\s/.test(fullText.charAt(searchPos))) {
             searchPos++;
         }
         
-        // The option starts at searchPos
         optionStart = searchPos;
         
-        // Find the end of the option (before the next | or })
         while (searchPos < wildcardEnd - 1 && fullText.charAt(searchPos) !== '|' && fullText.charAt(searchPos) !== '}') {
             searchPos++;
         }
         
-        // Go backwards to skip trailing whitespace
         while (searchPos > optionStart && /\s/.test(fullText.charAt(searchPos - 1))) {
             searchPos--;
         }
@@ -140,12 +126,10 @@ export class Textbox {
             const char = wildcardContent[pos];
             
             if (char === '{') {
-                // Start of a nested wildcard
                 bracketDepth++;
                 currentOption += char;
                 pos++;
                 
-                // Find the matching closing brace
                 while (pos < wildcardContent.length && bracketDepth > 0) {
                     const nestedChar = wildcardContent[pos];
                     currentOption += nestedChar;
@@ -159,7 +143,6 @@ export class Textbox {
                     pos++;
                 }
             } else if (char === '|' && bracketDepth === 0) {
-                // End of current option
                 if (currentOption.trim()) {
                     options.push(currentOption.trim());
                 }
@@ -171,7 +154,6 @@ export class Textbox {
             }
         }
         
-        // Add the last option
         if (currentOption.trim()) {
             options.push(currentOption.trim());
         }
@@ -249,7 +231,6 @@ export class Textbox {
             const selections = doc.listSelections();
             if (event.key === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey) {
                 event.preventDefault();
-                // Directly retrieve tab_spaces setting
                 const tabSpaces = await window.app.extensionManager.setting.get("wildcard_selector.tab_spaces");
                 const spaces = " ".repeat(tabSpaces);
                 if (selections.length === 1 && selections[0].empty()) {
@@ -390,9 +371,7 @@ export class Textbox {
             document.head.appendChild(link);
         }
         const basePath = `/extensions/${this.constants.EXTENSION_NAME}/common/vendor/js/codemirror/`;
-        // Load codemirror core first
         await this.loadScript(`${basePath}codemirror.min.js`);
-        // Then load addons
         await Promise.all([
             this.loadScript(`${basePath}mark-selection.min.js`),
             this.loadScript(`${basePath}searchcursor.min.js`)
