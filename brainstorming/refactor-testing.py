@@ -151,6 +151,7 @@ class ImprovedStructureCreation:
                     # Convert relative section positions to absolute text positions
                     absolute_start = section_start + wc_start
                     absolute_end = section_start + wc_end
+                    print(f"Wildcard {wc_idx}: '{wildcard_content}' at {absolute_start}-{absolute_end}")
                     wildcard_id = self._process_wildcard(
                         structure, wildcard_content, section_path,
                         absolute_start, absolute_end, depth + 1, wc_idx
@@ -248,12 +249,48 @@ class ImprovedStructureCreation:
                             break
                     
                     # Calculate the offset of this choice within the parent wildcard
+                    # We need to find the actual position by parsing the parent wildcard content
+                    parent_inner_content = wildcard_content[1:-1]  # Remove { and }
+                    parent_choices = self.parse_choices(parent_inner_content)
+                    
+                    # Calculate the actual offset by finding where this choice starts
                     choice_offset = 1  # Start after the opening {
                     for i in range(choice_index):
-                        choice_offset += len(all_choices[i]) + 1  # +1 for the |
+                        choice_offset += len(parent_choices[i]) + 1  # +1 for the |
                     
-                    absolute_start = start_pos + choice_offset + nw_start
-                    absolute_end = start_pos + choice_offset + nw_end
+                    # For nested wildcards, we need to find their absolute position in the full text
+                    # The choice_offset gives us the position within the parent wildcard
+                    # But we also need to consider where this choice is in the full text
+                    
+                    # If we have the full text stored, use it to find the absolute position
+                    if hasattr(self, 'full_text'):
+                        # Find the choice content in the full text to get its absolute position
+                        search_start = start_pos + choice_offset
+                        absolute_choice_pos = self.full_text.find(choice, search_start)
+                        if absolute_choice_pos != -1:
+                            absolute_start = absolute_choice_pos + nw_start
+                            absolute_end = absolute_choice_pos + nw_end
+                        else:
+                            # Fallback to the original calculation
+                            absolute_start = start_pos + choice_offset + nw_start
+                            absolute_end = start_pos + choice_offset + nw_end
+                    else:
+                        absolute_start = start_pos + choice_offset + nw_start
+                        absolute_end = start_pos + choice_offset + nw_end
+                    
+                    # Debug output for position calculation
+                    with open("./log.txt", "a") as debug_log:
+                        debug_log.write(f"DEBUG: Nested wildcard '{nested_content}'\n")
+                        debug_log.write(f"  Parent wildcard start: {start_pos}\n")
+                        debug_log.write(f"  Choice index: {choice_index}\n")
+                        debug_log.write(f"  Choice offset in parent: {choice_offset}\n")
+                        debug_log.write(f"  Nested wildcard local start: {nw_start}\n")
+                        debug_log.write(f"  Nested wildcard local end: {nw_end}\n")
+                        debug_log.write(f"  Calculated absolute start: {absolute_start}\n")
+                        debug_log.write(f"  Calculated absolute end: {absolute_end}\n")
+                        debug_log.write(f"  All choices: {all_choices}\n")
+                        debug_log.write(f"  Parent wildcard content: '{wildcard_content}'\n")
+                        debug_log.write("---\n")
                     nested_id = self._process_wildcard(
                         structure, nested_content, choice_path,
                         absolute_start, absolute_end, depth + 1, nw_idx
@@ -290,12 +327,12 @@ def test_structure_creation():
         
         # Real-world test case
         test_prompt = """{
-    {crop|drapped|knitted|off-the-shoulder|neckhalter|neckhalter-o-ring|chain-neckhalter} {blouse|top|tank|bikini}, {denim|satin|silk|cotton|wool|linen} extremely low-rise {hotpants|cutoffs|miniskirt}, {lace|{fine-thread|bold-thread|thin-strand|thick-strand|delicate-weave|coarse-weave} {micro|small-gauge|regular|wide|large-gauge|macro|fence} fishnet|sheer} {thigh-highs|stockings|pantyhose}
-    |
-    {satin|cotton|silk|velvet|lace|chiffon|leather} {evening|wrap|slit|maxi|mini|midi|majestic} {dress}, {lace|{fine-thread|bold-thread|thin-strand|thick-strand|delicate-weave|coarse-weave} {micro|small-gauge|regular|wide|large-gauge|macro|fence} fishnet|sheer} {thigh-highs|stockings|pantyhose}, {lace|chiffon|silk|sheer|embroidered} {shawl|cape|mantle|draping}
-    |
-    {crop|drapped|knitted|off-the-shoulder|neckhalter|neckhalter-o-ring|chain-neckhalter} {blouse|top|tank|bikini}, {denim|leather|satin|silk|cotton|velvet|linen|wool|chiffon|stretch} extremely low-rise {jeans|wide-leg trousers|cargo pants|palazzo pants|maxi skirts}, g-strings
-    }"""
+{crop|drapped|knitted|off-the-shoulder|neckhalter|neckhalter-o-ring|chain-neckhalter} {blouse|top|tank|bikini}, {denim|satin|silk|cotton|wool|linen} extremely low-rise {hotpants|cutoffs|miniskirt}, {lace|{fine-thread|bold-thread|thin-strand|thick-strand|delicate-weave|coarse-weave} {micro|small-gauge|regular|wide|large-gauge|macro|fence} fishnet|sheer} {thigh-highs|stockings|pantyhose}
+|
+{satin|cotton|silk|velvet|lace|chiffon|leather} {evening|wrap|slit|maxi|mini|midi|majestic} {dress}, {lace|{fine-thread|bold-thread|thin-strand|thick-strand|delicate-weave|coarse-weave} {micro|small-gauge|regular|wide|large-gauge|macro|fence} fishnet|sheer} {thigh-highs|stockings|pantyhose}, {lace|chiffon|silk|sheer|embroidered} {shawl|cape|mantle|draping}
+|
+{crop|drapped|knitted|off-the-shoulder|neckhalter|neckhalter-o-ring|chain-neckhalter} {blouse|top|tank|bikini}, {denim|leather|satin|silk|cotton|velvet|linen|wool|chiffon|stretch} extremely low-rise {jeans|wide-leg trousers|cargo pants|palazzo pants|maxi skirts}, g-strings
+}"""
         
         log_file.write("Real-world Test Case:\n")
         log_file.write("=" * 80 + "\n")

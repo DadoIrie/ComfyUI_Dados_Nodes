@@ -52,29 +52,17 @@ class DN_WildcardSelectorComposerV2:
 
         structure_data = ""
         if content:
-            new_structure = WildcardStructureCreation().create_json_structure(content)
+            creator = WildcardStructureCreation()
+            new_structure = creator.create_json_structure(content)
             try:
                 old_structure = json.loads(old_structure_json) if old_structure_json else {}
-                cls.merge_selected(old_structure, new_structure)
+                creator.merge_selected(old_structure, new_structure)
             except Exception:
                 pass  # If merging fails, just use new_structure
-            structure_data = WildcardStructureCreation.generate_structure_data(new_structure)
+            structure_data = creator.generate_structure_data(new_structure)
         else:
             structure_data = "{}"
         return structure_data
-
-    @staticmethod
-    def merge_selected(old, new):
-        """Recursively merge 'selected' values from old structure into new structure."""
-        if not isinstance(old, dict) or not isinstance(new, dict):
-            return
-        for k, v in new.items():
-            if isinstance(v, dict):
-                if 'selected' in v:
-                    old_v = old.get(k, {})
-                    if isinstance(old_v, dict) and 'selected' in old_v:
-                        v['selected'] = old_v.get('selected', v['selected'])
-                DN_WildcardSelectorComposerV2.merge_selected(old.get(k, {}), v)
 
 
 @register_operation_handler
