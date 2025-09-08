@@ -73,14 +73,30 @@ class DropdownUI {
         const textSpan = document.createElement('span');
         textSpan.className = 'custom-dropdown-text';
 
-        const selectedValue = wildcard.selected;
+        // Use 'selection' instead of 'selected' for the new structure
+        const selectedValue = wildcard.selection;
         let displayText;
         if (!selectedValue) {
             displayText = 'nothing selected (random selection)';
-        } else if (wildcard.options.includes(selectedValue)) {
-            displayText = DropdownUI.truncateOption(wildcard[selectedValue]?.raw || selectedValue);
         } else {
-            displayText = selectedValue;
+            // Find the selected option and get its content
+            let selectedOption = null;
+            if (wildcard.options && Array.isArray(wildcard.options)) {
+                selectedOption = wildcard.options.find(opt =>
+                    (typeof opt === 'string' && opt === selectedValue) ||
+                    (typeof opt === 'object' && opt !== null && opt.id === selectedValue)
+                );
+            }
+            
+            if (selectedOption) {
+                if (typeof selectedOption === 'object' && selectedOption !== null && selectedOption.displayText) {
+                    displayText = DropdownUI.truncateOption(selectedOption.displayText);
+                } else {
+                    displayText = DropdownUI.truncateOption(selectedOption);
+                }
+            } else {
+                displayText = selectedValue;
+            }
         }
         textSpan.textContent = displayText;
 
@@ -128,46 +144,59 @@ class DropdownUI {
         });
         optionsContainer.appendChild(resetOption);
 
-        wildcard.options.forEach((option, index) => {
-            const optionElement = document.createElement('div');
-            optionElement.className = 'custom-dropdown-option';
-            optionElement.dataset.value = option;
-            optionElement.dataset.index = index;
-            optionElement.textContent = DropdownUI.truncateOption(wildcard[option]?.raw || option);
+        if (wildcard.options && Array.isArray(wildcard.options)) {
+            wildcard.options.forEach((option, index) => {
+                const optionElement = document.createElement('div');
+                optionElement.className = 'custom-dropdown-option';
+                
+                // Handle both string options and object options with id/path
+                let optionValue, displayText;
+                if (typeof option === 'object' && option !== null && option.id) {
+                    optionValue = option.id;
+                    // Use displayText if available, otherwise use the id
+                    displayText = option.displayText || option.id;
+                } else {
+                    optionValue = option;
+                    displayText = option;
+                }
+                
+                optionElement.dataset.value = optionValue;
+                optionElement.dataset.index = index;
+                optionElement.textContent = DropdownUI.truncateOption(displayText);
 
-            optionElement.addEventListener('click', e => {
-                e.stopPropagation();
-                onSelect(option, index);
+                optionElement.addEventListener('click', e => {
+                    e.stopPropagation();
+                    onSelect(optionValue, index);
+                });
+                optionElement.addEventListener('mouseenter', () => {
+                    if (this.textbox) {
+                        this.textbox.unmark();
+                        // Use position data for marking
+                        const start = parentWildcard.position?.start;
+                        const end = parentWildcard.position?.end;
+                        this.textbox.mark(displayText, 'button', start, end);
+                    }
+                });
+                optionElement.addEventListener('mouseleave', () => {
+                    if (this.textbox) {
+                        this.textbox.unmark();
+                        const start = parentWildcard.position?.start;
+                        const end = parentWildcard.position?.end;
+                        this.textbox.mark(parentWildcard.content, 'button', start, end);
+                    }
+                });
+                optionsContainer.appendChild(optionElement);
             });
-            optionElement.addEventListener('mouseenter', () => {
-                if (this.textbox) {
-                    this.textbox.unmark();
-                    // Use option's own startingAt/endingAt if present
-                    const optionData = wildcard[option];
-                    const start = optionData?.startingAt ?? parentWildcard.startingAt;
-                    const end = optionData?.endingAt ?? parentWildcard.endingAt;
-                    this.textbox.mark(optionData?.raw || option, 'button', start, end);
-                }
-            });
-            optionElement.addEventListener('mouseleave', () => {
-                if (this.textbox) {
-                    this.textbox.unmark();
-                    const start = parentWildcard.startingAt;
-                    const end = parentWildcard.endingAt;
-                    this.textbox.mark(wildcard.raw, 'button', start, end);
-                }
-            });
-            optionsContainer.appendChild(optionElement);
-        });
+        }
 
         return optionsContainer;
     }
 
     static generateWildcardId(wildcard) {
         return btoa(JSON.stringify({
-            raw: wildcard.raw,
-            options: wildcard.options,
-            target: wildcard.target
+            path: wildcard.path,
+            content: wildcard.content,
+            options: wildcard.options
         })).replace(/[^a-zA-Z0-9]/g, '');
     }
 
@@ -185,11 +214,11 @@ class DropdownUI {
 
         const options = container.querySelector('.custom-dropdown-options');
         const wildcard = container._wildcard;
-        if (wildcard && typeof wildcard.raw === 'string') {
-            // Use startingAt/endingAt for marking
-            const start = wildcard.startingAt;
-            const end = wildcard.endingAt;
-            this.textbox.mark(wildcard.raw, 'button', start, end);
+        if (wildcard && typeof wildcard.content === 'string') {
+            // Use position data for marking
+            const start = wildcard.position?.start;
+            const end = wildcard.position?.end;
+            this.textbox.mark(wildcard.content, 'button', start, end);
         }
         if (options) {
             options.style.maxHeight = options.scrollHeight + 'px';
@@ -255,7 +284,7 @@ class DropdownUI {
 export class DropdownManager {
     constructor(sidebar, structureData, processor, textbox) {
         this.sidebar = sidebar;
-        this.structureData = structureData;
+        this.structureData = structureData || { nodes: {}, root_nodes: [] };
         this.processor = processor;
         this.textbox = textbox;
         this.ui = new DropdownUI(sidebar, (wildcard, selectedValue, selectedIndex, container) => {
@@ -290,8 +319,9 @@ export class DropdownManager {
     }
 
     setSelected(wildcard, selectedValue) {
-        wildcard.selected = selectedValue;
-        if (wildcard.target && this.processor) {
+        // Use 'selection' instead of 'selected' for the new structure
+        wildcard.selection = selectedValue;
+        if (wildcard.path && this.processor) {
             this.processor.updateNodeData({
                 wildcards_structure_data: JSON.stringify(this.structureData)
             });
@@ -300,29 +330,76 @@ export class DropdownManager {
     }
 
     setSelectedByTarget(target, value) {
-        let obj = this.structureData;
-        for (let i = 0; i < target.length; i++) {
-            obj = obj[target[i]];
+        // Navigate the new structure using the path
+        if (this.structureData && this.structureData.nodes && this.structureData.nodes[target]) {
+            this.structureData.nodes[target].selection = value;
+            this._notifyObservers();
         }
-        obj.selected = value;
-        this._notifyObservers();
     }
 
     findRootWildcards(data) {
         const wildcards = [];
-        for (const key in data) {
-            if (data.hasOwnProperty(key) && typeof data[key] === 'object' && data[key] !== null) {
-                for (const nestedKey in data[key]) {
-                    if (data[key].hasOwnProperty(nestedKey)) {
-                        const nested = data[key][nestedKey];
-                        if (typeof nested === 'object' && nested !== null && Array.isArray(nested.options)) {
-                            wildcards.push(nested);
+        
+        // Check if data is valid
+        if (!data) {
+            console.warn('Structure data is undefined or null');
+            return wildcards;
+        }
+        
+        // Handle the new structure with nodes and root_nodes
+        if (data.nodes && data.root_nodes) {
+            // Start with root nodes
+            data.root_nodes.forEach(rootNodeId => {
+                const rootNode = data.nodes[rootNodeId];
+                if (rootNode) {
+                    this._collectWildcardNodes(rootNode, data.nodes, wildcards);
+                }
+            });
+        } else {
+            // Fallback to the old structure for compatibility
+            for (const key in data) {
+                if (data.hasOwnProperty(key) && typeof data[key] === 'object' && data[key] !== null) {
+                    for (const nestedKey in data[key]) {
+                        if (data[key].hasOwnProperty(nestedKey)) {
+                            const nested = data[key][nestedKey];
+                            if (typeof nested === 'object' && nested !== null && Array.isArray(nested.options)) {
+                                wildcards.push(nested);
+                            }
                         }
                     }
                 }
             }
         }
+        
         return wildcards;
+    }
+    
+    _collectWildcardNodes(node, allNodes, wildcards) {
+        if (node.type === 'wildcard' && Array.isArray(node.options)) {
+            // Add displayText to object options
+            if (node.options) {
+                node.options = node.options.map(option => {
+                    if (typeof option === 'object' && option !== null && option.id && allNodes[option.id]) {
+                        return {
+                            ...option,
+                            displayText: allNodes[option.id].content
+                        };
+                    }
+                    return option;
+                });
+            }
+            wildcards.push(node);
+        }
+        
+        // Process children
+        if (node.children) {
+            Object.keys(node.children).forEach(childId => {
+                const childNode = allNodes[childId];
+                if (childNode) {
+                    this._collectWildcardNodes(childNode, allNodes, wildcards);
+                }
+            });
+        }
     }
 
     buildDropdownsData() {
@@ -330,22 +407,55 @@ export class DropdownManager {
         const rootWildcards = this.findRootWildcards(this.structureData);
         rootWildcards.forEach(wildcard => {
             dropdownsData.push({ wildcard, parent: null });
-            this._collectChildDropdowns(wildcard, wildcard.selected, dropdownsData, null);
+            // Use 'selection' instead of 'selected'
+            this._collectChildDropdowns(wildcard, wildcard.selection, dropdownsData, null);
         });
         return dropdownsData;
     }
 
     _collectChildDropdowns(wildcard, selectedValue, dropdownsData, parentContainer) {
-        if (selectedValue !== '' && wildcard[selectedValue]) {
-            const selectedOption = wildcard[selectedValue];
-            if (Array.isArray(selectedOption.options)) {
-                selectedOption.options.forEach(optKey => {
-                    const nestedItem = selectedOption[optKey];
-                    if (nestedItem && typeof nestedItem === 'object' && Array.isArray(nestedItem.options) && nestedItem.options.length > 0) {
-                        dropdownsData.push({ wildcard: nestedItem, parent: parentContainer });
-                        this._collectChildDropdowns(nestedItem, nestedItem.selected, dropdownsData, parentContainer);
+        if (selectedValue !== '' && wildcard.options) {
+            // Find the selected option in the options array
+            const selectedOption = wildcard.options.find(opt =>
+                (typeof opt === 'string' && opt === selectedValue) ||
+                (typeof opt === 'object' && opt !== null && opt.id === selectedValue)
+            );
+            
+            if (selectedOption) {
+                let optionId = null;
+                if (typeof selectedOption === 'object' && selectedOption.id) {
+                    optionId = selectedOption.id;
+                } else if (typeof selectedOption === 'string') {
+                    optionId = selectedOption;
+                }
+                
+                if (optionId && this.structureData && this.structureData.nodes && this.structureData.nodes[optionId]) {
+                    const nestedNode = this.structureData.nodes[optionId];
+                    
+                    // Check if this node has children (which would be nested wildcards)
+                    if (nestedNode.children) {
+                        Object.keys(nestedNode.children).forEach(childId => {
+                            const childNode = this.structureData.nodes[childId];
+                            if (childNode && childNode.type === 'wildcard' && Array.isArray(childNode.options)) {
+                                // Add displayText to object options
+                                if (childNode.options) {
+                                    childNode.options = childNode.options.map(option => {
+                                        if (typeof option === 'object' && option !== null && option.id && this.structureData.nodes[option.id]) {
+                                            return {
+                                                ...option,
+                                                displayText: this.structureData.nodes[option.id].content
+                                            };
+                                        }
+                                        return option;
+                                    });
+                                }
+                                dropdownsData.push({ wildcard: childNode, parent: parentContainer });
+                                // Use 'selection' instead of 'selected'
+                                this._collectChildDropdowns(childNode, childNode.selection, dropdownsData, parentContainer);
+                            }
+                        });
                     }
-                });
+                }
             }
         }
     }
