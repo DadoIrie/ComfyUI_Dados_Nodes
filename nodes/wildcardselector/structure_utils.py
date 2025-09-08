@@ -10,9 +10,9 @@ from typing import Dict, Any, List, Tuple
 
 class WildcardStructureCreation:
     def __init__(self):
-        self.position_cache = {}  # Cache for position tracking within single execution
-        self.unique_id_counter = {}  # Track occurrences of identical wildcards
-        self.MAX_NESTING_DEPTH = 21  # Maximum nesting depth for wildcards
+        self.position_cache = {}
+        self.unique_id_counter = {}
+        self.MAX_NESTING_DEPTH = 21
     
     def generate_unique_id(self, content: str, context_path: str = "", occurrence: int = 0) -> str:
         """
@@ -100,28 +100,22 @@ class WildcardStructureCreation:
             "root_nodes": [] if depth == 0 else None
         }
         
-        # Reset occurrence tracking for new root call
         if depth == 0:
             self.unique_id_counter = {}
-            # Store the full text for absolute position calculation
             self.full_text = text
         
         if depth == 0:
-            # Process top-level sections
             sections = self.parse_sections(text)
             
-            # Track the current position in the full text
             current_pos = 0
             
             for i, section in enumerate(sections):
-                # Find the actual position of this section in the full text
                 section_start = text.find(section, current_pos)
                 section_end = section_start + len(section)
                 current_pos = section_end
                 
                 section_id = self.generate_unique_id(section, parent_path, i)
                 
-                # Track section occurrence
                 content_key = section
                 if content_key not in self.unique_id_counter:
                     self.unique_id_counter[content_key] = 0
@@ -131,7 +125,6 @@ class WildcardStructureCreation:
                 
                 section_path = f"{parent_path}/{section_id}" if parent_path else section_id
                 
-                # Create section node with absolute positions
                 structure["nodes"][section_id] = {
                     "type": "section",
                     "content": section,
@@ -140,26 +133,19 @@ class WildcardStructureCreation:
                     "children": {}
                 }
                 
-                # No need for separate lookup tables - all info is in the nodes
-                
-                # Add to root nodes
                 structure["root_nodes"].append(section_id)
                 
-                # Process wildcards within section with absolute positions
                 section_wildcards = self.find_wildcards(section)
                 for wc_idx, (wc_start, wc_end) in enumerate(section_wildcards):
                     wildcard_content = section[wc_start:wc_end]
-                    # Convert relative section positions to absolute text positions
                     absolute_start = section_start + wc_start
                     absolute_end = section_start + wc_end
                     wildcard_id = self._process_wildcard(
                         structure, wildcard_content, section_path,
                         absolute_start, absolute_end, depth + 1, wc_idx
                     )
-                    # Add wildcard to section's children
                     structure["nodes"][section_id]["children"][wildcard_id] = True
         else:
-            # Process nested content (wildcards within wildcards)
             wildcards = self.find_wildcards(text)
             for wc_idx, (wc_start, wc_end) in enumerate(wildcards):
                 wildcard_content = text[wc_start:wc_end]
@@ -174,7 +160,6 @@ class WildcardStructureCreation:
         """
         Process a single wildcard and add it to the structure
         """
-        # Generate unique ID for this wildcard
         content_key = wildcard_content
         if content_key not in self.unique_id_counter:
             self.unique_id_counter[content_key] = 0
@@ -187,37 +172,30 @@ class WildcardStructureCreation:
         
         wildcard_path = f"{parent_path}/{wildcard_id}"
         
-        # Extract choices
         inner_content = wildcard_content[1:-1]  # Remove { and }
         choices = self.parse_choices(inner_content)
         
-        # Create wildcard node with minimal options
         wildcard_node = {
             "type": "wildcard",
             "content": wildcard_content,
             "path": wildcard_path,
             "position": {"start": start_pos, "end": end_pos},
-            "options": [],  # Will be populated with minimal option objects
-            "selection": None  # Current selection
+            "options": [],
+            "selection": None
         }
         
-        # Process each choice
         for choice_idx, choice in enumerate(choices):
-            # Check if choice contains nested wildcards
             nested_wildcards = self.find_wildcards(choice)
             
             if nested_wildcards:
-                # For choices with nested wildcards, create a full choice node
                 choice_id = self.generate_unique_id(choice, wildcard_path, choice_idx)
                 choice_path = f"{wildcard_path}/{choice_id}"
                 
-                # Add minimal option reference
                 wildcard_node["options"].append({
                     "id": choice_id,
                     "path": choice_path
                 })
                 
-                # Create choice node
                 choice_node = {
                     "type": "choice",
                     "content": choice,
@@ -226,52 +204,33 @@ class WildcardStructureCreation:
                     "children": {}
                 }
                 
-                # Add choice node to structure
                 structure["nodes"][choice_id] = choice_node
                 
-                # No need for separate lookup tables - all info is in the nodes
                 
-                # Process nested wildcards with absolute positions
                 for nw_idx, (nw_start, nw_end) in enumerate(nested_wildcards):
                     nested_content = choice[nw_start:nw_end]
                     
-                    # For nested wildcards, we need to find their exact position in the full text
-                    # The key is to use the actual choice index from the enumeration (choice_idx)
-                    # This ensures we get the correct occurrence of the nested wildcard
-                    
                     if hasattr(self, 'full_text'):
-                        # Calculate the position within the parent wildcard
-                        parent_inner_content = wildcard_content[1:-1]  # Remove { and }
+                        parent_inner_content = wildcard_content[1:-1]
                         parent_choices = self.parse_choices(parent_inner_content)
                         
-                        # Calculate the offset of this choice within the parent wildcard
-                        choice_offset = 1  # Start after the opening {
+                        choice_offset = 1
                         for i in range(choice_idx):
-                            choice_offset += len(parent_choices[i]) + 1  # +1 for the |
-                        
-                        # Find the parent wildcard in the full text
+                            choice_offset += len(parent_choices[i]) + 1
                         parent_wildcard_pos = self.full_text.find(wildcard_content, start_pos)
                         if parent_wildcard_pos != -1:
-                            # Calculate the absolute position of the nested wildcard
-                            # parent_wildcard_pos + choice_offset gives us the start of the choice
-                            # + nw_start gives us the start of the nested wildcard within the choice
                             absolute_start = parent_wildcard_pos + choice_offset + nw_start
                             absolute_end = parent_wildcard_pos + choice_offset + nw_end
                             
-                            # Verify this position is correct by checking the content
                             if (absolute_start >= 0 and absolute_end <= len(self.full_text) and
                                     self.full_text[absolute_start:absolute_end] == nested_content):
-                                # Position is correct, use it
                                 pass
                             else:
-                                # If verification fails, try to find the exact occurrence
-                                # Count how many identical nested wildcards appear before this choice
                                 occurrence_count = 0
                                 for i in range(choice_idx):
                                     if nested_content in parent_choices[i]:
                                         occurrence_count += 1
                                 
-                                # Find the (occurrence_count + 1)th occurrence after the parent
                                 search_pos = parent_wildcard_pos
                                 for _ in range(occurrence_count + 1):
                                     found_pos = self.full_text.find(nested_content, search_pos)
@@ -282,16 +241,14 @@ class WildcardStructureCreation:
                                     else:
                                         break
                         else:
-                            # Parent wildcard not found in full text, use relative calculation
                             absolute_start = start_pos + choice_offset + nw_start
                             absolute_end = start_pos + choice_offset + nw_end
                     else:
-                        # No full text available, use relative calculation
                         parent_inner_content = wildcard_content[1:-1]
                         parent_choices = self.parse_choices(parent_inner_content)
-                        choice_offset = 1  # Start after the opening {
+                        choice_offset = 1
                         for i in range(choice_idx):
-                            choice_offset += len(parent_choices[i]) + 1  # +1 for the |
+                            choice_offset += len(parent_choices[i]) + 1
                         absolute_start = start_pos + choice_offset + nw_start
                         absolute_end = start_pos + choice_offset + nw_end
                     
@@ -299,17 +256,11 @@ class WildcardStructureCreation:
                         structure, nested_content, choice_path,
                         absolute_start, absolute_end, depth + 1, nw_idx
                     )
-                    # Add nested wildcard to choice's children
                     choice_node["children"][nested_id] = True
             else:
-                # For simple choices without nested wildcards, just store the text
-                # No need to create a separate node - we'll use CodeMirror's search
                 wildcard_node["options"].append(choice)
         
-        # Add wildcard node to structure
         structure["nodes"][wildcard_id] = wildcard_node
-        
-        # No need for separate lookup tables - all info is in the nodes
         
         return wildcard_id
     
@@ -326,19 +277,15 @@ class WildcardStructureCreation:
         if not isinstance(old, dict) or not isinstance(new, dict):
             return
         
-        # Handle the new structure with nodes
         if 'nodes' in new and 'nodes' in old:
             for node_id, new_node in new['nodes'].items():
                 if node_id in old['nodes']:
                     old_node = old['nodes'][node_id]
-                    # Merge selection values
                     if 'selection' in new_node and 'selection' in old_node:
                         new_node['selection'] = old_node['selection']
                     
-                    # Recursively merge child nodes
                     WildcardStructureCreation.merge_selected(old_node, new_node)
         else:
-            # Fallback to the old structure
             for k, v in new.items():
                 if isinstance(v, dict):
                     if 'selected' in v:
