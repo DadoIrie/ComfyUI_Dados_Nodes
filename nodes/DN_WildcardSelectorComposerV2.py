@@ -96,7 +96,6 @@ async def handle_wildcard_selector_composer_operations(request):
             })
 
         if operation == 'process_wildcards':
-            print("Toggling process_wildcards state...")
             payload = data.get('payload', {})
             state = bool(payload.get('state'))
             DN_WildcardSelectorComposerV2.node_state[node_id]["process_wildcards"] = state
