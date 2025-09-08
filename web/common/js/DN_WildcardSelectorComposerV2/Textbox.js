@@ -28,7 +28,6 @@ export class Textbox {
         const doc = this.cmEditor.getDoc();
         const value = doc.getValue();
         
-        console.log(`[Textbox.mark] type: ${type}, str: '${str}', startingAt: ${start}, endingAt: ${end}, optionIndex: ${optionIndex}`);
         
         let found = null;
         

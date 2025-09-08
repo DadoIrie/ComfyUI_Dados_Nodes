@@ -172,21 +172,13 @@ class DropdownUI {
                     if (this.textbox) {
                         this.textbox.unmark();
                         
-                        // Check if this option is a nested wildcard
-                        const isNestedWildcard = typeof displayText === 'string' &&
-                                                displayText.startsWith('{') &&
-                                                displayText.endsWith('}');
-                        
-                        if (isNestedWildcard && typeof option === 'object' && option !== null && option.id) {
+                        if (this._isNestedWildcardOption(option, displayText)) {
                             // This is a nested wildcard, we need to get its position from the manager
-                            console.log(`[DropdownManager] Requesting position for nested wildcard: ${option.id}, displayText: ${displayText}`);
-                            // Trigger a custom event or callback to get the position data
                             const event = new CustomEvent('get-nested-wildcard-position', {
                                 detail: {
                                     optionId: option.id,
                                     displayText: displayText,
                                     callback: (start, end) => {
-                                        console.log(`[DropdownManager] Received position for nested wildcard: start=${start}, end=${end}`);
                                         this.textbox.mark(displayText, 'button', start, end);
                                     }
                                 },
@@ -194,19 +186,16 @@ class DropdownUI {
                             });
                             this.sidebar.dispatchEvent(event);
                         } else {
-                            // Check if there are duplicate options in this wildcard
+                            // Regular option handling
                             const hasDuplicates = this._hasDuplicateOptions(parentWildcard);
-                            console.log(`[DropdownManager] Option: ${displayText}, isNested: ${isNestedWildcard}, hasDuplicates: ${hasDuplicates}`);
+                            const start = parentWildcard.position?.start;
+                            const end = parentWildcard.position?.end;
                             
                             if (hasDuplicates) {
                                 // Regular string option with duplicates, send the index
-                                const start = parentWildcard.position?.start;
-                                const end = parentWildcard.position?.end;
                                 this.textbox.mark(displayText, 'button', start, end, index);
                             } else {
                                 // No duplicates, use the current approach
-                                const start = parentWildcard.position?.start;
-                                const end = parentWildcard.position?.end;
                                 this.textbox.mark(displayText, 'button', start, end);
                             }
                         }
@@ -316,22 +305,31 @@ class DropdownUI {
     }
 
     _hasDuplicateOptions(wildcard) {
-        if (!wildcard.options || !Array.isArray(wildcard.options)) {
+        if (!wildcard.options || !Array.isArray(wildcard.options) || wildcard.options.length <= 1) {
             return false;
         }
         
-        const optionTexts = wildcard.options.map(option => {
-            if (typeof option === 'string') {
-                return option;
-            } else if (typeof option === 'object' && option !== null) {
-                return option.displayText || option.id || '';
+        const seen = new Set();
+        for (const option of wildcard.options) {
+            const text = typeof option === 'string' ? option :
+                        (option?.displayText || option?.id || '');
+            
+            if (seen.has(text)) {
+                return true;
             }
-            return '';
-        });
+            seen.add(text);
+        }
         
-        // Check for duplicates
-        const uniqueTexts = new Set(optionTexts);
-        return uniqueTexts.size < optionTexts.length;
+        return false;
+    }
+    
+    _isNestedWildcardOption(option, displayText) {
+        return typeof displayText === 'string' &&
+               displayText.startsWith('{') &&
+               displayText.endsWith('}') &&
+               typeof option === 'object' &&
+               option !== null &&
+               option.id;
     }
 }
 
@@ -357,11 +355,9 @@ export class DropdownManager {
         // Set up event listener for nested wildcard position requests
         this.sidebar.addEventListener('get-nested-wildcard-position', (event) => {
             const { optionId, displayText, callback } = event.detail;
-            console.log(`[DropdownManager] Event received for optionId: ${optionId}, displayText: ${displayText}`);
             
             // The optionId points to a choice node, we need to find its child wildcard node
             const choiceNode = this.structureData?.nodes?.[optionId];
-            console.log(`[DropdownManager] Found choice node:`, choiceNode);
             
             if (choiceNode && choiceNode.children) {
                 // Get the first child of the choice node, which should be the wildcard node
@@ -369,19 +365,11 @@ export class DropdownManager {
                 if (wildcardChildIds.length > 0) {
                     const wildcardNodeId = wildcardChildIds[0];
                     const wildcardNode = this.structureData?.nodes?.[wildcardNodeId];
-                    console.log(`[DropdownManager] Found wildcard node:`, wildcardNode);
                     
                     if (wildcardNode && wildcardNode.position) {
-                        console.log(`[DropdownManager] Calling callback with position:`, wildcardNode.position);
                         callback(wildcardNode.position.start, wildcardNode.position.end);
-                    } else {
-                        console.log(`[DropdownManager] No position data found for wildcard node`);
                     }
-                } else {
-                    console.log(`[DropdownManager] No children found for choice node`);
                 }
-            } else {
-                console.log(`[DropdownManager] No choice node found or no children`);
             }
         });
         
