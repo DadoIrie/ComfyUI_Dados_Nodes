@@ -206,7 +206,6 @@ class WildcardStructureCreation:
                 
                 structure["nodes"][choice_id] = choice_node
                 
-                
                 for nw_idx, (nw_start, nw_end) in enumerate(nested_wildcards):
                     nested_content = choice[nw_start:nw_end]
                     
