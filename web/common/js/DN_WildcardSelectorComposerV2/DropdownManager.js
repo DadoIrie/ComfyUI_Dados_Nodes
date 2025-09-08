@@ -73,13 +73,11 @@ class DropdownUI {
         const textSpan = document.createElement('span');
         textSpan.className = 'custom-dropdown-text';
 
-        // Use 'selection' instead of 'selected' for the new structure
         const selectedValue = wildcard.selection;
         let displayText;
         if (!selectedValue) {
             displayText = 'nothing selected (random selection)';
         } else {
-            // Find the selected option and get its content
             let selectedOption = null;
             if (wildcard.options && Array.isArray(wildcard.options)) {
                 selectedOption = wildcard.options.find(opt =>
@@ -149,11 +147,9 @@ class DropdownUI {
                 const optionElement = document.createElement('div');
                 optionElement.className = 'custom-dropdown-option';
                 
-                // Handle both string options and object options with id/path
                 let optionValue, displayText;
                 if (typeof option === 'object' && option !== null && option.id) {
                     optionValue = option.id;
-                    // Use displayText if available, otherwise use the id
                     displayText = option.displayText || option.id;
                 } else {
                     optionValue = option;
@@ -173,7 +169,6 @@ class DropdownUI {
                         this.textbox.unmark();
                         
                         if (this._isNestedWildcardOption(option, displayText)) {
-                            // This is a nested wildcard, we need to get its position from the manager
                             const event = new CustomEvent('get-nested-wildcard-position', {
                                 detail: {
                                     optionId: option.id,
@@ -186,16 +181,13 @@ class DropdownUI {
                             });
                             this.sidebar.dispatchEvent(event);
                         } else {
-                            // Regular option handling - check if this specific option text has duplicates
                             const hasDuplicates = this._hasDuplicateOptionText(parentWildcard, displayText);
                             const start = parentWildcard.position?.start;
                             const end = parentWildcard.position?.end;
                             
                             if (hasDuplicates) {
-                                // Regular string option with duplicates, send the index
                                 this.textbox.mark(displayText, 'button', start, end, index);
                             } else {
-                                // No duplicates, use the current approach
                                 this.textbox.mark(displayText, 'button', start, end);
                             }
                         }
@@ -239,7 +231,6 @@ class DropdownUI {
         const options = container.querySelector('.custom-dropdown-options');
         const wildcard = container._wildcard;
         if (wildcard && typeof wildcard.content === 'string') {
-            // Use position data for marking
             const start = wildcard.position?.start;
             const end = wildcard.position?.end;
             this.textbox.mark(wildcard.content, 'button', start, end);
@@ -324,7 +315,6 @@ class DropdownUI {
     }
     
     _normalizeWildcardText(text) {
-        // Remove spaces around |, after {, and before }
         return text.replace(/\s*\|\s*/g, '|')
                   .replace(/{\s*/g, '{')
                   .replace(/\s*}/g, '}');
@@ -384,15 +374,12 @@ export class DropdownManager {
             this.render();
         });
         
-        // Set up event listener for nested wildcard position requests
         this.sidebar.addEventListener('get-nested-wildcard-position', (event) => {
             const { optionId, displayText, callback } = event.detail;
             
-            // The optionId points to a choice node, we need to find its child wildcard node
             const choiceNode = this.structureData?.nodes?.[optionId];
             
             if (choiceNode && choiceNode.children) {
-                // Get the first child of the choice node, which should be the wildcard node
                 const wildcardChildIds = Object.keys(choiceNode.children);
                 if (wildcardChildIds.length > 0) {
                     const wildcardNodeId = wildcardChildIds[0];
@@ -425,7 +412,6 @@ export class DropdownManager {
     }
 
     setSelected(wildcard, selectedValue) {
-        // Use 'selection' instead of 'selected' for the new structure
         wildcard.selection = selectedValue;
         if (wildcard.path && this.processor) {
             this.processor.updateNodeData({
@@ -436,7 +422,6 @@ export class DropdownManager {
     }
 
     setSelectedByTarget(target, value) {
-        // Navigate the new structure using the path
         if (this.structureData && this.structureData.nodes && this.structureData.nodes[target]) {
             this.structureData.nodes[target].selection = value;
             this._notifyObservers();
@@ -446,15 +431,12 @@ export class DropdownManager {
     findRootWildcards(data) {
         const wildcards = [];
         
-        // Check if data is valid
         if (!data) {
             console.warn('Structure data is undefined or null');
             return wildcards;
         }
         
-        // Handle the new structure with nodes and root_nodes
         if (data.nodes && data.root_nodes) {
-            // Start with root nodes
             data.root_nodes.forEach(rootNodeId => {
                 const rootNode = data.nodes[rootNodeId];
                 if (rootNode) {
@@ -462,7 +444,6 @@ export class DropdownManager {
                 }
             });
         } else {
-            // Fallback to the old structure for compatibility
             for (const key in data) {
                 if (data.hasOwnProperty(key) && typeof data[key] === 'object' && data[key] !== null) {
                     for (const nestedKey in data[key]) {
@@ -482,7 +463,6 @@ export class DropdownManager {
     
     _collectWildcardNodes(node, allNodes, wildcards) {
         if (node.type === 'wildcard' && Array.isArray(node.options)) {
-            // Add displayText to object options
             if (node.options) {
                 node.options = node.options.map(option => {
                     if (typeof option === 'object' && option !== null && option.id && allNodes[option.id]) {
@@ -497,7 +477,6 @@ export class DropdownManager {
             wildcards.push(node);
         }
         
-        // Process children
         if (node.children) {
             Object.keys(node.children).forEach(childId => {
                 const childNode = allNodes[childId];
@@ -513,7 +492,6 @@ export class DropdownManager {
         const rootWildcards = this.findRootWildcards(this.structureData);
         rootWildcards.forEach(wildcard => {
             dropdownsData.push({ wildcard, parent: null });
-            // Use 'selection' instead of 'selected'
             this._collectChildDropdowns(wildcard, wildcard.selection, dropdownsData, null);
         });
         return dropdownsData;
@@ -521,7 +499,6 @@ export class DropdownManager {
 
     _collectChildDropdowns(wildcard, selectedValue, dropdownsData, parentContainer) {
         if (selectedValue !== '' && wildcard.options) {
-            // Find the selected option in the options array
             const selectedOption = wildcard.options.find(opt =>
                 (typeof opt === 'string' && opt === selectedValue) ||
                 (typeof opt === 'object' && opt !== null && opt.id === selectedValue)
@@ -538,12 +515,10 @@ export class DropdownManager {
                 if (optionId && this.structureData && this.structureData.nodes && this.structureData.nodes[optionId]) {
                     const nestedNode = this.structureData.nodes[optionId];
                     
-                    // Check if this node has children (which would be nested wildcards)
                     if (nestedNode.children) {
                         Object.keys(nestedNode.children).forEach(childId => {
                             const childNode = this.structureData.nodes[childId];
                             if (childNode && childNode.type === 'wildcard' && Array.isArray(childNode.options)) {
-                                // Add displayText to object options
                                 if (childNode.options) {
                                     childNode.options = childNode.options.map(option => {
                                         if (typeof option === 'object' && option !== null && option.id && this.structureData.nodes[option.id]) {
@@ -556,7 +531,6 @@ export class DropdownManager {
                                     });
                                 }
                                 dropdownsData.push({ wildcard: childNode, parent: parentContainer });
-                                // Use 'selection' instead of 'selected'
                                 this._collectChildDropdowns(childNode, childNode.selection, dropdownsData, parentContainer);
                             }
                         });
