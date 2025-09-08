@@ -3,7 +3,7 @@
 @author: Dado
 @description: Utilities for creating and analyzing wildcard JSON structures.
 """
-# ! Known issue: reversed wildcards with identical content are not handled > {{{entry|entry}|entry}|entry}
+# ! Known limitation: reversed wildcards with identical content are not handled > {{{entry|entry}|entry}|entry}
 import xxhash
 import json
 from typing import Dict, Any, List, Tuple
