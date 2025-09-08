@@ -3,7 +3,6 @@
 import os
 from server import PromptServer  # type: ignore pylint: disable=import-error
 
-# Define core constants
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 EXTENSION_NAME = os.path.basename(BASE_DIR)
 MESSAGE_ROUTE = "/dadosNodes"
@@ -15,12 +14,10 @@ class Constants:
 
 constants = Constants()
 
-# Define web directories
 WEB_DIRECTORY = "./web/comfyui"
 COMMON_DIRECTORY = "./web/common"
 
 
-# Import node definitions
 # from .nodes.inactive_pinterest_image import inactivePinterestImageNode
 from .nodes.DN_MultilineString import DN_MultilineString
 from .nodes.DN_TextConcatenateNode import DN_TextConcatenateNode
