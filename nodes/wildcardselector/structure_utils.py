@@ -91,6 +91,7 @@ class WildcardStructureCreation:
                 "target": section_target_path
             }
             for start, end in section_wildcards:
+                print(text)
                 wildcard_content = section[start:end]
                 choices_content = section[start+1:end-1]
                 choices = self.parse_choices(choices_content)

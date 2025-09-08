@@ -18,7 +18,7 @@ class DN_WildcardSelectorComposerV2:
             "optional": {
                 "wildcards_prompt": ("STRING", {"multiline": True}),
                 "wildcards_structure_data": ("STRING", {"multiline": True}),
-                "seed": ("INT", {"default": -1, "min": -1, "max": 2147483647}),
+                "seed": ("INT", {"forceInput": True}),
             },
             "hidden": {
                 "unique_id": "UNIQUE_ID",

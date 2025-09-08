@@ -93,13 +93,18 @@ app.registerExtension({
             textLoader.createEditContentButton();
 
             console.log(this.title);
-            
+
             setTimeout(() => {
                 if (this.inputs) {
                     for (let i = 0; i < this.inputs.length; i++) {
                         const input = this.inputs[i];
-                        input.color_on = "#00000000";
-                        input.color_off = "#00000000";
+                        // Exclude inputs named 'seed' from color changes
+                        console.log(input.name);
+                        console.log(input);
+                        if (input.name !== "seed") {
+                            input.color_on = "#00000000";
+                            input.color_off = "#00000000";
+                        }
                     }
                 }
             }, 0);
@@ -107,9 +112,9 @@ app.registerExtension({
 
         const onConnectionsChange = nodeType.prototype.onConnectionsChange;
         nodeType.prototype.onConnectionsChange = function(slotType, slot_idx, event, link_info, node_slot) {
-            if (slotType === 1 && event === true) {
-                console.log("Input connections are not allowed on Wildcard Selector/Composer (DN_WildcardSelectorComposerV2)");
-                
+            // Exclude inputs named 'seed' from restrictions
+            const input = this.inputs?.[slot_idx];
+            if (slotType === 1 && event === true && input?.name !== "seed") {
                 if (link_info) {
                     const linkId = link_info.id;
                     setTimeout(() => {
@@ -119,7 +124,7 @@ app.registerExtension({
                 }
                 return;
             }
-            
+
             return onConnectionsChange?.apply(this, arguments);
         };
 
