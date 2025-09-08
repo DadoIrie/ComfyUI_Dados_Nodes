@@ -17,7 +17,6 @@ const _TYPE = "STRING";
 app.registerExtension({
     name: 'dados_nodes.' + _ID,
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
-        // Skip if not our node
         if (nodeData.name !== _ID) {
             return
         }
@@ -25,10 +24,8 @@ app.registerExtension({
         const onNodeCreated = nodeType.prototype.onNodeCreated;
         nodeType.prototype.onNodeCreated = async function () {
             const result = onNodeCreated?.apply(this);
-            // Start with a new dynamic input
             this.addInput(_PREFIX, _TYPE);
             
-            // Ensure the new slot has proper appearance
             const slot = this.inputs[this.inputs.length - 1];
             if (slot) {
                 slot.color_off = "#666";
@@ -52,9 +49,7 @@ app.registerExtension({
                         const parent_link = fromNode.outputs[link_info.origin_slot];
                         if (parent_link) {
                             node_slot.type = parent_link.type;
-                            // If connecting to the unnumbered "text" slot, give it the next number
                             if (node_slot.name === _PREFIX) {
-                                // Find the highest numbered slot
                                 let maxNumber = 0;
                                 for(const slot of this.inputs) {
                                     if (slot.name.startsWith(_PREFIX)) {
@@ -73,18 +68,16 @@ app.registerExtension({
                         this.removeInput(slot_idx);
                     }
                     
-                    // Count trailing empty numbered slots
                     let trailingEmpty = 0;
                     for(let i = this.inputs.length - 1; i >= 0; i--) {
                         const slot = this.inputs[i];
                         if (slot.name.startsWith(_PREFIX + '_') && slot.link === null) {
                             trailingEmpty++;
                         } else if (slot.name.startsWith(_PREFIX + '_')) {
-                            break; // Stop at first connected numbered slot
+                            break;
                         }
                     }
                     
-                    // Only clean up if we have more than 1 trailing empty slot
                     if (trailingEmpty > 1) {
                         let lastConnectedIndex = -1;
                         for(let i = 0; i < this.inputs.length; i++) {
@@ -95,20 +88,18 @@ app.registerExtension({
                         }
                         
                         if (lastConnectedIndex !== -1) {
-                            // Remove excess trailing slots, keep only 1
                             for(let i = this.inputs.length - 1; i > lastConnectedIndex; i--) {
                                 const slot = this.inputs[i];
                                 if (slot.name.startsWith(_PREFIX + '_') && slot.link === null) {
                                     this.removeInput(i);
                                     trailingEmpty--;
-                                    if (trailingEmpty <= 1) break; // Stop when we have only 1 left
+                                    if (trailingEmpty <= 1) break;
                                 }
                             }
                         }
                     }
                 }
 
-                // Handle unnumbered slots (always runs)
                 let unnumberedSlots = [];
                 for(let i = this.inputs.length - 1; i >= 0; i--) {
                     const slot = this.inputs[i];
@@ -128,7 +119,6 @@ app.registerExtension({
                         last.color_off = "#666";
                     }
                 } else {
-                    // Move the unnumbered slot to the end if it's not already there
                     const unnumberedIndex = unnumberedSlots[0];
                     if (unnumberedIndex !== this.inputs.length - 1) {
                         this.removeInput(unnumberedIndex);
