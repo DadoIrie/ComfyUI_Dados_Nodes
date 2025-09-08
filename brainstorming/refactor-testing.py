@@ -234,8 +234,24 @@ class ImprovedStructureCreation:
                 for nw_idx, (nw_start, nw_end) in enumerate(nested_wildcards):
                     nested_content = choice[nw_start:nw_end]
                     # Find the absolute position of this nested wildcard in the full text
+                    # We need to find the exact position of this choice within the parent wildcard
+                    
+                    # Get all choices in the wildcard
+                    inner_content = wildcard_content[1:-1]  # Remove { and }
+                    all_choices = self.parse_choices(inner_content)
+                    
+                    # Find the index of this choice in the list of all choices
+                    choice_index = -1
+                    for i, c in enumerate(all_choices):
+                        if c == choice:
+                            choice_index = i
+                            break
+                    
                     # Calculate the offset of this choice within the parent wildcard
-                    choice_offset = wildcard_content.find(choice, 1)  # +1 to skip the opening {
+                    choice_offset = 1  # Start after the opening {
+                    for i in range(choice_index):
+                        choice_offset += len(all_choices[i]) + 1  # +1 for the |
+                    
                     absolute_start = start_pos + choice_offset + nw_start
                     absolute_end = start_pos + choice_offset + nw_end
                     nested_id = self._process_wildcard(

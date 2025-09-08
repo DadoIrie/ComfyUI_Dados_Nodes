@@ -89,8 +89,8 @@ Full JSON Structure:
       "content": "{crop|drapped|knitted|off-the-shoulder|neckhalter|neckhalter-o-ring|chain-neckhalter}",
       "path": "i_fbd86fa7/i_4dce92cc_1/i_4d3cf25f/i_cf104985",
       "position": {
-        "start": 6,
-        "end": 91
+        "start": 1,
+        "end": 86
       },
       "options": [
         "crop",
@@ -108,8 +108,8 @@ Full JSON Structure:
       "content": "{blouse|top|tank|bikini}",
       "path": "i_fbd86fa7/i_4dce92cc_1/i_4d3cf25f/i_f6411cc6",
       "position": {
-        "start": 92,
-        "end": 116
+        "start": 87,
+        "end": 111
       },
       "options": [
         "blouse",
@@ -124,8 +124,8 @@ Full JSON Structure:
       "content": "{denim|satin|silk|cotton|wool|linen}",
       "path": "i_fbd86fa7/i_4dce92cc_1/i_4d3cf25f/i_4fd2f1ed",
       "position": {
-        "start": 118,
-        "end": 154
+        "start": 113,
+        "end": 149
       },
       "options": [
         "denim",
@@ -142,8 +142,8 @@ Full JSON Structure:
       "content": "{hotpants|cutoffs|miniskirt}",
       "path": "i_fbd86fa7/i_4dce92cc_1/i_4d3cf25f/i_daa26c10",
       "position": {
-        "start": 174,
-        "end": 202
+        "start": 169,
+        "end": 197
       },
       "options": [
         "hotpants",
@@ -167,8 +167,8 @@ Full JSON Structure:
       "content": "{fine-thread|bold-thread|thin-strand|thick-strand|delicate-weave|coarse-weave}",
       "path": "i_fbd86fa7/i_4dce92cc_1/i_4d3cf25f/i_5ff3b343/i_6409d541_1/i_83d6a8d8",
       "position": {
-        "start": 210,
-        "end": 288
+        "start": 205,
+        "end": 283
       },
       "options": [
         "fine-thread",
@@ -185,8 +185,8 @@ Full JSON Structure:
       "content": "{micro|small-gauge|regular|wide|large-gauge|macro|fence}",
       "path": "i_fbd86fa7/i_4dce92cc_1/i_4d3cf25f/i_5ff3b343/i_6409d541_1/i_80600dc7",
       "position": {
-        "start": 289,
-        "end": 345
+        "start": 284,
+        "end": 340
       },
       "options": [
         "micro",
@@ -204,8 +204,8 @@ Full JSON Structure:
       "content": "{lace|{fine-thread|bold-thread|thin-strand|thick-strand|delicate-weave|coarse-weave} {micro|small-gauge|regular|wide|large-gauge|macro|fence} fishnet|sheer}",
       "path": "i_fbd86fa7/i_4dce92cc_1/i_4d3cf25f/i_5ff3b343",
       "position": {
-        "start": 204,
-        "end": 360
+        "start": 199,
+        "end": 355
       },
       "options": [
         "lace",
@@ -222,8 +222,8 @@ Full JSON Structure:
       "content": "{thigh-highs|stockings|pantyhose}",
       "path": "i_fbd86fa7/i_4dce92cc_1/i_4d3cf25f/i_631254f4",
       "position": {
-        "start": 361,
-        "end": 394
+        "start": 356,
+        "end": 389
       },
       "options": [
         "thigh-highs",
@@ -252,8 +252,8 @@ Full JSON Structure:
       "content": "{satin|cotton|silk|velvet|lace|chiffon|leather}",
       "path": "i_fbd86fa7/i_4dce92cc_1/i_3b93b0c7_1/i_2fcba8d9",
       "position": {
-        "start": 405,
-        "end": 452
+        "start": 390,
+        "end": 437
       },
       "options": [
         "satin",
@@ -271,8 +271,8 @@ Full JSON Structure:
       "content": "{evening|wrap|slit|maxi|mini|midi|majestic}",
       "path": "i_fbd86fa7/i_4dce92cc_1/i_3b93b0c7_1/i_1cc37c69",
       "position": {
-        "start": 453,
-        "end": 496
+        "start": 438,
+        "end": 481
       },
       "options": [
         "evening",
@@ -290,8 +290,8 @@ Full JSON Structure:
       "content": "{dress}",
       "path": "i_fbd86fa7/i_4dce92cc_1/i_3b93b0c7_1/i_56a1ed81",
       "position": {
-        "start": 497,
-        "end": 504
+        "start": 482,
+        "end": 489
       },
       "options": [
         "dress"
@@ -313,8 +313,8 @@ Full JSON Structure:
       "content": "{fine-thread|bold-thread|thin-strand|thick-strand|delicate-weave|coarse-weave}",
       "path": "i_fbd86fa7/i_4dce92cc_1/i_3b93b0c7_1/i_179f3a63_1/i_7ecc5b26_1/i_bbc136aa_1",
       "position": {
-        "start": 512,
-        "end": 590
+        "start": 497,
+        "end": 575
       },
       "options": [
         "fine-thread",
@@ -331,8 +331,8 @@ Full JSON Structure:
       "content": "{micro|small-gauge|regular|wide|large-gauge|macro|fence}",
       "path": "i_fbd86fa7/i_4dce92cc_1/i_3b93b0c7_1/i_179f3a63_1/i_7ecc5b26_1/i_05f8314a_1",
       "position": {
-        "start": 591,
-        "end": 647
+        "start": 576,
+        "end": 632
       },
       "options": [
         "micro",
@@ -350,8 +350,8 @@ Full JSON Structure:
       "content": "{lace|{fine-thread|bold-thread|thin-strand|thick-strand|delicate-weave|coarse-weave} {micro|small-gauge|regular|wide|large-gauge|macro|fence} fishnet|sheer}",
       "path": "i_fbd86fa7/i_4dce92cc_1/i_3b93b0c7_1/i_179f3a63_1",
       "position": {
-        "start": 506,
-        "end": 662
+        "start": 491,
+        "end": 647
       },
       "options": [
         "lace",
@@ -368,8 +368,8 @@ Full JSON Structure:
       "content": "{thigh-highs|stockings|pantyhose}",
       "path": "i_fbd86fa7/i_4dce92cc_1/i_3b93b0c7_1/i_71f9d824_1",
       "position": {
-        "start": 663,
-        "end": 696
+        "start": 648,
+        "end": 681
       },
       "options": [
         "thigh-highs",
@@ -383,8 +383,8 @@ Full JSON Structure:
       "content": "{lace|chiffon|silk|sheer|embroidered}",
       "path": "i_fbd86fa7/i_4dce92cc_1/i_3b93b0c7_1/i_0bd40434",
       "position": {
-        "start": 698,
-        "end": 735
+        "start": 683,
+        "end": 720
       },
       "options": [
         "lace",
@@ -400,8 +400,8 @@ Full JSON Structure:
       "content": "{shawl|cape|mantle|draping}",
       "path": "i_fbd86fa7/i_4dce92cc_1/i_3b93b0c7_1/i_52931606",
       "position": {
-        "start": 736,
-        "end": 763
+        "start": 721,
+        "end": 748
       },
       "options": [
         "shawl",
@@ -428,8 +428,8 @@ Full JSON Structure:
       "content": "{crop|drapped|knitted|off-the-shoulder|neckhalter|neckhalter-o-ring|chain-neckhalter}",
       "path": "i_fbd86fa7/i_4dce92cc_1/i_1d7f4551_2/i_65356a04_1",
       "position": {
-        "start": 774,
-        "end": 859
+        "start": 749,
+        "end": 834
       },
       "options": [
         "crop",
@@ -447,8 +447,8 @@ Full JSON Structure:
       "content": "{blouse|top|tank|bikini}",
       "path": "i_fbd86fa7/i_4dce92cc_1/i_1d7f4551_2/i_a47e9d79_1",
       "position": {
-        "start": 860,
-        "end": 884
+        "start": 835,
+        "end": 859
       },
       "options": [
         "blouse",
@@ -463,8 +463,8 @@ Full JSON Structure:
       "content": "{denim|leather|satin|silk|cotton|velvet|linen|wool|chiffon|stretch}",
       "path": "i_fbd86fa7/i_4dce92cc_1/i_1d7f4551_2/i_187e22ca",
       "position": {
-        "start": 886,
-        "end": 953
+        "start": 861,
+        "end": 928
       },
       "options": [
         "denim",
@@ -485,8 +485,8 @@ Full JSON Structure:
       "content": "{jeans|wide-leg trousers|cargo pants|palazzo pants|maxi skirts}",
       "path": "i_fbd86fa7/i_4dce92cc_1/i_1d7f4551_2/i_1677baa6",
       "position": {
-        "start": 973,
-        "end": 1036
+        "start": 948,
+        "end": 1011
       },
       "options": [
         "jeans",
