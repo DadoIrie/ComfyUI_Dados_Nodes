@@ -22,34 +22,46 @@ export class Textbox {
         return this.textbox;
     }
 
-    mark(str, type = 'button', start = null, end = null) {
+    mark(str, type = 'button', start = null, end = null, optionIndex = null) {
         this.unmark(type);
         if (!str || !this.cmEditor) return;
         const doc = this.cmEditor.getDoc();
         const value = doc.getValue();
-        let markStart = 0;
-        let markEnd = value.length;
-        if (typeof start === 'number' && typeof end === 'number' && start >= 0 && end > start) {
-            markStart = start;
-            markEnd = end;
-        }
-        console.log(`[Textbox.mark] type: ${type}, str: '${str}', startingAt: ${start}, endingAt: ${end}`);
-        let re = new RegExp(str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-        let match;
+        
+        console.log(`[Textbox.mark] type: ${type}, str: '${str}', startingAt: ${start}, endingAt: ${end}, optionIndex: ${optionIndex}`);
+        
         let found = null;
-        while ((match = re.exec(value)) !== null) {
-            if (match.index >= markStart && match.index + str.length <= markEnd) {
-                found = {start: match.index, end: match.index + str.length};
-                break;
+        
+        if (optionIndex !== null && optionIndex >= 0 && typeof start === 'number' && typeof end === 'number') {
+            // Calculate the exact position of the option within the wildcard
+            found = this._calculateOptionPosition(value, str, start, end, optionIndex);
+        } else {
+            // Original logic for non-duplicate cases or when optionIndex is not provided
+            let markStart = 0;
+            let markEnd = value.length;
+            if (typeof start === 'number' && typeof end === 'number' && start >= 0 && end > start) {
+                markStart = start;
+                markEnd = end;
+            }
+            
+            let re = new RegExp(str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+            let match;
+            while ((match = re.exec(value)) !== null) {
+                if (match.index >= markStart && match.index + str.length <= markEnd) {
+                    found = {start: match.index, end: match.index + str.length};
+                    break;
+                }
+            }
+            
+            if (!found) {
+                re.lastIndex = 0;
+                match = re.exec(value);
+                if (match) {
+                    found = {start: match.index, end: match.index + str.length};
+                }
             }
         }
-        if (!found) {
-            re.lastIndex = 0;
-            match = re.exec(value);
-            if (match) {
-                found = {start: match.index, end: match.index + str.length};
-            }
-        }
+        
         if (found) {
             const from = doc.posFromIndex(found.start);
             const to = doc.posFromIndex(found.end);
@@ -58,6 +70,67 @@ export class Textbox {
             doc.markText(from, to, { className });
             this.cmEditor.scrollIntoView({from, to});
         }
+    }
+
+    _calculateOptionPosition(fullText, optionText, wildcardStart, wildcardEnd, optionIndex) {
+        // Extract the wildcard content (without the braces)
+        const wildcardContent = fullText.substring(wildcardStart + 1, wildcardEnd - 1);
+        
+        // Parse the wildcard content into options, treating nested wildcards as single options
+        const options = this._parseWildcardOptions(wildcardContent);
+        
+        // Check if the option index is valid
+        if (optionIndex < 0 || optionIndex >= options.length) {
+            return null;
+        }
+        
+        // Calculate the position of the requested option
+        let currentPos = wildcardStart + 1; // Start after the opening {
+        
+        // Add the lengths of all previous options plus the | separators
+        for (let i = 0; i < optionIndex; i++) {
+            currentPos += options[i].length;
+            currentPos += 1; // Add 1 for the | separator after each option
+        }
+        
+        // The option starts at currentPos and ends at currentPos + optionText.length
+        const optionStart = currentPos;
+        const optionEnd = currentPos + optionText.length;
+        
+        return {start: optionStart, end: optionEnd};
+    }
+
+    _parseWildcardOptions(wildcardContent) {
+        const options = [];
+        let currentOption = '';
+        let bracketDepth = 0;
+        
+        for (let i = 0; i < wildcardContent.length; i++) {
+            const char = wildcardContent[i];
+            
+            if (char === '{') {
+                bracketDepth++;
+                currentOption += char;
+            } else if (char === '}') {
+                bracketDepth--;
+                currentOption += char;
+            } else if (char === '|' && bracketDepth === 0) {
+                // End of current option
+                if (currentOption.trim()) {
+                    options.push(currentOption.trim());
+                }
+                currentOption = '';
+            } else {
+                currentOption += char;
+            }
+        }
+        
+        // Add the last option
+        if (currentOption.trim()) {
+            options.push(currentOption.trim());
+        }
+        
+        return options;
     }
 
     unmark(type = 'button') {

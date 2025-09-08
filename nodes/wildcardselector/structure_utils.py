@@ -233,47 +233,64 @@ class WildcardStructureCreation:
                 # Process nested wildcards with absolute positions
                 for nw_idx, (nw_start, nw_end) in enumerate(nested_wildcards):
                     nested_content = choice[nw_start:nw_end]
-                    # Find the absolute position of this nested wildcard in the full text
-                    # We need to find the exact position of this choice within the parent wildcard
                     
-                    # Get all choices in the wildcard
-                    inner_content = wildcard_content[1:-1]  # Remove { and }
-                    all_choices = self.parse_choices(inner_content)
+                    # For nested wildcards, we need to find their exact position in the full text
+                    # The key is to use the actual choice index from the enumeration (choice_idx)
+                    # This ensures we get the correct occurrence of the nested wildcard
                     
-                    # Find the index of this choice in the list of all choices
-                    choice_index = -1
-                    for i, c in enumerate(all_choices):
-                        if c == choice:
-                            choice_index = i
-                            break
-                    
-                    # Calculate the offset of this choice within the parent wildcard
-                    # We need to find the actual position by parsing the parent wildcard content
-                    parent_inner_content = wildcard_content[1:-1]  # Remove { and }
-                    parent_choices = self.parse_choices(parent_inner_content)
-                    
-                    # Calculate the actual offset by finding where this choice starts
-                    choice_offset = 1  # Start after the opening {
-                    for i in range(choice_index):
-                        choice_offset += len(parent_choices[i]) + 1  # +1 for the |
-                    
-                    # For nested wildcards, we need to find their absolute position in the full text
-                    # The choice_offset gives us the position within the parent wildcard
-                    # But we also need to consider where this choice is in the full text
-                    
-                    # If we have the full text stored, use it to find the absolute position
                     if hasattr(self, 'full_text'):
-                        # Find the choice content in the full text to get its absolute position
-                        search_start = start_pos + choice_offset
-                        absolute_choice_pos = self.full_text.find(choice, search_start)
-                        if absolute_choice_pos != -1:
-                            absolute_start = absolute_choice_pos + nw_start
-                            absolute_end = absolute_choice_pos + nw_end
+                        # Calculate the position within the parent wildcard
+                        parent_inner_content = wildcard_content[1:-1]  # Remove { and }
+                        parent_choices = self.parse_choices(parent_inner_content)
+                        
+                        # Calculate the offset of this choice within the parent wildcard
+                        choice_offset = 1  # Start after the opening {
+                        for i in range(choice_idx):
+                            choice_offset += len(parent_choices[i]) + 1  # +1 for the |
+                        
+                        # Find the parent wildcard in the full text
+                        parent_wildcard_pos = self.full_text.find(wildcard_content, start_pos)
+                        if parent_wildcard_pos != -1:
+                            # Calculate the absolute position of the nested wildcard
+                            # parent_wildcard_pos + choice_offset gives us the start of the choice
+                            # + nw_start gives us the start of the nested wildcard within the choice
+                            absolute_start = parent_wildcard_pos + choice_offset + nw_start
+                            absolute_end = parent_wildcard_pos + choice_offset + nw_end
+                            
+                            # Verify this position is correct by checking the content
+                            if (absolute_start >= 0 and absolute_end <= len(self.full_text) and
+                                    self.full_text[absolute_start:absolute_end] == nested_content):
+                                # Position is correct, use it
+                                pass
+                            else:
+                                # If verification fails, try to find the exact occurrence
+                                # Count how many identical nested wildcards appear before this choice
+                                occurrence_count = 0
+                                for i in range(choice_idx):
+                                    if nested_content in parent_choices[i]:
+                                        occurrence_count += 1
+                                
+                                # Find the (occurrence_count + 1)th occurrence after the parent
+                                search_pos = parent_wildcard_pos
+                                for _ in range(occurrence_count + 1):
+                                    found_pos = self.full_text.find(nested_content, search_pos)
+                                    if found_pos != -1:
+                                        absolute_start = found_pos
+                                        absolute_end = found_pos + len(nested_content)
+                                        search_pos = found_pos + 1
+                                    else:
+                                        break
                         else:
-                            # Fallback to the original calculation
+                            # Parent wildcard not found in full text, use relative calculation
                             absolute_start = start_pos + choice_offset + nw_start
                             absolute_end = start_pos + choice_offset + nw_end
                     else:
+                        # No full text available, use relative calculation
+                        parent_inner_content = wildcard_content[1:-1]
+                        parent_choices = self.parse_choices(parent_inner_content)
+                        choice_offset = 1  # Start after the opening {
+                        for i in range(choice_idx):
+                            choice_offset += len(parent_choices[i]) + 1  # +1 for the |
                         absolute_start = start_pos + choice_offset + nw_start
                         absolute_end = start_pos + choice_offset + nw_end
                     
