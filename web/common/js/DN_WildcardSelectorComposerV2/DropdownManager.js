@@ -186,8 +186,8 @@ class DropdownUI {
                             });
                             this.sidebar.dispatchEvent(event);
                         } else {
-                            // Regular option handling
-                            const hasDuplicates = this._hasDuplicateOptions(parentWildcard);
+                            // Regular option handling - check if this specific option text has duplicates
+                            const hasDuplicates = this._hasDuplicateOptionText(parentWildcard, displayText);
                             const start = parentWildcard.position?.start;
                             const end = parentWildcard.position?.end;
                             
@@ -318,6 +318,38 @@ class DropdownUI {
                 return true;
             }
             seen.add(text);
+        }
+        
+        return false;
+    }
+    
+    _normalizeWildcardText(text) {
+        // Remove spaces around |, after {, and before }
+        return text.replace(/\s*\|\s*/g, '|')
+                  .replace(/{\s*/g, '{')
+                  .replace(/\s*}/g, '}');
+    }
+    
+    _hasDuplicateOptionText(wildcard, searchText) {
+        if (!wildcard.options || !Array.isArray(wildcard.options) || wildcard.options.length <= 1) {
+            return false;
+        }
+        
+        const normalizedSearchText = this._normalizeWildcardText(searchText);
+        let count = 0;
+        
+        for (const option of wildcard.options) {
+            const text = typeof option === 'string' ? option :
+                        (option?.displayText || option?.id || '');
+            
+            const normalizedText = this._normalizeWildcardText(text);
+            
+            if (normalizedText === normalizedSearchText) {
+                count++;
+                if (count > 1) {
+                    return true;
+                }
+            }
         }
         
         return false;

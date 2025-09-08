@@ -89,12 +89,43 @@ export class Textbox {
         // Add the lengths of all previous options plus the | separators
         for (let i = 0; i < optionIndex; i++) {
             currentPos += options[i].length;
-            currentPos += 1; // Add 1 for the | separator after each option
+            // Find the position of the next | separator
+            let pipePos = currentPos;
+            while (pipePos < wildcardEnd - 1 && fullText.charAt(pipePos) !== '|') {
+                pipePos++;
+            }
+            if (fullText.charAt(pipePos) === '|') {
+                currentPos = pipePos + 1; // Move past the | separator
+            }
         }
         
-        // The option starts at currentPos and ends at currentPos + optionText.length
-        const optionStart = currentPos;
-        const optionEnd = currentPos + optionText.length;
+        // Find the actual option text in the original text (with spaces)
+        const actualOptionText = options[optionIndex];
+        
+        // Find the exact position of this option in the original text
+        let searchPos = currentPos;
+        let optionStart = -1;
+        let optionEnd = -1;
+        
+        // Skip leading whitespace
+        while (searchPos < wildcardEnd - 1 && /\s/.test(fullText.charAt(searchPos))) {
+            searchPos++;
+        }
+        
+        // The option starts at searchPos
+        optionStart = searchPos;
+        
+        // Find the end of the option (before the next | or })
+        while (searchPos < wildcardEnd - 1 && fullText.charAt(searchPos) !== '|' && fullText.charAt(searchPos) !== '}') {
+            searchPos++;
+        }
+        
+        // Go backwards to skip trailing whitespace
+        while (searchPos > optionStart && /\s/.test(fullText.charAt(searchPos - 1))) {
+            searchPos--;
+        }
+        
+        optionEnd = searchPos;
         
         return {start: optionStart, end: optionEnd};
     }
@@ -103,24 +134,40 @@ export class Textbox {
         const options = [];
         let currentOption = '';
         let bracketDepth = 0;
+        let pos = 0;
         
-        for (let i = 0; i < wildcardContent.length; i++) {
-            const char = wildcardContent[i];
+        while (pos < wildcardContent.length) {
+            const char = wildcardContent[pos];
             
             if (char === '{') {
+                // Start of a nested wildcard
                 bracketDepth++;
                 currentOption += char;
-            } else if (char === '}') {
-                bracketDepth--;
-                currentOption += char;
+                pos++;
+                
+                // Find the matching closing brace
+                while (pos < wildcardContent.length && bracketDepth > 0) {
+                    const nestedChar = wildcardContent[pos];
+                    currentOption += nestedChar;
+                    
+                    if (nestedChar === '{') {
+                        bracketDepth++;
+                    } else if (nestedChar === '}') {
+                        bracketDepth--;
+                    }
+                    
+                    pos++;
+                }
             } else if (char === '|' && bracketDepth === 0) {
                 // End of current option
                 if (currentOption.trim()) {
                     options.push(currentOption.trim());
                 }
                 currentOption = '';
+                pos++;
             } else {
                 currentOption += char;
+                pos++;
             }
         }
         
