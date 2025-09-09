@@ -3,7 +3,7 @@ import os
 from typing import Any, Dict, Optional, Callable, List
 from aiohttp import web
 from server import PromptServer
-from ... import constants, MESSAGE_ROUTE, EXTENSION_NAME  # Import from root __init__.py
+from ... import constants, MESSAGE_ROUTE, EXTENSION_NAME
 
 class TimedOutException(Exception):
     """Exception raised when waiting for a message times out"""
@@ -51,7 +51,7 @@ operation_handlers: List[Callable] = []
 def register_operation_handler(handler_func: Callable):
     """Register a handler function for operations"""
     operation_handlers.append(handler_func)
-    return handler_func  # Return the function to allow use as decorator
+    return handler_func
 
 def register_routes():
     """Register all routes for the extension"""
@@ -67,22 +67,18 @@ def register_routes():
         json_data = await request.json()
         node_id = json_data.get("id")
         
-        # If no operation is specified, store the message for polling
         if node_id and "operation" not in json_data:
             ComfyAPIMessage.MESSAGE[str(node_id)] = json_data
             return web.json_response(json_data)
         
-        # If operation is specified, try to find a handler
         if "operation" in json_data:
             for handler in operation_handlers:
                 response = await handler(request)
                 if response is not None:
                     return response
                 
-        # Return success response for valid message if no handler processed it
         return web.json_response({"status": "success"})
     
-    # Static file routes
     @PromptServer.instance.routes.get(f"/extensions/{EXTENSION_NAME}/common/{{path:.*}}")
     async def serve_common_file(request):
         path = request.match_info['path']
@@ -93,7 +89,6 @@ def register_routes():
             return web.FileResponse(file_path)
         return web.Response(status=404)
     
-    # Constants route for frontend
     @PromptServer.instance.routes.get("/dadosConstants")
     async def dados_constants(request):
         constants_data = {
