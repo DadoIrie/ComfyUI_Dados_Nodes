@@ -64,7 +64,6 @@ async def handle_text_dropdown_operations(request):
         data = await request.json()
         operation = data.get('operation')
         
-        # Skip if not a text_dropdown operation
         if operation not in ['update_selection', 'remove_selection']:
             return None
             
@@ -80,7 +79,6 @@ async def handle_text_dropdown_operations(request):
                 if selection == "random" and entries is not None:
                     DN_TextDropDownNode.entries_map[node_id] = entries
                 
-                # Just return success without sending a message
                 return web.json_response({"status": "success"})
         
         elif operation == 'remove_selection':
@@ -89,7 +87,6 @@ async def handle_text_dropdown_operations(request):
             if node_id in DN_TextDropDownNode.entries_map:
                 del DN_TextDropDownNode.entries_map[node_id]
                 
-            # Just return success without sending a message
             return web.json_response({"status": "success"})
         
         return web.json_response({"error": "Invalid operation or parameters"}, status=400)
