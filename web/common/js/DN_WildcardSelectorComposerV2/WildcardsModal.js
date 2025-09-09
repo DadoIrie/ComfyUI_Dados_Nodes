@@ -60,7 +60,6 @@ export class WildcardsModal {
                 this.initializeDropdowns();
             }
         });
-        // Return the promise for the textbox node
         return this.textbox.createTextbox();
     }
 

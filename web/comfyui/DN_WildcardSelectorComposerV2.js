@@ -79,7 +79,6 @@ class DN_WildcardSelectorComposerV2 {
     }
 
     updateProcessedPromptState(isConnected) {
-        console.log("isConnected pass from listener", isConnected);
         fetchSend(
             MESSAGE_ROUTE,
             this.node.id,

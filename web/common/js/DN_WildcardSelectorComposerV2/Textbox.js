@@ -22,34 +22,43 @@ export class Textbox {
         return this.textbox;
     }
 
-    mark(str, type = 'button', start = null, end = null) {
+    mark(str, type = 'button', start = null, end = null, optionIndex = null) {
         this.unmark(type);
         if (!str || !this.cmEditor) return;
         const doc = this.cmEditor.getDoc();
         const value = doc.getValue();
-        let markStart = 0;
-        let markEnd = value.length;
-        if (typeof start === 'number' && typeof end === 'number' && start >= 0 && end > start) {
-            markStart = start;
-            markEnd = end;
-        }
-        console.log(`[Textbox.mark] type: ${type}, str: '${str}', startingAt: ${start}, endingAt: ${end}`);
-        let re = new RegExp(str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-        let match;
+        
+        
         let found = null;
-        while ((match = re.exec(value)) !== null) {
-            if (match.index >= markStart && match.index + str.length <= markEnd) {
-                found = {start: match.index, end: match.index + str.length};
-                break;
+        
+        if (optionIndex !== null && optionIndex >= 0 && typeof start === 'number' && typeof end === 'number') {
+            found = this._calculateOptionPosition(value, str, start, end, optionIndex);
+        } else {
+            let markStart = 0;
+            let markEnd = value.length;
+            if (typeof start === 'number' && typeof end === 'number' && start >= 0 && end > start) {
+                markStart = start;
+                markEnd = end;
+            }
+            
+            let re = new RegExp(str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+            let match;
+            while ((match = re.exec(value)) !== null) {
+                if (match.index >= markStart && match.index + str.length <= markEnd) {
+                    found = {start: match.index, end: match.index + str.length};
+                    break;
+                }
+            }
+            
+            if (!found) {
+                re.lastIndex = 0;
+                match = re.exec(value);
+                if (match) {
+                    found = {start: match.index, end: match.index + str.length};
+                }
             }
         }
-        if (!found) {
-            re.lastIndex = 0;
-            match = re.exec(value);
-            if (match) {
-                found = {start: match.index, end: match.index + str.length};
-            }
-        }
+        
         if (found) {
             const from = doc.posFromIndex(found.start);
             const to = doc.posFromIndex(found.end);
@@ -58,6 +67,98 @@ export class Textbox {
             doc.markText(from, to, { className });
             this.cmEditor.scrollIntoView({from, to});
         }
+    }
+
+    _calculateOptionPosition(fullText, optionText, wildcardStart, wildcardEnd, optionIndex) {
+        const wildcardContent = fullText.substring(wildcardStart + 1, wildcardEnd - 1);
+        
+        const options = this._parseWildcardOptions(wildcardContent);
+        
+        if (optionIndex < 0 || optionIndex >= options.length) {
+            return null;
+        }
+        
+        let currentPos = wildcardStart + 1;
+        
+        for (let i = 0; i < optionIndex; i++) {
+            currentPos += options[i].length;
+            let pipePos = currentPos;
+            while (pipePos < wildcardEnd - 1 && fullText.charAt(pipePos) !== '|') {
+                pipePos++;
+            }
+            if (fullText.charAt(pipePos) === '|') {
+                currentPos = pipePos + 1;
+            }
+        }
+        
+        const actualOptionText = options[optionIndex];
+        
+        let searchPos = currentPos;
+        let optionStart = -1;
+        let optionEnd = -1;
+        
+        while (searchPos < wildcardEnd - 1 && /\s/.test(fullText.charAt(searchPos))) {
+            searchPos++;
+        }
+        
+        optionStart = searchPos;
+        
+        while (searchPos < wildcardEnd - 1 && fullText.charAt(searchPos) !== '|' && fullText.charAt(searchPos) !== '}') {
+            searchPos++;
+        }
+        
+        while (searchPos > optionStart && /\s/.test(fullText.charAt(searchPos - 1))) {
+            searchPos--;
+        }
+        
+        optionEnd = searchPos;
+        
+        return {start: optionStart, end: optionEnd};
+    }
+
+    _parseWildcardOptions(wildcardContent) {
+        const options = [];
+        let currentOption = '';
+        let bracketDepth = 0;
+        let pos = 0;
+        
+        while (pos < wildcardContent.length) {
+            const char = wildcardContent[pos];
+            
+            if (char === '{') {
+                bracketDepth++;
+                currentOption += char;
+                pos++;
+                
+                while (pos < wildcardContent.length && bracketDepth > 0) {
+                    const nestedChar = wildcardContent[pos];
+                    currentOption += nestedChar;
+                    
+                    if (nestedChar === '{') {
+                        bracketDepth++;
+                    } else if (nestedChar === '}') {
+                        bracketDepth--;
+                    }
+                    
+                    pos++;
+                }
+            } else if (char === '|' && bracketDepth === 0) {
+                if (currentOption.trim()) {
+                    options.push(currentOption.trim());
+                }
+                currentOption = '';
+                pos++;
+            } else {
+                currentOption += char;
+                pos++;
+            }
+        }
+        
+        if (currentOption.trim()) {
+            options.push(currentOption.trim());
+        }
+        
+        return options;
     }
 
     unmark(type = 'button') {
@@ -130,7 +231,6 @@ export class Textbox {
             const selections = doc.listSelections();
             if (event.key === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey) {
                 event.preventDefault();
-                // Directly retrieve tab_spaces setting
                 const tabSpaces = await window.app.extensionManager.setting.get("wildcard_selector.tab_spaces");
                 const spaces = " ".repeat(tabSpaces);
                 if (selections.length === 1 && selections[0].empty()) {
@@ -271,9 +371,7 @@ export class Textbox {
             document.head.appendChild(link);
         }
         const basePath = `/extensions/${this.constants.EXTENSION_NAME}/common/vendor/js/codemirror/`;
-        // Load codemirror core first
         await this.loadScript(`${basePath}codemirror.min.js`);
-        // Then load addons
         await Promise.all([
             this.loadScript(`${basePath}mark-selection.min.js`),
             this.loadScript(`${basePath}searchcursor.min.js`)
