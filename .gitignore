@@ -3,3 +3,4 @@ __pycache__/
 models/
 .cred_root/
 config.json
+.github/
