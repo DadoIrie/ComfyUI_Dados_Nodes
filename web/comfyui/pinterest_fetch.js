@@ -332,52 +332,40 @@ app.registerExtension({
                 return widgetFactory.createWidget(node, widgetData);
             };
                         
-            // Validate token with credentials
             try {
                 const validationResult = await validatePinterestToken(node);
                 console.log(`Token validation result for node ${node.id}:`, validationResult);
                 
-                // Based on authentication status, choose the appropriate widget list
                 const isAuthenticated = validationResult.valid === true;
                 const widgetList = isAuthenticated ? authenticatedWidgets : unauthenticatedWidgets;
                 
-                // If not authenticated, store outputs and clear them
                 if (!isAuthenticated) {
-                    // Store original outputs for later restoration
                     node._originalOutputs = [...node.outputs];
-                    // Clear outputs
                     node.outputs = [];
                 }
                 
-                // Create all widgets from the selected list
                 widgetList.map(widgetData => widgetCreator(widgetData));
             } catch(error) {
                 console.error(`Error validating token for node ${node.id}:`, error);
-                // In case of error, default to unauthenticated state
                 node._originalOutputs = [...node.outputs];
                 node.outputs = [];
                 unauthenticatedWidgets.map(widgetData => widgetCreator(widgetData));
             }
             
-            // Create event handler with filtering by node ID in the message payload
             const eventHandler = ({ detail }) => {
-                // Only process messages intended for this node
                 if (detail.node_id == node.id || detail.id == node.id) {
                     handleNodeMessages(node, detail);
                 }
             };
             
-            // Listen to global event (no node ID in event name)
             console.log(`Setting up global event listener for ${MESSAGE_ROUTE}`);
             api.addEventListener(MESSAGE_ROUTE, eventHandler);
             
-            // Add cleanup when node is removed
             chainCallback(node, "onRemoved", function() {
                 api.removeEventListener(MESSAGE_ROUTE, eventHandler);
                 console.log(`Removed event listener for ${MESSAGE_ROUTE}`);
             });
 
-            // Force canvas update to make widgets visible immediately
             node.setDirtyCanvas(true);
         });
     }
