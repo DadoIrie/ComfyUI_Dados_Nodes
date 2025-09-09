@@ -103,11 +103,9 @@ class WildcardManager {
         const selections = JSON.parse(this.operations.originalSelections || '{}');
         const wildcardId = this._createWildcardIdentifier(wildcard);
         
-        // Look for mark by wildcard identifier first, then fallback to index
         let savedMark = '';
         let pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
 
-        // First try to find by identifier in all selections
         for (const [selectionIndex, selectionData] of Object.entries(selections)) {
             const selectionId = this._getWildcardIdentifierFromSelections(selections, selectionIndex);
             if (selectionId === wildcardId && selectionData.mark) {
@@ -116,7 +114,6 @@ class WildcardManager {
             }
         }
 
-        // Fallback to direct index lookup
         if (!savedMark && selections[wildcard.index]?.mark) {
             savedMark = selections[wildcard.index].mark;
         }
@@ -191,11 +188,9 @@ class WildcardManager {
         const selections = JSON.parse(this.operations.originalSelections || '{}');
         const wildcardId = this._createWildcardIdentifier(wildcard);
         
-        // Look for mark by identifier first
         let savedMark = '';
         let pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
 
-        // Search for mark by identifier
         for (const [selectionIndex, selectionData] of Object.entries(selections)) {
             const selectionId = this._getWildcardIdentifierFromSelections(selections, selectionIndex);
             if (selectionId === wildcardId && selectionData.mark) {
@@ -204,7 +199,6 @@ class WildcardManager {
             }
         }
 
-        // Fallback to direct index
         if (!savedMark && selections[wildcard.index]?.mark) {
             savedMark = selections[wildcard.index].mark;
         }
@@ -279,7 +273,6 @@ class WildcardManager {
         const selections = JSON.parse(this.operations.originalSelections || '{}');
         const wildcardId = this._createWildcardIdentifier(wildcard);
         
-        // Find mark by identifier or index
         let savedMark = '';
         for (const [selectionIndex, selectionData] of Object.entries(selections)) {
             const selectionId = this._getWildcardIdentifierFromSelections(selections, selectionIndex);
@@ -313,7 +306,6 @@ class WildcardManager {
 
         const addMark = () => {
             let val = input.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
-            // MODIFIED: Store wildcard position and content for stable identification
             this.operations.updatePendingMark(wildcard.index, val, wildcard);
 
             this.activeOverlay = null;
@@ -326,7 +318,6 @@ class WildcardManager {
                     const selections = JSON.parse(this.operations.originalSelections || '{}');
                     const pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
                     
-                    // Find saved mark by identifier
                     let savedMark = '';
                     const wildcardId = this._createWildcardIdentifier(wildcard);
                     for (const [selectionIndex, selectionData] of Object.entries(selections)) {
@@ -358,7 +349,6 @@ class WildcardManager {
                     const selections = JSON.parse(this.operations.originalSelections || '{}');
                     const pendingMark = this.operations.pendingSelections[wildcard.index]?.mark;
                     
-                    // Find saved mark by identifier
                     let savedMark = '';
                     const wildcardId = this._createWildcardIdentifier(wildcard);
                     for (const [selectionIndex, selectionData] of Object.entries(selections)) {
@@ -505,7 +495,6 @@ class WildcardManager {
             this._toggleCustomDropdown(container);
         };
 
-/*         document.addEventListener('mousedown', handleClickOutsideDropdown); */
 
         container.appendChild(button);
         container.appendChild(arrow);
@@ -535,7 +524,6 @@ class WildcardManager {
             selectedOption.scrollIntoView({ block: 'nearest' });
         }
 
-        // Add click outside handler
         const handleClickOutsideDropdown = (e) => {
             if (!container.contains(e.target)) {
                 this._closeCustomDropdown(container);
@@ -552,7 +540,6 @@ class WildcardManager {
         if (this.activeOverlay === container) {
             this.activeOverlay = null;
         }
-        // Remove click outside handler if needed (already handled above)
     }
 
     _handleCustomDropdownSelection(container, wildcard, selectedOption, selectedIndex) {
@@ -602,7 +589,6 @@ class WildcardManager {
 
     async handleSelectionChange(wildcard, selectedValue, selectedIndex) {
         try {
-            // MODIFIED: Include position data
             this.operations.updatePendingSelection(wildcard.index, selectedValue, wildcard.original, wildcard.position);
             
             this.updateChildrenVisibility(wildcard, selectedIndex, false);
@@ -842,12 +828,10 @@ class WildcardManager {
     }
 
     async _savePendingSelections() {
-        // Group updates: first do selections, then do marks to ensure marks are preserved
         const selectionUpdates = [];
         const markUpdates = [];
         
         for (const [wildcardIndex, selectionData] of Object.entries(this.operations.pendingSelections)) {
-            // If there's a selection change, add it to selection updates
             if (selectionData.selected !== undefined) {
                 selectionUpdates.push({
                     wildcard_index: wildcardIndex,
@@ -858,7 +842,6 @@ class WildcardManager {
                 });
             }
             
-            // If there's a mark change, add it to mark updates  
             if (selectionData.mark !== undefined) {
                 markUpdates.push({
                     wildcard_index: wildcardIndex,
@@ -873,7 +856,6 @@ class WildcardManager {
 
         let latestSelectionsJson = this.textLoaderInstance.getHiddenWidgetValue("wildcards_selections");
         
-        // Process selection updates first
         for (const updateData of selectionUpdates) {
             updateData.wildcards_selections = latestSelectionsJson;
             
@@ -884,7 +866,6 @@ class WildcardManager {
             }
         }
         
-        // Process mark updates second, ensuring we preserve all existing marks
         for (const updateData of markUpdates) {
             updateData.wildcards_selections = latestSelectionsJson;
             
@@ -895,7 +876,6 @@ class WildcardManager {
             }
         }
         
-        // Update with the final selections JSON that contains all changes
         this.textLoaderInstance.updateHiddenWidget("wildcards_selections", latestSelectionsJson);
         this.operations.originalSelections = latestSelectionsJson;
     }
@@ -940,16 +920,12 @@ class WildcardManager {
         this.lastWildcardStructure = this._extractWildcardStructure(wildcards);
     }
 
-    // NEW: Create stable wildcard identifier
     _createWildcardIdentifier(wildcard) {
-        // Combine original content and position for a stable identifier
         const content = wildcard.original || '';
         const position = wildcard.position || 0;
-        // Create a hash-like identifier that's stable regardless of index changes
         return `${content}@${position}`;
     }
 
-    // NEW: Get wildcard identifier from selections
     _getWildcardIdentifierFromSelections(selections, wildcardIndex) {
         const selection = selections[wildcardIndex];
         if (selection && selection.original !== undefined && selection.position !== undefined) {
@@ -989,7 +965,6 @@ class Operations {
             try {
                 const selections = JSON.parse(this.originalSelections || '{}');
                 
-                // NEW: Search by identifier first
                 const wildcardId = `${originalWildcard}@${wildcardPosition}`;
                 for (const [selectionIndex, selectionData] of Object.entries(selections)) {
                     const selectionId = selectionData.original && selectionData.position !== undefined
@@ -1001,7 +976,6 @@ class Operations {
                     }
                 }
                 
-                // Fallback to direct index lookup
                 if (existingMark === undefined) {
                     existingMark = selections[wildcardIndex]?.mark;
                 }
@@ -1025,14 +999,12 @@ class Operations {
         this.hasUnsavedSelectionChanges = true;
     }
 
-    // MODIFIED: Update to include wildcard metadata
     updatePendingMark(wildcardIndex, markValue, wildcard = null) {
         let originalMark = '';
         let selections = {};
         try {
             selections = JSON.parse(this.originalSelections || '{}');
             
-            // NEW: Search by identifier if wildcard provided
             if (wildcard) {
                 const wildcardId = `${wildcard.original}@${wildcard.position}`;
                 for (const [selectionIndex, selectionData] of Object.entries(selections)) {
@@ -1046,7 +1018,6 @@ class Operations {
                 }
             }
             
-            // Fallback to direct lookup
             if (!originalMark) {
                 originalMark = selections[wildcardIndex]?.mark || '';
             }
@@ -1060,11 +1031,10 @@ class Operations {
             this.pendingSelections[wildcardIndex] = { 
                 selected: savedSelection, 
                 original: savedOriginal,
-                position: savedPosition // NEW: Store position
+                position: savedPosition
             };
         }
         
-        // NEW: Update position if wildcard provided
         if (wildcard) {
             this.pendingSelections[wildcardIndex].original = wildcard.original;
             this.pendingSelections[wildcardIndex].position = wildcard.position;
@@ -1106,13 +1076,11 @@ class Operations {
             currentSelections = {};
         }
 
-        // FIXED: Merge each pending selection individually to preserve existing marks
         for (const [wildcardIndex, pendingData] of Object.entries(this.pendingSelections)) {
             if (!currentSelections[wildcardIndex]) {
                 currentSelections[wildcardIndex] = {};
             }
             
-            // Merge the pending data with existing data
             currentSelections[wildcardIndex] = {
                 ...currentSelections[wildcardIndex],
                 ...pendingData
@@ -1282,18 +1250,14 @@ class ButtonManager {
             this.setButtonState(clearButton, 'Clearing...', true);
             
             try {
-                // Clear the textarea
                 const textarea = this.elements.elements.textarea;
                 textarea.value = '';
                 
-                // Save the empty content
                 await this.operations.saveContent('');
                 
-                // Update UI to show no wildcards
                 this.wildcardManager.createWildcardUI(this.elements.elements.wildcardDropdowns, []);
                 this.elements.autoExpandSidebar(0);
                 
-                // Show notification
                 this.wildcardManager.showNotification(
                     this.elements.elements.wildcardDropdowns, 
                     'Text content cleared'
@@ -1419,7 +1383,6 @@ export function createTextEditorModal(node, textContent, constants, textLoaderIn
     wildcardControls.insertBefore(sidebarButtonsContainer, elements.elements.wildcardDropdowns);
     elements.elements.sidebarContent.appendChild(wildcardControls);
 
-    // MODIFIED: Create main button container with both Clear and Save buttons
     const mainButtonsContainer = document.createElement('div');
     Object.assign(mainButtonsContainer.style, {
         display: 'flex',
