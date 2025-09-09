@@ -16,7 +16,6 @@ let EXTENSION_NAME, MESSAGE_ROUTE, chainCallback, fetchSend;
 async function validatePinterestToken(node) {
     console.log(`Validating token for node ${node.id}`);
     
-    // Get credentials directly in the function
     const credentials = await getPinterestCredentials();
     
     const response = await fetchSend(
@@ -32,7 +31,6 @@ async function validatePinterestToken(node) {
     if (response.valid && response.username) {
         console.log(`Token validation for node ${node.id}: Valid token for user "${response.username}"`);
     } else {
-        // Now we can differentiate between missing and invalid tokens
         if (response.token_status === "missing") {
             console.log(`Token validation for node ${node.id}: No token found, authentication required`);
         } else if (response.token_status === "invalid") {
@@ -54,7 +52,6 @@ async function getPinterestCredentials() {
     const scope = await app.extensionManager.setting.get("pinterest.scope");
     const token_environment = await app.extensionManager.setting.get("pinterest.token_environment") || "standard";
     
-    // For special environments
     let accessToken = null;
     if (token_environment === "production_limited") {
         accessToken = await app.extensionManager.setting.get("pinterest.production_limited_access_token");
@@ -111,31 +108,25 @@ function handleNodeMessages(node, detail) {
         case "auth_complete":
             console.log(`Node ${node.id} - OAuth complete: ${message}`);
             if (status === "success") {
-                // Remove existing authentication button
                 while (node.widgets.length > 0) {
                     node.widgets.splice(0, 1);
                 }
                 
-                // Create authenticated widgets
                 const widgetCreator = (widgetData) => {
                     return widgetFactory.createWidget(node, widgetData);
                 };
                 
-                // Restore original outputs if they were saved
                 if (node._originalOutputs && node._originalOutputs.length > 0) {
                     node.outputs = node._originalOutputs;
-                    delete node._originalOutputs; // Clean up
+                    delete node._originalOutputs;
                 }
                 
-                // Add all authenticated widgets
                 authenticatedWidgets.map(widgetData => widgetCreator(widgetData));
                 
-                // Update the canvas
                 node.setDirtyCanvas(true);
                 
                 console.log(`Dynamically updated widgets for node ${node.id} after successful authentication`);
                 
-                // Request boards now that we are authenticated
                 requestBoards(node);
             }
             break;
@@ -169,10 +160,8 @@ function handleNodeMessages(node, detail) {
 async function authenticate() {
     console.log(`Authentication was requested on node ${this.id}`);
     
-    // Get credentials from settings
     const credentials = await getPinterestCredentials();
     
-    // Call the authentication operation directly
     const response = await fetchSend(
         MESSAGE_ROUTE,
         this.id,
@@ -190,7 +179,6 @@ async function authenticate() {
 
 function selectPinterestImage() {
     console.log(`Selecting Image was requested on node ${this.id}`);
-    // Call the existing requestBoards function with this node
     requestBoards(this);
 }
 
@@ -246,7 +234,6 @@ const unauthenticatedWidgets = [
 ];
 
 const settingsList = [
-    // This will appear FIRST in the UI
     {
         id: "app_id",
         name: "App ID",
@@ -316,18 +303,15 @@ app.registerExtension({
         
         chainCallback(nodeType.prototype, "onNodeCreated", async function() {
             const node = this;
-            // Log the constants here
             console.log("Extension constants in node:", {
                 EXTENSION_NAME,
                 MESSAGE_ROUTE
             });
 
-            // Get credentials from settings
             const credentials = await getPinterestCredentials();
             console.log("Pinterest credentials retrieved from settings, App ID present:", !!credentials.app_id);
             console.log("Setting up Pinterest node", this);
             
-            // Create widgets for the node
             const widgetCreator = (widgetData) => {
                 return widgetFactory.createWidget(node, widgetData);
             };
