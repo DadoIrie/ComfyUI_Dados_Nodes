@@ -12,12 +12,7 @@ let EXTENSION_NAME, MESSAGE_ROUTE, chainCallback, fetchSend;
    await import(`/extensions/${EXTENSION_NAME}/common/js/utils.js`));
 })().catch(error => console.error("Failed:", error));
 
-/**
- * Validates Pinterest token and updates node status
- */
-/**
- * Validates Pinterest token and updates node status
- */
+
 async function validatePinterestToken(node) {
     console.log(`Validating token for node ${node.id}`);
     
@@ -52,9 +47,7 @@ async function validatePinterestToken(node) {
 
 
 
-/**
- * Get Pinterest credentials from settings
- */
+
 async function getPinterestCredentials() {
     const app_id = await app.extensionManager.setting.get("pinterest.app_id");
     const app_secret = await app.extensionManager.setting.get("pinterest.app_secret");
@@ -79,9 +72,7 @@ async function getPinterestCredentials() {
 }
 
 
-/**
- * Request boards from the backend
- */
+
 async function requestBoards(node) {
     console.log(`Requesting boards (node ${node.id})`);
     
@@ -99,9 +90,7 @@ async function requestBoards(node) {
     
     console.log("Backend API response for boards:", response);
 }
- /**
- * Handle messages from backend to a specific Pinterest node
- */
+
 function handleNodeMessages(node, detail) {
     const { operation, status, message, payload } = detail;
     
@@ -176,9 +165,7 @@ function handleNodeMessages(node, detail) {
             console.warn(`Unknown operation: ${operation}`);
     }
 }
-/**
- * Button action function for initiating Pinterest authentication
- */
+
 async function authenticate() {
     console.log(`Authentication was requested on node ${this.id}`);
     
@@ -199,8 +186,6 @@ async function authenticate() {
     
     console.log("Authentication initiation response:", response);
     
-    // The actual OAuth redirect will be handled by the handleNodeMessages function
-    // when it receives the "oauth_started" message with the oauth_url
 }
 
 function selectPinterestImage() {
@@ -209,9 +194,7 @@ function selectPinterestImage() {
     requestBoards(this);
 }
 
-/**
- * Widget factory for creating different types of widgets
- */
+
 const widgetFactory = {
     createWidget: (node, { name, type, value, options, tooltip, action }) => {
         const widgetTypes = {
@@ -228,9 +211,7 @@ const widgetFactory = {
     }
 };
 
-/**
- * Callback function for widget changes
- */
+
 function widgetCallback(node, changedWidget) {
     if (changedWidget.type === "button") {
         return;
@@ -239,9 +220,7 @@ function widgetCallback(node, changedWidget) {
     console.log(`Widget [${changedWidget.name}] changed on node ${node.id}`);
 }
 
-/**
- * List of widget definitions
- */
+
 const authenticatedWidgets = [
     {
         name: "Boards",
