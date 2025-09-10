@@ -54,12 +54,13 @@ class DN_WildcardSelectorComposerV2 {
             const wildcardPromptWidget = this.node.widgets?.find(w => w.name === "wildcards_prompt");
             const wildcardStructureWidget = this.node.widgets?.find(w => w.name === "wildcards_structure_data");
             
-/*             if (wildcardPromptWidget && wildcardStructureWidget) {
+            // hide it again when needed
+            if (wildcardPromptWidget && wildcardStructureWidget) {
                 wildcardPromptWidget.hidden = true;
                 wildcardStructureWidget.hidden = true;
                 wildcardPromptWidget.computeSize = () => [0, -4];
                 wildcardStructureWidget.computeSize = () => [0, -4];
-            } */
+            }
     }
 
     createEditContentButton() {
