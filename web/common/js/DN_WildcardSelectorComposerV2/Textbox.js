@@ -1,9 +1,9 @@
 import { fetchSend } from "../utils.js";
 
 export class Textbox {
-    constructor(node, nodeDataProcessor, { constants = {}, onStructureUpdate } = {}) {
+    constructor(node, mediator, { constants = {}, onStructureUpdate } = {}) {
         this.node = node;
-        this.nodeDataProcessor = nodeDataProcessor;
+        this.mediator = mediator;
         this.constants = constants;
         this.onStructureUpdate = onStructureUpdate;
         this.structureData = null;
@@ -23,37 +23,11 @@ export class Textbox {
     }
 
     getContent() {
-        return this.cmEditor ? this.cmEditor.getValue() : "";
+        return this.cmEditor.getValue();
     }
 
     async saveAndSync() {
-        const content = this.getContent();
-        const structureDataStr = this.nodeDataProcessor.getWildcardsStructure();
-        this.structureData = structureDataStr ? JSON.parse(structureDataStr) : {};
-        const currentStructure = this.structureData ? JSON.stringify(this.structureData) : "";
-        try {
-            this.nodeDataProcessor.updateNodeData({ wildcards_prompt: content });
-            const response = await fetchSend(
-                this.constants.MESSAGE_ROUTE,
-                this.node.id,
-                "update_wildcards_prompt",
-                { content, wildcards_structure_data: currentStructure }
-            );
-            if (response.status === 'success' && response.wildcard_structure_data !== undefined) {
-                this.nodeDataProcessor.updateNodeData({
-                    wildcards_structure_data: response.wildcard_structure_data
-                });
-                this.structureData = JSON.parse(response.wildcard_structure_data);
-                if (this.onStructureUpdate) {
-                    this.onStructureUpdate(this.structureData);
-                }
-            }
-            this.node.setDirtyCanvas(true, true);
-            this.showSuccessMessage("Saved!");
-        } catch (error) {
-            console.error("Error saving content:", error);
-            this.showErrorMessage("Save failed");
-        }
+        this.mediator.queueEvent('save-request', {});
     }
 
     _createTextboxElement() {
@@ -71,7 +45,7 @@ export class Textbox {
 
     async _initCodeMirror() {
         await this.loadCodeMirror();
-        const wildcardsPrompt = this.nodeDataProcessor.getWildcardsPrompt() || "";
+        const wildcardsPrompt = this.mediator.getWildcardsPrompt();
         if (!window.CodeMirror.modes["wildcards"]) {
             window.CodeMirror.defineMode("wildcards", function() {
                 return {
@@ -247,7 +221,7 @@ export class Textbox {
             this.cmEditor.setValue("");
             this.cmEditor.focus();
             this.structureData = {};
-            this.nodeDataProcessor.updateNodeData({ wildcards_structure_data: "{}" });
+            this.mediator.updateNodeData({ wildcards_structure_data: "{}" });
             if (this.onStructureUpdate) {
                 this.onStructureUpdate(this.structureData);
             }
@@ -277,158 +251,50 @@ export class Textbox {
         alert(message);
     }
 
-    mark(str, type = 'button', start = null, end = null, optionIndex = null) {
-        this.unmark(type);
-        if (!str || !this.cmEditor) return;
+    // Simple marking command - just executes what the mediator tells it to do
+    markText(start, end, className = 'wildcard-mark') {
+        if (!this.cmEditor) return;
+        
         const doc = this.cmEditor.getDoc();
-        const value = doc.getValue();
+        const from = doc.posFromIndex(start);
+        const to = doc.posFromIndex(end);
         
+        doc.setSelection(from, to);
+        doc.markText(from, to, { className });
+        this.cmEditor.scrollIntoView({from, to});
+    }
+
+    // Simple unmark command - removes marks by type
+    clearMarks(className = 'wildcard-mark') {
+        if (!this.cmEditor) return;
         
-        let found = null;
-        
-        if (optionIndex !== null && optionIndex >= 0 && typeof start === 'number' && typeof end === 'number') {
-            found = this._calculateOptionPosition(value, str, start, end, optionIndex);
-        } else {
-            let markStart = 0;
-            let markEnd = value.length;
-            if (typeof start === 'number' && typeof end === 'number' && start >= 0 && end > start) {
-                markStart = start;
-                markEnd = end;
+        const marks = this.cmEditor.getDoc().getAllMarks();
+        marks.forEach(mark => {
+            if (mark.className === className) {
+                mark.clear();
             }
-            
-            let re = new RegExp(str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-            let match;
-            while ((match = re.exec(value)) !== null) {
-                if (match.index >= markStart && match.index + str.length <= markEnd) {
-                    found = {start: match.index, end: match.index + str.length};
-                    break;
-                }
-            }
-            
-            if (!found) {
-                re.lastIndex = 0;
-                match = re.exec(value);
-                if (match) {
-                    found = {start: match.index, end: match.index + str.length};
-                }
-            }
-        }
+        });
         
-        if (found) {
-            const from = doc.posFromIndex(found.start);
-            const to = doc.posFromIndex(found.end);
-            doc.setSelection(from, to);
-            const className = type === 'option' ? 'option-mark' : 'wildcard-mark';
-            doc.markText(from, to, { className });
-            this.cmEditor.scrollIntoView({from, to});
+        const doc = this.cmEditor.getDoc();
+        const cursor = doc.getCursor();
+        doc.setSelection(cursor, cursor);
+    }
+
+    // Legacy method for backward compatibility
+    mark(str, type = 'button', start = null, end = null, optionIndex = null) {
+        if (!str || !this.cmEditor) return;
+        
+        const className = type === 'option' ? 'option-mark' : 'wildcard-mark';
+        
+        if (typeof start === 'number' && typeof end === 'number') {
+            this.markText(start, end, className);
         }
     }
 
+    // Legacy method for backward compatibility
     unmark(type = 'button') {
-        if (this.cmEditor) {
-            const marks = this.cmEditor.getDoc().getAllMarks();
-            const className = type === 'option' ? 'option-mark' : 'wildcard-mark';
-            marks.forEach(mark => {
-                if (mark.className === className) {
-                    mark.clear();
-                }
-            });
-            const doc = this.cmEditor.getDoc();
-            const cursor = doc.getCursor();
-            doc.setSelection(cursor, cursor);
-        }
-    }
-
-    _calculateOptionPosition(fullText, optionText, wildcardStart, wildcardEnd, optionIndex) {
-        const wildcardContent = fullText.substring(wildcardStart + 1, wildcardEnd - 1);
-        
-        const options = this._parseWildcardOptions(wildcardContent);
-        
-        if (optionIndex < 0 || optionIndex >= options.length) {
-            return null;
-        }
-        
-        let currentPos = wildcardStart + 1;
-        
-        for (let i = 0; i < optionIndex; i++) {
-            currentPos += options[i].length;
-            let pipePos = currentPos;
-            while (pipePos < wildcardEnd - 1 && fullText.charAt(pipePos) !== '|') {
-                pipePos++;
-            }
-            if (fullText.charAt(pipePos) === '|') {
-                currentPos = pipePos + 1;
-            }
-        }
-        
-        const actualOptionText = options[optionIndex];
-        
-        let searchPos = currentPos;
-        let optionStart = -1;
-        let optionEnd = -1;
-        
-        while (searchPos < wildcardEnd - 1 && /\s/.test(fullText.charAt(searchPos))) {
-            searchPos++;
-        }
-        
-        optionStart = searchPos;
-        
-        while (searchPos < wildcardEnd - 1 && fullText.charAt(searchPos) !== '|' && fullText.charAt(searchPos) !== '}') {
-            searchPos++;
-        }
-        
-        while (searchPos > optionStart && /\s/.test(fullText.charAt(searchPos - 1))) {
-            searchPos--;
-        }
-        
-        optionEnd = searchPos;
-        
-        return {start: optionStart, end: optionEnd};
-    }
-
-    _parseWildcardOptions(wildcardContent) {
-        const options = [];
-        let currentOption = '';
-        let bracketDepth = 0;
-        let pos = 0;
-        
-        while (pos < wildcardContent.length) {
-            const char = wildcardContent[pos];
-            
-            if (char === '{') {
-                bracketDepth++;
-                currentOption += char;
-                pos++;
-                
-                while (pos < wildcardContent.length && bracketDepth > 0) {
-                    const nestedChar = wildcardContent[pos];
-                    currentOption += nestedChar;
-                    
-                    if (nestedChar === '{') {
-                        bracketDepth++;
-                    } else if (nestedChar === '}') {
-                        bracketDepth--;
-                    }
-                    
-                    pos++;
-                }
-            } else if (char === '|' && bracketDepth === 0) {
-                if (currentOption.trim()) {
-                    options.push(currentOption.trim());
-                }
-                currentOption = '';
-                pos++;
-            } else {
-                currentOption += char;
-                pos++;
-            }
-        }
-        
-        if (currentOption.trim()) {
-            options.push(currentOption.trim());
-        }
-        
-        return options;
+        const className = type === 'option' ? 'option-mark' : 'wildcard-mark';
+        this.clearMarks(className);
     }
 
     loadScript(src) {

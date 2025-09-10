@@ -55,12 +55,12 @@ class DN_WildcardSelectorComposerV2 {
             const wildcardStructureWidget = this.node.widgets?.find(w => w.name === "wildcards_structure_data");
             
             // hide it again when needed
-            if (wildcardPromptWidget && wildcardStructureWidget) {
+/*             if (wildcardPromptWidget && wildcardStructureWidget) {
                 wildcardPromptWidget.hidden = true;
                 wildcardStructureWidget.hidden = true;
                 wildcardPromptWidget.computeSize = () => [0, -4];
                 wildcardStructureWidget.computeSize = () => [0, -4];
-            }
+            } */
     }
 
     createEditContentButton() {

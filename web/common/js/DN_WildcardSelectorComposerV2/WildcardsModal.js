@@ -1,5 +1,5 @@
 import { getIcon } from "../svg_icons.js";
-import { WildcardsProcessor } from './NodeDataProcessor.js';
+import { WildcardsMediator } from './WildcardsMediator.js';
 import { DropdownManager } from './DropdownManager.js';
 import { Textbox } from './Textbox.js';
 
@@ -12,7 +12,7 @@ export class WildcardsModal {
     constructor(node, constants) {
         this.node = node;
         this.constants = constants;
-        this.nodeDataProcessor = new WildcardsProcessor(node);
+        this.mediator = new WildcardsMediator(node, constants);
         this.dropdownManager = null;
         this.overlay = null;
         this.modal = null;
@@ -53,13 +53,32 @@ export class WildcardsModal {
     }
 
     initializeTextbox() {
-        this.textbox = new Textbox(this.node, this.nodeDataProcessor, {
+        this.textbox = new Textbox(this.node, this.mediator, {
             constants: this.constants,
             onStructureUpdate: (newStructure) => {
                 this.structureData = newStructure;
                 this.initializeDropdowns();
             }
         });
+        
+        // Register textbox with mediator
+        this.mediator.setTextbox(this.textbox);
+        
+        // Set up event listeners for save operations
+        this.mediator.addEventListener('save-success', (event) => {
+            this.textbox.showSuccessMessage(event.detail);
+        });
+        
+        this.mediator.addEventListener('save-error', (event) => {
+            this.textbox.showErrorMessage(event.detail);
+        });
+        
+        // Set up event listener for structure updates
+        this.mediator.addEventListener('structure-updated', (event) => {
+            this.structureData = event.detail;
+            this.initializeDropdowns();
+        });
+        
         return this.textbox.createTextbox();
     }
 
@@ -123,26 +142,38 @@ export class WildcardsModal {
     }
 
     initializeDropdowns() {
-        const structureDataStr = this.nodeDataProcessor.getWildcardsStructure();
+        const structureDataStr = this.mediator.getWildcardsStructure();
+        console.log("Structure data string:", structureDataStr);
+        
         if (structureDataStr) {
             try {
                 this.structureData = JSON.parse(structureDataStr);
+                console.log("Parsed structure data:", this.structureData);
+                
                 if (!this.dropdownManager) {
+                    console.log("Creating new DropdownManager");
                     this.dropdownManager = new DropdownManager(
                         this.sidebarDropdownsScroll,
                         this.structureData,
-                        this.nodeDataProcessor,
-                        this.textbox
+                        this.mediator
                     );
                 } else {
+                    console.log("Updating existing DropdownManager");
                     this.dropdownManager.structureData = this.structureData;
                     this.dropdownManager.sidebar = this.sidebarDropdownsScroll;
-                    this.dropdownManager.processor = this.nodeDataProcessor;
+                    this.dropdownManager.mediator = this.mediator;
                 }
+                
+                // Register dropdown manager with mediator
+                this.mediator.setDropdownManager(this.dropdownManager);
+                
+                console.log("Refreshing dropdown manager");
                 this.dropdownManager.refresh();
             } catch (e) {
                 console.error("Error parsing structure data:", e);
             }
+        } else {
+            console.log("No structure data found");
         }
     }
 

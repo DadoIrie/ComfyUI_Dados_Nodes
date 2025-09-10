@@ -1,30 +1,24 @@
 class DropdownUI {
-    constructor(sidebar, onSelect, textbox) {
+    constructor(sidebar, onSelect, mediator) {
         this.sidebar = sidebar;
         this.onSelect = onSelect;
-        this.textbox = textbox;
+        this.mediator = mediator;
         this.activeOverlay = null;
         this._setupGlobalClickListener();
     }
 
     _markWildcard(wildcard) {
-        if (this.textbox && wildcard && typeof wildcard.content === 'string') {
-            const start = wildcard.position?.start;
-            const end = wildcard.position?.end;
-            this.textbox.mark(wildcard.content, 'button', start, end);
-        }
+        this.mediator.queueEvent('mark-request', {
+            type: 'wildcard',
+            data: wildcard
+        });
     }
 
-    _markOption(displayText, parentWildcard, idx) {
-        if (!this.textbox) return;
-        const hasDuplicates = this._hasDuplicateOptionText(parentWildcard, displayText);
-        const start = parentWildcard.position?.start;
-        const end = parentWildcard.position?.end;
-        if (hasDuplicates) {
-            this.textbox.mark(displayText, 'button', start, end, idx);
-            return;
-        }
-        this.textbox.mark(displayText, 'button', start, end);
+    _markOption(optionData) {
+        this.mediator.queueEvent('mark-request', {
+            type: 'option',
+            data: optionData
+        });
     }
 
     render(dropdownsData) {
@@ -185,9 +179,10 @@ class DropdownUI {
         });
         
         button.addEventListener('mouseleave', () => {
-            if (this.textbox) {
-                this.textbox.unmark('button');
-            }
+            this.mediator.queueEvent('mark-request', {
+                type: 'unmark',
+                data: { markType: 'button' }
+            });
         });
 
         button.addEventListener('mousedown', (e) => {
@@ -261,7 +256,9 @@ class DropdownUI {
             e.stopPropagation();
             const idx = Number(el.dataset.index);
             const val = el.dataset.value;
-            onSelect(val, idx);
+            // Get the actual option object for nested wildcards
+            const option = idx === -1 ? null : wildcard.options[idx];
+            onSelect(option || val, idx);
             const dropdown = optionsContainer.closest('.custom-dropdown');
             if (!dropdown) return;
             this.closeCustomDropdown(dropdown);
@@ -269,8 +266,11 @@ class DropdownUI {
 
         optionsContainer.addEventListener('mouseenter', e => {
             const el = e.target.closest('.custom-dropdown-option');
-            if (!el || !this.textbox) return;
-            this.textbox.unmark();
+            if (!el) return;
+            this.mediator.queueEvent('mark-request', {
+                type: 'unmark',
+                data: { markType: 'button' }
+            });
             const idx = Number(el.dataset.index);
             const displayText = el.textContent;
             const option = idx === -1 ? null : wildcard.options[idx];
@@ -278,16 +278,17 @@ class DropdownUI {
                 this._handleNestedWildcardOption(option, displayText);
                 return;
             }
-            this._markOption(displayText, parentWildcard, idx);
+            this._markOption({ displayText, parentWildcard, optionIndex: idx });
         }, true);
 
         optionsContainer.addEventListener('mouseleave', e => {
             const el = e.target.closest('.custom-dropdown-option');
-            if (!el || !this.textbox) return;
-            this.textbox.unmark();
-            const start = parentWildcard.position?.start;
-            const end = parentWildcard.position?.end;
-            this.textbox.mark(parentWildcard.content, 'button', start, end);
+            if (!el) return;
+            this.mediator.queueEvent('mark-request', {
+                type: 'unmark',
+                data: { markType: 'button' }
+            });
+            this._markWildcard(parentWildcard);
         }, true);
     }
 
@@ -297,7 +298,14 @@ class DropdownUI {
                 optionId: option.id,
                 displayText: displayText,
                 callback: (start, end) => {
-                    this.textbox.mark(displayText, 'button', start, end);
+                    this.mediator.queueEvent('mark-request', {
+                        type: 'option',
+                        data: {
+                            displayText,
+                            parentWildcard: { position: { start, end } },
+                            optionIndex: 0
+                        }
+                    });
                 }
             },
             bubbles: true
@@ -362,10 +370,14 @@ class DropdownUI {
         if (this.activeOverlay === container) {
             this.activeOverlay = null;
         }
-        if (this.textbox) {
-            this.textbox.unmark('button');
-            this.textbox.unmark('option');
-        }
+        this.mediator.queueEvent('mark-request', {
+            type: 'unmark',
+            data: { markType: 'button' }
+        });
+        this.mediator.queueEvent('mark-request', {
+            type: 'unmark',
+            data: { markType: 'option' }
+        });
         const button = container.querySelector('.custom-dropdown-button');
         if (button) button.blur();
 
@@ -454,21 +466,18 @@ class DropdownUI {
         return typeof displayText === 'string' &&
                displayText.startsWith('{') &&
                displayText.endsWith('}') &&
-               typeof option === 'object' &&
-               option !== null &&
-               option.id;
+               (typeof option === 'object' && option !== null && option.id);
     }
 }
 
 export class DropdownManager {
-    constructor(sidebar, structureData, processor, textbox) {
+    constructor(sidebar, structureData, mediator) {
         this.sidebar = sidebar;
         this.structureData = structureData || { nodes: {}, root_nodes: [] };
-        this.processor = processor;
-        this.textbox = textbox;
+        this.mediator = mediator;
         this.ui = new DropdownUI(sidebar, (wildcard, selectedValue, selectedIndex, container) => {
             this.handleUserSelection(wildcard, selectedValue, selectedIndex, container);
-        }, textbox);
+        }, mediator);
         this.observers = [];
         this._init();
     }
@@ -511,14 +520,55 @@ export class DropdownManager {
         this.observers.forEach(fn => fn());
     }
 
-    handleUserSelection(wildcard, selectedValue) {
-        this.setSelected(wildcard, selectedValue);
+    handleUserSelection(wildcard, selectedValue, selectedIndex, container) {
+        this.setSelected(wildcard, selectedValue, container);
     }
 
-    setSelected(wildcard, selectedValue) {
+    setSelected(wildcard, selectedValue, container) {
+        // Handle both string and object options
+        let actualSelectedValue = selectedValue;
+        
+        if (selectedValue && typeof selectedValue === 'object' && selectedValue.id) {
+            actualSelectedValue = selectedValue.id;
+        } else if (typeof selectedValue === 'string') {
+            // Check if this string corresponds to a nested wildcard option
+            const option = wildcard.options.find(opt =>
+                (typeof opt === 'object' && opt !== null && opt.id === selectedValue) ||
+                (typeof opt === 'string' && opt === selectedValue)
+            );
+            
+            if (option && typeof option === 'object' && option.id) {
+                actualSelectedValue = option.id;
+            }
+        }
+        
+        // Process the dropdown selection directly
+        this.processDropdownSelection({
+            wildcard,
+            selectedValue: actualSelectedValue
+        });
+    }
+
+    processDropdownSelection(data) {
+        const { wildcard, selectedValue } = data;
         wildcard.selection = selectedValue;
-        this._updateProcessorData();
-        this._notifyObservers();
+        
+        // Update the selection in the structure data nodes
+        if (wildcard.path) {
+            const pathParts = wildcard.path.split('/');
+            const key = pathParts[pathParts.length - 1];
+            if (this.structureData.nodes[key]) {
+                this.structureData.nodes[key].selection = selectedValue;
+            }
+        }
+        
+        // Update the node data through the mediator
+        this.mediator.updateNodeData({
+            wildcards_structure_data: JSON.stringify(this.structureData)
+        });
+        
+        // Refresh the dropdowns to show/hide nested ones based on selection
+        this.refresh();
     }
 
     setSelectedByTarget(target, value) {
@@ -528,8 +578,8 @@ export class DropdownManager {
     }
 
     _updateProcessorData() {
-        if (this.processor) {
-            this.processor.updateNodeData({
+        if (this.mediator) {
+            this.mediator.updateNodeData({
                 wildcards_structure_data: JSON.stringify(this.structureData)
             });
         }
@@ -664,10 +714,16 @@ export class DropdownManager {
         const optionId = this._extractOptionId(selectedOption);
         if (!this._isValidOptionId(optionId)) return;
         
+        // For nested wildcards, we need to find the actual container element
+        let actualParentContainer = parentContainer;
+        if (parentContainer && parentContainer.classList.contains('custom-dropdown')) {
+            actualParentContainer = parentContainer.closest('.wildcard-dropdown-container');
+        }
+        
         const nestedNode = this.structureData.nodes[optionId];
         if (!nestedNode.children) return;
         
-        this._processNestedNodeChildren(nestedNode, dropdownsData, parentContainer);
+        this._processNestedNodeChildren(nestedNode, dropdownsData, actualParentContainer);
     }
 
     _findSelectedOptionForWildcard(wildcard, selectedValue) {
