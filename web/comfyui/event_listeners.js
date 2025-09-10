@@ -1,5 +1,4 @@
 import { app } from "../../scripts/app.js";
-import { api } from "../../scripts/api.js";
 
 const { chainCallback } = await import("/extensions/ComfyUI_Dados_Nodes/common/js/utils.js");
 
