@@ -43,7 +43,7 @@ class DN_WildcardSelectorComposerV2:
 
         return (wildcards_prompt, marked_prompt, processed_prompt)
     
-    # ! IS_CHANGED is missing in order to force node execution even if inputs don't change
+    # ! IS_CHANGED is missing in order to force node execution
     
     @classmethod
     def update_wildcards_prompt(cls, node_id: str, content: str, old_structure_json: str = "") -> str:
