@@ -1,7 +1,7 @@
 # flake8: noqa: E402
 # pylint: disable=wrong-import-position
 import os
-from server import PromptServer  # type: ignore pylint: disable=import-error
+from server import PromptServer
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 EXTENSION_NAME = os.path.basename(BASE_DIR)
@@ -32,7 +32,8 @@ from .nodes.DN_SmolVLMNode import DN_SmolVLMNode
 from .nodes.DN_MiaoshouAITaggerNode import DN_MiaoshouAITaggerNode
 from .nodes.DN_JoyTaggerNode import DN_JoyTaggerNode
 
-# Node class mappings
+from .nodes.utils.api_routes import register_routes
+
 NODE_CLASS_MAPPINGS = {
     # "inactivePinterestImageNode": inactivePinterestImageNode,
     "DN_MultilineString": DN_MultilineString,
@@ -65,7 +66,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "DN_JoyTaggerNode": "JoyTagger",
 }
 
-from .nodes.utils.api_routes import register_routes
 register_routes()
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
