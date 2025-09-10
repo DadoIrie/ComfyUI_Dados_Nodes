@@ -47,7 +47,6 @@ class DN_WildcardSelectorComposerV2:
     
     @classmethod
     def update_wildcards_prompt(cls, node_id: str, content: str, old_structure_json: str = "") -> str:
-        """Handles updating the wildcards prompt and merging selected values."""
         cls.node_state[node_id]['wildcards_prompt'] = content
 
         structure_data = ""
