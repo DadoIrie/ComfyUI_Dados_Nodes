@@ -1,5 +1,3 @@
-import { fetchSend } from "../utils.js";
-
 export class Textbox {
     constructor(node, mediator, { constants = {}, onStructureUpdate } = {}) {
         this.node = node;
@@ -19,7 +17,17 @@ export class Textbox {
         await this._initCodeMirror();
         this._setupEditorFeatures();
         this._setupActionBar();
+        this._initContextMenu();
         return this.textbox;
+    }
+
+    _initContextMenu() {
+    this.contextMenu = document.createElement("div");
+    this.contextMenu.className = "textbox-context-menu";
+
+        this._defaultMenuEntries = ["Dummy Action 1", "Dummy Action 2", "Dummy Action 3"];
+        this._renderContextMenuEntries();
+
     }
 
     getContent() {
@@ -73,6 +81,11 @@ export class Textbox {
         });
         setTimeout(() => {
             this.cmEditor.refresh();
+            this.cmEditor.focus();
+            const doc = this.cmEditor.getDoc();
+            const lastLine = doc.lastLine();
+            const lastCh = doc.getLine(lastLine).length;
+            doc.setCursor({ line: lastLine, ch: lastCh });
         }, 1);
     }
 
@@ -205,6 +218,11 @@ export class Textbox {
                 }
                 return;
             }
+            if (event.key === "s" && event.ctrlKey && !event.altKey && !event.metaKey) {
+                event.preventDefault();
+                this.saveBtn.click();
+                return;
+            }
         });
     }
 
@@ -251,7 +269,6 @@ export class Textbox {
         alert(message);
     }
 
-    // Simple marking command - just executes what the mediator tells it to do
     markText(start, end, className = 'wildcard-mark') {
         if (!this.cmEditor) return;
         
@@ -264,7 +281,6 @@ export class Textbox {
         this.cmEditor.scrollIntoView({from, to});
     }
 
-    // Simple unmark command - removes marks by type
     clearMarks(className = 'wildcard-mark') {
         if (!this.cmEditor) return;
         
@@ -280,7 +296,6 @@ export class Textbox {
         doc.setSelection(cursor, cursor);
     }
 
-    // Legacy method for backward compatibility
     mark(str, type = 'button', start = null, end = null, optionIndex = null) {
         if (!str || !this.cmEditor) return;
         
@@ -291,7 +306,6 @@ export class Textbox {
         }
     }
 
-    // Legacy method for backward compatibility
     unmark(type = 'button') {
         const className = type === 'option' ? 'option-mark' : 'wildcard-mark';
         this.clearMarks(className);
@@ -308,6 +322,56 @@ export class Textbox {
             script.onload = resolve;
             script.onerror = reject;
             document.head.appendChild(script);
+        });
+    }
+
+    _renderContextMenuEntries() {
+        this.contextMenu.innerHTML = "";
+        this._defaultMenuEntries.forEach(text => {
+            const item = document.createElement("div");
+            item.textContent = text;
+            item.className = "textbox-context-menu-item";
+            item.onmousedown = e => e.preventDefault();
+            item.onclick = () => {
+                this.contextMenu.style.visibility = 'hidden';
+                this.contextMenu.style.pointerEvents = 'none';
+            };
+            this.contextMenu.appendChild(item);
+        });
+        if (this.cmEditor && this.cmEditor.getSelection && this.cmEditor.getSelection()) {
+            const selText = this.cmEditor.getSelection();
+            if (selText && selText.length > 0) {
+                const item = document.createElement("div");
+                item.textContent = "Selected: " + selText;
+                item.className = "textbox-context-menu-item";
+                item.onmousedown = e => e.preventDefault();
+                item.onclick = () => {
+                    this.contextMenu.style.visibility = 'hidden';
+                    this.contextMenu.style.pointerEvents = 'none';
+                };
+                this.contextMenu.appendChild(item);
+            }
+        }
+
+    document.body.insertBefore(this.contextMenu, document.body.firstChild);
+
+        if (this.cmEditor && this.cmEditor.getWrapperElement) {
+            const wrapper = this.cmEditor.getWrapperElement();
+            wrapper.addEventListener("contextmenu", e => {
+                e.preventDefault();
+                this._renderContextMenuEntries();
+                this.contextMenu.style.setProperty('--menu-left', `${e.clientX}px`);
+                this.contextMenu.style.setProperty('--menu-top', `${e.clientY}px`);
+                this.contextMenu.style.visibility = 'visible';
+                this.contextMenu.style.pointerEvents = 'auto';
+            });
+        }
+
+        document.addEventListener("mousedown", e => {
+            if (!this.contextMenu.contains(e.target)) {
+                this.contextMenu.style.visibility = 'hidden';
+                this.contextMenu.style.pointerEvents = 'none';
+            }
         });
     }
 }

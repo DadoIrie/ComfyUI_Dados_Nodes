@@ -443,3 +443,36 @@
 .comment-highlight {
     color: #888 !important;
 }
+
+/* --- Custom Context Menu for Textbox --- */
+.textbox-context-menu {
+    position: fixed;
+    z-index: 99999;
+    background: #1E1E1E;
+    border: none;
+    box-shadow: 2px 4px 4px 0 rgba(0, 0, 0, 0.40);
+    padding: 4px 0;
+    min-width: 120px;
+    font-size: 0.8em;
+    left: var(--menu-left, 0px);
+    top: var(--menu-top, 0px);
+    visibility: hidden;
+    pointer-events: none;
+    display: block;
+}
+
+.textbox-context-menu-item {
+    padding: 8px 20px;
+    cursor: pointer;
+    color: #fff;
+    background: #1E1E1E;
+    border: none;
+    margin: 0;
+    transition: background 0.2s ease, color 0.2s ease;
+    opacity: 1;
+}
+
+.textbox-context-menu-item:hover {
+    background: #333;
+    color: #fff;
+}

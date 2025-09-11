@@ -28,7 +28,8 @@ export class WildcardsModal {
     this.modal.appendChild(this.sidebar);
     this.initializeDropdowns();
     document.body.appendChild(this.overlay);
-    }
+    this._addGlobalCtrlSBlocker();
+}
 
     async ensureCSSLoaded() {
         const cssHref = `/extensions/${this.constants.EXTENSION_NAME}/common/css/DN_WildcardSelectorComposerV2.css`;
@@ -143,37 +144,42 @@ export class WildcardsModal {
 
     initializeDropdowns() {
         const structureDataStr = this.mediator.getWildcardsStructure();
-        console.log("Structure data string:", structureDataStr);
         
         if (structureDataStr) {
-            try {
-                this.structureData = JSON.parse(structureDataStr);
-                console.log("Parsed structure data:", this.structureData);
-                
-                if (!this.dropdownManager) {
-                    console.log("Creating new DropdownManager");
-                    this.dropdownManager = new DropdownManager(
-                        this.sidebarDropdownsScroll,
-                        this.structureData,
-                        this.mediator
-                    );
-                } else {
-                    console.log("Updating existing DropdownManager");
-                    this.dropdownManager.structureData = this.structureData;
-                    this.dropdownManager.sidebar = this.sidebarDropdownsScroll;
-                    this.dropdownManager.mediator = this.mediator;
-                }
-                
-                // Register dropdown manager with mediator
-                this.mediator.setDropdownManager(this.dropdownManager);
-                
-                console.log("Refreshing dropdown manager");
-                this.dropdownManager.refresh();
-            } catch (e) {
-                console.error("Error parsing structure data:", e);
+            this.structureData = JSON.parse(structureDataStr);
+            
+            if (!this.dropdownManager) {
+                this.dropdownManager = new DropdownManager(
+                    this.sidebarDropdownsScroll,
+                    this.structureData,
+                    this.mediator
+                );
+            } else {
+                this.dropdownManager.structureData = this.structureData;
+                this.dropdownManager.sidebar = this.sidebarDropdownsScroll;
+                this.dropdownManager.mediator = this.mediator;
             }
-        } else {
-            console.log("No structure data found");
+            
+            this.mediator.setDropdownManager(this.dropdownManager);
+        }
+    }
+
+    _addGlobalCtrlSBlocker() {
+        this._globalCtrlSHandler = (event) => {
+            if (event.key === "s" && event.ctrlKey && !event.altKey && !event.metaKey) {
+                if (!event.target.closest(".CodeMirror")) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+            }
+        };
+        document.addEventListener("keydown", this._globalCtrlSHandler, true);
+    }
+
+    _removeGlobalCtrlSBlocker() {
+        if (this._globalCtrlSHandler) {
+            document.removeEventListener("keydown", this._globalCtrlSHandler, true);
+            this._globalCtrlSHandler = null;
         }
     }
 
@@ -188,12 +194,14 @@ export class WildcardsModal {
         });
         this.overlay.addEventListener("mouseup", (event) => {
             if (mouseDownOnOverlay && event.target === this.overlay) {
+                this._removeGlobalCtrlSBlocker();
                 this.overlay.remove();
             }
             mouseDownOnOverlay = false;
         });
         document.addEventListener("keydown", (event) => {
             if (event.key === "Escape") {
+                this._removeGlobalCtrlSBlocker();
                 this.overlay.remove();
             }
         });
