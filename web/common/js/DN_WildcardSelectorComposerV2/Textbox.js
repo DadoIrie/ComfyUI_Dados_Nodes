@@ -36,9 +36,9 @@ export class Textbox {
         this.contextMenu = document.createElement("div");
         this.contextMenu.className = "textbox-context-menu";
         document.body.insertBefore(this.contextMenu, document.body.firstChild);
-        
+
         this.contextMenuFactory = new ContextMenuFactory(this);
-        this._setupMenuSpecifications();
+        this.contextMenuManager = new ContextMenuManager(this);
     }
 
     getContent() {
@@ -370,161 +370,13 @@ export class Textbox {
             document.head.appendChild(script);
         });
     }
-
-    _setupMenuSpecifications() {
-        this.menuSpecifications = {
-            main: [
-                {
-                    type: 'function',
-                    text: 'Cut',
-                    value: 'cut',
-                    callback: () => this._handleCutAction(),
-                    requiresSelection: true
-                },
-                {
-                    type: 'function',
-                    text: 'Copy',
-                    value: 'copy',
-                    callback: () => this._handleCopyAction(),
-                    requiresSelection: true
-                },
-                {
-                    type: (this.customClipboard.length === 1) ? 'function' : 'submenu',
-                    text: 'Paste',
-                    value: 'paste',
-                    callback: (this.customClipboard.length === 1) ? (value) => this._handlePasteAction(value) : null,
-                    submenu: (this.customClipboard.length > 1) ? 'clipboard' : null
-                },
-                {
-                    type: 'separator'
-                },
-                {
-                    type: 'submenu',
-                    text: 'Wildcards',
-                    submenu: 'wildcard'
-                },
-                {
-                    type: 'submenu',
-                    text: 'Text Operations',
-                    submenu: 'textops'
-                },
-                {
-                    type: 'function',
-                    text: (selection) => selection ? `Use "${selection}"` : 'No selection',
-                    value: 'selection',
-                    dynamic: true,
-                    callback: () => this._handleSelectionAction(),
-                    requiresSelection: true
-                }
-            ],
-            wildcard: [
-                {
-                    type: 'function',
-                    text: 'Add Wildcard',
-                    value: 'add_wildcard',
-                    callback: () => this._handleAddWildcard()
-                },
-                {
-                    type: 'submenu',
-                    text: 'Presets',
-                    submenu: 'presets'
-                },
-                {
-                    type: 'submenu',
-                    text: 'Advanced',
-                    submenu: 'advanced'
-                }
-            ],
-            presets: [
-                {
-                    type: 'function',
-                    text: 'Character',
-                    value: '{character}',
-                    callback: (value) => this._insertText(value)
-                },
-                {
-                    type: 'function',
-                    text: 'Style',
-                    value: '{style}',
-                    callback: (value) => this._insertText(value)
-                },
-                {
-                    type: 'function',
-                    text: 'Setting',
-                    value: '{setting}',
-                    callback: (value) => this._insertText(value)
-                }
-            ],
-            advanced: [
-                {
-                    type: 'function',
-                    text: 'Multiple Choice',
-                    value: '{option1|option2|option3}',
-                    callback: (value) => this._insertText(value)
-                },
-                {
-                    type: 'function',
-                    text: 'Range',
-                    value: '{1-10}',
-                    callback: (value) => this._insertText(value)
-                },
-                {
-                    type: 'function',
-                    text: 'Weighted',
-                    value: '{option1::2|option2::1}',
-                    callback: (value) => this._insertText(value)
-                }
-            ],
-            textops: [
-                {
-                    type: 'submenu',
-                    text: 'Transform',
-                    submenu: 'transform'
-                }
-            ],
-            transform: [
-                {
-                    type: 'function',
-                    text: 'Uppercase',
-                    value: 'uppercase',
-                    callback: (value) => this._handleTransformAction(value),
-                    requiresSelection: true
-                },
-                {
-                    type: 'function',
-                    text: 'Lowercase',
-                    value: 'lowercase',
-                    callback: (value) => this._handleTransformAction(value),
-                    requiresSelection: true
-                }
-            ],
-            clipboard: []
-        };
-        
-        this._updateClipboardMenuEntries();
-    }
     
-    _updateClipboardMenuEntries() {
-        this.menuSpecifications.clipboard = [];
-        
-        for (let i = this.customClipboard.length - 1; i >= 0; i--) {
-            const text = this.customClipboard[i];
-            const displayText = text.replace(/\n/g, ' ').substring(0, 20) + (text.length > 20 ? '...' : '');
-            
-            this.menuSpecifications.clipboard.push({
-                type: 'function',
-                text: displayText,
-                value: text,
-                callback: (value) => this._handlePasteAction(value)
-            });
-        }
-    }
-
     _setupContextMenuEventListeners() {
         if (this.cmEditor && this.cmEditor.getWrapperElement) {
             const wrapper = this.cmEditor.getWrapperElement();
             wrapper.addEventListener("contextmenu", (e) => {
-                this._handleContextMenuEvent(e);
+                e.preventDefault(); // Prevent system context menu
+                this.contextMenuManager.showContextMenu(e.clientX, e.clientY); // Use contextMenuManager
             });
         }
 
@@ -714,6 +566,174 @@ export class Textbox {
     }
 }
 
+
+
+class ContextMenuManager {
+    constructor(textbox) {
+        this.textbox = textbox;
+        this.menuSpecifications = {
+            main: [
+                {
+                    type: 'function',
+                    text: 'Cut',
+                    value: 'cut',
+                    callback: () => this.textbox._handleCutAction(),
+                    requiresSelection: true
+                },
+                {
+                    type: 'function',
+                    text: 'Copy',
+                    value: 'copy',
+                    callback: () => this.textbox._handleCopyAction(),
+                    requiresSelection: true
+                },
+                {
+                    type: (this.textbox.customClipboard.length === 1) ? 'function' : 'submenu',
+                    text: 'Paste',
+                    value: 'paste',
+                    callback: (this.textbox.customClipboard.length === 1) ? (value) => this.textbox._handlePasteAction(value) : null,
+                    submenu: (this.textbox.customClipboard.length > 1) ? 'clipboard' : null
+                },
+                {
+                    type: 'separator'
+                },
+                {
+                    type: 'submenu',
+                    text: 'Wildcards',
+                    submenu: 'wildcard'
+                },
+                {
+                    type: 'submenu',
+                    text: 'Text Operations',
+                    submenu: 'textops'
+                },
+                {
+                    type: 'function',
+                    text: (selection) => selection ? `Use "${selection}"` : 'No selection',
+                    value: 'selection',
+                    dynamic: true,
+                    callback: () => this.textbox._handleSelectionAction(),
+                    requiresSelection: true
+                }
+            ],
+            wildcard: [
+                {
+                    type: 'function',
+                    text: 'Add Wildcard',
+                    value: 'add_wildcard',
+                    callback: () => this.textbox._handleAddWildcard()
+                },
+                {
+                    type: 'submenu',
+                    text: 'Presets',
+                    submenu: 'presets'
+                },
+                {
+                    type: 'submenu',
+                    text: 'Advanced',
+                    submenu: 'advanced'
+                }
+            ],
+            presets: [
+                {
+                    type: 'function',
+                    text: 'Character',
+                    value: '{character}',
+                    callback: (value) => this.textbox._insertText(value)
+                },
+                {
+                    type: 'function',
+                    text: 'Style',
+                    value: '{style}',
+                    callback: (value) => this.textbox._insertText(value)
+                },
+                {
+                    type: 'function',
+                    text: 'Setting',
+                    value: '{setting}',
+                    callback: (value) => this.textbox._insertText(value)
+                }
+            ],
+            advanced: [
+                {
+                    type: 'function',
+                    text: 'Multiple Choice',
+                    value: '{option1|option2|option3}',
+                    callback: (value) => this.textbox._insertText(value)
+                },
+                {
+                    type: 'function',
+                    text: 'Range',
+                    value: '{1-10}',
+                    callback: (value) => this.textbox._insertText(value)
+                },
+                {
+                    type: 'function',
+                    text: 'Weighted',
+                    value: '{option1::2|option2::1}',
+                    callback: (value) => this.textbox._insertText(value)
+                }
+            ],
+            textops: [
+                {
+                    type: 'submenu',
+                    text: 'Transform',
+                    submenu: 'transform'
+                }
+            ],
+            transform: [
+                {
+                    type: 'function',
+                    text: 'Uppercase',
+                    value: 'uppercase',
+                    callback: (value) => this.textbox._handleTransformAction(value),
+                    requiresSelection: true
+                },
+                {
+                    type: 'function',
+                    text: 'Lowercase',
+                    value: 'lowercase',
+                    callback: (value) => this.textbox._handleTransformAction(value),
+                    requiresSelection: true
+                }
+            ],
+            clipboard: []
+        };
+
+        this._updateClipboardMenuEntries();
+    }
+
+    showContextMenu(x, y) {
+        this.textbox._hideAllMenus();
+        const selection = this.textbox.cmEditor ? this.textbox.cmEditor.getSelection() : '';
+
+        this.menuSpecifications.main[2].type = (this.textbox.customClipboard.length === 1) ? 'function' : 'submenu';
+        this.menuSpecifications.main[2].callback = (this.textbox.customClipboard.length === 1) ?
+            (value) => this.textbox._handlePasteAction(this.textbox.customClipboard[0]) : null;
+        this.menuSpecifications.main[2].submenu = (this.textbox.customClipboard.length > 1) ? 'clipboard' : null;
+
+        this._updateClipboardMenuEntries();
+
+        this.textbox.contextMenuFactory.createMenu(this.menuSpecifications.main, x, y, 0, selection);
+    }
+
+    _updateClipboardMenuEntries() {
+        this.menuSpecifications.clipboard = [];
+
+        for (let i = this.textbox.customClipboard.length - 1; i >= 0; i--) {
+            const text = this.textbox.customClipboard[i];
+            const displayText = text.replace(/\n/g, ' ').substring(0, 20) + (text.length > 20 ? '...' : '');
+
+            this.menuSpecifications.clipboard.push({
+                type: 'function',
+                text: displayText,
+                value: text,
+                callback: (value) => this.textbox._handlePasteAction(value)
+            });
+        }
+    }
+}
+
 class ContextMenuFactory {
     constructor(textbox) {
         this.textbox = textbox;
@@ -747,35 +767,35 @@ class ContextMenuFactory {
     createMenuItem(entry, selection, level) {
         const item = document.createElement("div");
         item.className = "textbox-context-menu-item";
-        
+
         const text = entry.dynamic && typeof entry.text === 'function'
             ? entry.text(selection)
             : entry.text;
-        
+
         item.textContent = text;
         item.onmousedown = (e) => e.preventDefault();
-        
+
         const requiresSelection = entry.requiresSelection || false;
         const hasSelection = selection && selection.length > 0;
-        
+
         if (requiresSelection && !hasSelection) {
             item.classList.add('disabled');
         }
-        
+
         if (entry.type === 'submenu') {
             item.onmouseenter = (e) => {
                 const rect = item.getBoundingClientRect();
                 const submenuX = rect.right;
                 const submenuY = rect.top;
-                
+
                 this.textbox.activeMenus
                     .filter(menu => menu.level > level)
                     .forEach(menu => {
                         menu.element.style.visibility = 'hidden';
                         menu.element.style.pointerEvents = 'none';
                     });
-                
-                const submenuEntries = this.textbox.menuSpecifications[entry.submenu];
+
+                const submenuEntries = this.textbox.contextMenuManager.menuSpecifications[entry.submenu]; // Fix reference
                 if (submenuEntries) {
                     this.createMenu(submenuEntries, submenuX, submenuY, level + 1, selection);
                 }
