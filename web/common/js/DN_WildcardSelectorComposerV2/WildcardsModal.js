@@ -21,14 +21,70 @@ export class WildcardsModal {
     }
 
     async show() {
-    await this.ensureCSSLoaded();
-    this.createElements();
-    const textboxNode = await this.initializeTextbox();
-    this.modal.appendChild(textboxNode);
-    this.modal.appendChild(this.sidebar);
-    this.initializeDropdowns();
-    document.body.appendChild(this.overlay);
+    this.createSpinnerModal();
+    
+    this.addSpinnerStyles();
+    
+    document.body.appendChild(this.spinnerOverlay);
     this._addGlobalCtrlSBlocker();
+    
+    // TEMPORARY: Add 5-second delay for testing loading spinner
+    /* await new Promise(resolve => setTimeout(resolve, 5000)); */
+    
+    await this.loadResourcesAndInitialize();
+}
+
+async loadResourcesAndInitialize() {
+    try {
+        await this.ensureCSSLoaded();
+        
+        this.removeSpinnerModal();
+        
+        this.createOverlay();
+        this.createModal();
+        this.createSidebar();
+        
+        const textboxNode = await this.initializeTextbox();
+        this.modal.appendChild(textboxNode);
+        this.modal.appendChild(this.sidebar);
+        this.initializeDropdowns();
+        
+        this.overlay.appendChild(this.modal);
+        this.setupOverlayCloseHandlers();
+        
+        this.createSidebarToggleButton();
+        
+        document.body.appendChild(this.overlay);
+    } catch (error) {
+        console.error("Error loading modal resources:", error);
+        const loadingContainer = this.spinnerOverlay.querySelector('.modal-loading-container');
+        if (loadingContainer) {
+            loadingContainer.innerHTML = `
+                <div class="modal-loading-error">Error loading modal</div>
+            `;
+        }
+    }
+}
+
+createSpinnerModal() {
+    this.spinnerOverlay = document.createElement("div");
+    this.spinnerOverlay.id = "wildcard-spinner-overlay";
+    
+    const loadingContainer = document.createElement("div");
+    loadingContainer.className = "modal-loading-container";
+    
+    const spinner = document.createElement("div");
+    spinner.className = "modal-loading-spinner";
+    
+    loadingContainer.appendChild(spinner);
+    this.spinnerOverlay.appendChild(loadingContainer);
+}
+
+removeSpinnerModal() {
+    if (this.spinnerOverlay) {
+        this.spinnerOverlay.remove();
+        this.spinnerOverlay = null;
+    }
 }
 
     async ensureCSSLoaded() {
@@ -44,15 +100,6 @@ export class WildcardsModal {
         });
     }
 
-    createElements() {
-        this.createOverlay();
-        this.createModal();
-        this.createSidebar();
-        this.overlay.appendChild(this.modal);
-        this.createSidebarToggleButton();
-        this.setupOverlayCloseHandlers();
-    }
-
     initializeTextbox() {
         this.textbox = new Textbox(this.node, this.mediator, {
             constants: this.constants,
@@ -62,10 +109,8 @@ export class WildcardsModal {
             }
         });
         
-        // Register textbox with mediator
         this.mediator.setTextbox(this.textbox);
         
-        // Set up event listeners for save operations
         this.mediator.addEventListener('save-success', (event) => {
             this.textbox.showSuccessMessage(event.detail);
         });
@@ -74,7 +119,6 @@ export class WildcardsModal {
             this.textbox.showErrorMessage(event.detail);
         });
         
-        // Set up event listener for structure updates
         this.mediator.addEventListener('structure-updated', (event) => {
             this.structureData = event.detail;
             this.initializeDropdowns();
@@ -194,16 +238,81 @@ export class WildcardsModal {
         });
         this.overlay.addEventListener("mouseup", (event) => {
             if (mouseDownOnOverlay && event.target === this.overlay) {
-                this._removeGlobalCtrlSBlocker();
-                this.overlay.remove();
+                this.close();
             }
             mouseDownOnOverlay = false;
         });
         document.addEventListener("keydown", (event) => {
             if (event.key === "Escape") {
-                this._removeGlobalCtrlSBlocker();
-                this.overlay.remove();
+                this.close();
             }
         });
+    }
+
+    close() {
+        this._removeGlobalCtrlSBlocker();
+        this.removeSpinnerStyles();
+        this.removeSpinnerModal();
+        if (this.overlay) {
+            this.overlay.remove();
+        }
+    }
+
+    addSpinnerStyles() {
+        if (document.getElementById('wildcard-spinner-styles')) {
+            return;
+        }
+        
+        const style = document.createElement('style');
+        style.id = 'wildcard-spinner-styles';
+        style.textContent = `
+            @keyframes modal-spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            
+            #wildcard-spinner-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 20000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            
+            .modal-loading-container {
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                padding: 40px;
+                background: rgb(25, 25, 25);
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                width: 200px;
+                height: 120px;
+            }
+            
+            .modal-loading-spinner {
+                width: 40px;
+                height: 40px;
+                border: 4px solid rgba(255, 255, 255, 0.3);
+                border-top: 4px solid rgb(25, 25, 25);
+                border-radius: 50%;
+                animation: modal-spin 1s linear infinite;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    removeSpinnerStyles() {
+        const style = document.getElementById('wildcard-spinner-styles');
+        if (style) {
+            style.remove();
+        }
     }
 }
