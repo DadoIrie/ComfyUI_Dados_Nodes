@@ -445,17 +445,6 @@ export class Textbox {
                     type: 'submenu',
                     text: 'Transform',
                     submenu: 'transform'
-                },
-                {
-                    type: 'submenu',
-                    text: 'Format',
-                    submenu: 'format'
-                },
-                {
-                    type: 'function',
-                    text: 'Insert Quote',
-                    value: '"',
-                    callback: (value) => this._insertText(value)
                 }
             ],
             transform: [
@@ -472,33 +461,6 @@ export class Textbox {
                     value: 'lowercase',
                     callback: (value) => this._handleTransformAction(value),
                     requiresSelection: true
-                },
-                {
-                    type: 'function',
-                    text: 'Title Case',
-                    value: 'titlecase',
-                    callback: (value) => this._handleTransformAction(value),
-                    requiresSelection: true
-                }
-            ],
-            format: [
-                {
-                    type: 'function',
-                    text: 'Bold',
-                    value: '**bold**',
-                    callback: (value) => this._insertText(value)
-                },
-                {
-                    type: 'function',
-                    text: 'Italic',
-                    value: '*italic*',
-                    callback: (value) => this._insertText(value)
-                },
-                {
-                    type: 'function',
-                    text: 'Code',
-                    value: '`code`',
-                    callback: (value) => this._insertText(value)
                 }
             ],
             clipboard: [] // This will be populated dynamically
@@ -703,11 +665,6 @@ export class Textbox {
                 break;
             case 'lowercase':
                 transformedText = selection.toLowerCase();
-                break;
-            case 'titlecase':
-                transformedText = selection.replace(/\w\S*/g, (txt) =>
-                    txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
-                );
                 break;
         }
         
