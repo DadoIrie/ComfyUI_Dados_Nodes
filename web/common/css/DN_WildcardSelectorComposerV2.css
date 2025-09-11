@@ -476,3 +476,14 @@
     background: #333;
     color: #fff;
 }
+
+.textbox-context-menu-separator {
+    height: 1px;
+    background: #444;
+    margin: 4px 0;
+}
+
+.textbox-context-menu-item.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}

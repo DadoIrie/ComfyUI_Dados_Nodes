@@ -10,6 +10,12 @@ export class Textbox {
         this.clearBtn = null;
         this.saveBtn = null;
         this.searchBtn = null;
+        
+        // Context menu initialization
+        this.contextMenu = null;
+        this.activeMenus = [];
+        this.contextMenuFactory = null;
+        this._initContextMenuCore();
     }
 
     async createTextbox() {
@@ -17,17 +23,17 @@ export class Textbox {
         await this._initCodeMirror();
         this._setupEditorFeatures();
         this._setupActionBar();
-        this._initContextMenu();
+        this._setupContextMenuEventListeners();
         return this.textbox;
     }
 
-    _initContextMenu() {
-    this.contextMenu = document.createElement("div");
-    this.contextMenu.className = "textbox-context-menu";
-
-        this._defaultMenuEntries = ["Dummy Action 1", "Dummy Action 2", "Dummy Action 3"];
-        this._renderContextMenuEntries();
-
+    _initContextMenuCore() {
+        this.contextMenu = document.createElement("div");
+        this.contextMenu.className = "textbox-context-menu";
+        document.body.insertBefore(this.contextMenu, document.body.firstChild);
+        
+        this.contextMenuFactory = new ContextMenuFactory(this);
+        this._setupMenuSpecifications();
     }
 
     getContent() {
@@ -325,53 +331,376 @@ export class Textbox {
         });
     }
 
-    _renderContextMenuEntries() {
-        this.contextMenu.innerHTML = "";
-        this._defaultMenuEntries.forEach(text => {
-            const item = document.createElement("div");
-            item.textContent = text;
-            item.className = "textbox-context-menu-item";
-            item.onmousedown = e => e.preventDefault();
-            item.onclick = () => {
-                this.contextMenu.style.visibility = 'hidden';
-                this.contextMenu.style.pointerEvents = 'none';
-            };
-            this.contextMenu.appendChild(item);
-        });
-        if (this.cmEditor && this.cmEditor.getSelection && this.cmEditor.getSelection()) {
-            const selText = this.cmEditor.getSelection();
-            if (selText && selText.length > 0) {
-                const item = document.createElement("div");
-                item.textContent = "Selected: " + selText;
-                item.className = "textbox-context-menu-item";
-                item.onmousedown = e => e.preventDefault();
-                item.onclick = () => {
-                    this.contextMenu.style.visibility = 'hidden';
-                    this.contextMenu.style.pointerEvents = 'none';
-                };
-                this.contextMenu.appendChild(item);
-            }
-        }
+    _setupMenuSpecifications() {
+        this.menuSpecifications = {
+            main: [
+                {
+                    type: 'function',
+                    text: 'Cut',
+                    value: 'cut',
+                    callback: (value) => this._handleCutAction(value),
+                    requiresSelection: true
+                },
+                {
+                    type: 'function',
+                    text: 'Copy',
+                    value: 'copy',
+                    callback: (value) => this._handleCopyAction(value),
+                    requiresSelection: true
+                },
+                {
+                    type: 'function',
+                    text: 'Paste',
+                    value: 'paste',
+                    callback: (value) => this._handlePasteAction(value)
+                },
+                {
+                    type: 'separator'
+                },
+                {
+                    type: 'submenu',
+                    text: 'Wildcards',
+                    submenu: 'wildcard'
+                },
+                {
+                    type: 'submenu',
+                    text: 'Text Operations',
+                    submenu: 'textops'
+                },
+                {
+                    type: 'function',
+                    text: (selection) => selection ? `Use "${selection}"` : 'No selection',
+                    value: 'selection',
+                    dynamic: true,
+                    callback: (value) => this._handleSelectionAction(value),
+                    requiresSelection: true
+                }
+            ],
+            wildcard: [
+                {
+                    type: 'function',
+                    text: 'Add Wildcard',
+                    value: 'add_wildcard',
+                    callback: (value) => this._handleAddWildcard(value)
+                },
+                {
+                    type: 'submenu',
+                    text: 'Presets',
+                    submenu: 'presets'
+                },
+                {
+                    type: 'submenu',
+                    text: 'Advanced',
+                    submenu: 'advanced'
+                }
+            ],
+            presets: [
+                {
+                    type: 'function',
+                    text: 'Character',
+                    value: '{character}',
+                    callback: (value) => this._insertText(value)
+                },
+                {
+                    type: 'function',
+                    text: 'Style',
+                    value: '{style}',
+                    callback: (value) => this._insertText(value)
+                },
+                {
+                    type: 'function',
+                    text: 'Setting',
+                    value: '{setting}',
+                    callback: (value) => this._insertText(value)
+                }
+            ],
+            advanced: [
+                {
+                    type: 'function',
+                    text: 'Multiple Choice',
+                    value: '{option1|option2|option3}',
+                    callback: (value) => this._insertText(value)
+                },
+                {
+                    type: 'function',
+                    text: 'Range',
+                    value: '{1-10}',
+                    callback: (value) => this._insertText(value)
+                },
+                {
+                    type: 'function',
+                    text: 'Weighted',
+                    value: '{option1::2|option2::1}',
+                    callback: (value) => this._insertText(value)
+                }
+            ],
+            textops: [
+                {
+                    type: 'submenu',
+                    text: 'Transform',
+                    submenu: 'transform'
+                },
+                {
+                    type: 'submenu',
+                    text: 'Format',
+                    submenu: 'format'
+                },
+                {
+                    type: 'function',
+                    text: 'Insert Quote',
+                    value: '"',
+                    callback: (value) => this._insertText(value)
+                }
+            ],
+            transform: [
+                {
+                    type: 'function',
+                    text: 'Uppercase',
+                    value: 'uppercase',
+                    callback: (value) => this._handleTransformAction(value),
+                    requiresSelection: true
+                },
+                {
+                    type: 'function',
+                    text: 'Lowercase',
+                    value: 'lowercase',
+                    callback: (value) => this._handleTransformAction(value),
+                    requiresSelection: true
+                },
+                {
+                    type: 'function',
+                    text: 'Title Case',
+                    value: 'titlecase',
+                    callback: (value) => this._handleTransformAction(value),
+                    requiresSelection: true
+                }
+            ],
+            format: [
+                {
+                    type: 'function',
+                    text: 'Bold',
+                    value: '**bold**',
+                    callback: (value) => this._insertText(value)
+                },
+                {
+                    type: 'function',
+                    text: 'Italic',
+                    value: '*italic*',
+                    callback: (value) => this._insertText(value)
+                },
+                {
+                    type: 'function',
+                    text: 'Code',
+                    value: '`code`',
+                    callback: (value) => this._insertText(value)
+                }
+            ]
+        };
+    }
 
-    document.body.insertBefore(this.contextMenu, document.body.firstChild);
-
+    _setupContextMenuEventListeners() {
         if (this.cmEditor && this.cmEditor.getWrapperElement) {
             const wrapper = this.cmEditor.getWrapperElement();
-            wrapper.addEventListener("contextmenu", e => {
+            wrapper.addEventListener("contextmenu", (e) => {
                 e.preventDefault();
-                this._renderContextMenuEntries();
-                this.contextMenu.style.setProperty('--menu-left', `${e.clientX}px`);
-                this.contextMenu.style.setProperty('--menu-top', `${e.clientY}px`);
-                this.contextMenu.style.visibility = 'visible';
-                this.contextMenu.style.pointerEvents = 'auto';
+                this._showContextMenu(e.clientX, e.clientY);
             });
         }
 
-        document.addEventListener("mousedown", e => {
-            if (!this.contextMenu.contains(e.target)) {
-                this.contextMenu.style.visibility = 'hidden';
-                this.contextMenu.style.pointerEvents = 'none';
+        document.addEventListener("mousedown", (e) => {
+            if (!this._isClickInsideMenus(e.target)) {
+                this._hideAllMenus();
             }
         });
+    }
+
+    _showContextMenu(x, y) {
+        this._hideAllMenus();
+        const selection = this.cmEditor ? this.cmEditor.getSelection() : '';
+        this.contextMenuFactory.createMenu(this.menuSpecifications.main, x, y, 0, selection);
+    }
+
+    _hideAllMenus() {
+        this.activeMenus.forEach(menu => {
+            menu.element.style.visibility = 'hidden';
+            menu.element.style.pointerEvents = 'none';
+        });
+        this.activeMenus = [];
+    }
+
+    _isClickInsideMenus(target) {
+        return this.activeMenus.some(menu => menu.element.contains(target));
+    }
+
+    _adjustMenuPosition(menuElement, x, y) {
+        const rect = menuElement.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        
+        let adjustedX = x;
+        let adjustedY = y;
+        
+        if (x + rect.width > viewportWidth) {
+            adjustedX = viewportWidth - rect.width;
+        }
+        
+        if (y + rect.height > viewportHeight) {
+            adjustedY = viewportHeight - rect.height;
+        }
+        
+        menuElement.style.left = `${adjustedX}px`;
+        menuElement.style.top = `${adjustedY}px`;
+    }
+
+    _handleCutAction(value) {
+        if (this.cmEditor) {
+            const selection = this.cmEditor.getSelection();
+            if (selection) {
+                navigator.clipboard.writeText(selection).then(() => {
+                    this.cmEditor.replaceSelection('');
+                });
+            }
+        }
+    }
+
+    _handleCopyAction(value) {
+        if (this.cmEditor) {
+            const selection = this.cmEditor.getSelection();
+            if (selection) {
+                navigator.clipboard.writeText(selection);
+            }
+        }
+    }
+
+    _handlePasteAction(value) {
+        // Placeholder for paste functionality
+        // This will be implemented in a future iteration
+        console.log('Paste action triggered - functionality to be implemented');
+    }
+
+    _handleSelectionAction(value) {
+        const selection = this.cmEditor ? this.cmEditor.getSelection() : '';
+        if (selection) {
+            this._insertText(selection);
+        }
+    }
+
+    _handleAddWildcard(value) {
+        this._insertText('{}');
+        if (this.cmEditor) {
+            const cursor = this.cmEditor.getCursor();
+            this.cmEditor.setCursor({ line: cursor.line, ch: cursor.ch - 1 });
+        }
+    }
+
+    _insertText(text) {
+        if (this.cmEditor) {
+            this.cmEditor.replaceSelection(text);
+        }
+    }
+
+    _handleTransformAction(value) {
+        if (!this.cmEditor) return;
+        
+        const selection = this.cmEditor.getSelection();
+        if (!selection) return;
+        
+        let transformedText = selection;
+        
+        switch (value) {
+            case 'uppercase':
+                transformedText = selection.toUpperCase();
+                break;
+            case 'lowercase':
+                transformedText = selection.toLowerCase();
+                break;
+            case 'titlecase':
+                transformedText = selection.replace(/\w\S*/g, (txt) =>
+                    txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
+                );
+                break;
+        }
+        
+        this.cmEditor.replaceSelection(transformedText);
+    }
+}
+
+class ContextMenuFactory {
+    constructor(textbox) {
+        this.textbox = textbox;
+    }
+
+    createMenu(entries, x, y, level = 0, selection = '') {
+        const menuElement = document.createElement("div");
+        menuElement.className = "textbox-context-menu";
+        menuElement.style.visibility = 'visible';
+        menuElement.style.pointerEvents = 'auto';
+        
+        entries.forEach(entry => {
+            if (entry.type === 'separator') {
+                const separator = document.createElement("div");
+                separator.className = "textbox-context-menu-separator";
+                menuElement.appendChild(separator);
+            } else {
+                const item = this.createMenuItem(entry, selection, level);
+                menuElement.appendChild(item);
+            }
+        });
+
+        document.body.appendChild(menuElement);
+        this.textbox.activeMenus.push({ element: menuElement, level });
+        
+        this.textbox._adjustMenuPosition(menuElement, x, y);
+        
+        return menuElement;
+    }
+
+    createMenuItem(entry, selection, level) {
+        const item = document.createElement("div");
+        item.className = "textbox-context-menu-item";
+        
+        const text = entry.dynamic && typeof entry.text === 'function'
+            ? entry.text(selection)
+            : entry.text;
+        
+        item.textContent = text;
+        item.onmousedown = (e) => e.preventDefault();
+        
+        // Check if the item requires selection and disable if none exists
+        const requiresSelection = entry.requiresSelection || false;
+        const hasSelection = selection && selection.length > 0;
+        
+        if (requiresSelection && !hasSelection) {
+            item.classList.add('disabled');
+        }
+        
+        if (entry.type === 'submenu') {
+            item.onmouseenter = (e) => {
+                const rect = item.getBoundingClientRect();
+                const submenuX = rect.right;
+                const submenuY = rect.top;
+                
+                this.textbox.activeMenus
+                    .filter(menu => menu.level > level)
+                    .forEach(menu => {
+                        menu.element.style.visibility = 'hidden';
+                        menu.element.style.pointerEvents = 'none';
+                    });
+                
+                const submenuEntries = this.textbox.menuSpecifications[entry.submenu];
+                if (submenuEntries) {
+                    this.createMenu(submenuEntries, submenuX, submenuY, level + 1, selection);
+                }
+            };
+        } else if (entry.type === 'function') {
+            item.onclick = () => {
+                if (!requiresSelection || hasSelection) {
+                    entry.callback(entry.value);
+                    this.textbox._hideAllMenus();
+                }
+            };
+        }
+        
+        return item;
     }
 }
