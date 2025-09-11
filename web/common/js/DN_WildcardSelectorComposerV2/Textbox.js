@@ -250,16 +250,16 @@ export class Textbox {
                 if (event.shiftKey || isCustomMode) {
                     event.preventDefault();
                     event.stopPropagation();
-                    useSystemAction ? this.actions._handleSystemCut() : this.actions._handleCopyOrCutAction(true);
+                    useSystemAction ? this.actions._handleSystemCutOrCopy(true) : this.actions._handleCopyOrCutAction(true);
                 }
                 return;
             }
-            
+
             if (key === 'c') {
                 if (event.shiftKey || isCustomMode) {
                     event.preventDefault();
                     event.stopPropagation();
-                    useSystemAction ? this.actions._handleSystemCopy() : this.actions._handleCopyOrCutAction(false);
+                    useSystemAction ? this.actions._handleSystemCutOrCopy(false) : this.actions._handleCopyOrCutAction(false);
                 }
                 return;
             }

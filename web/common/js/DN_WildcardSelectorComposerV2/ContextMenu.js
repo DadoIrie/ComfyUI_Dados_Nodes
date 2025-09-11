@@ -262,7 +262,6 @@ class ContextMenuManager {
         for (let i = this.textbox.customClipboard.length - 1; i >= 0; i--) {
             const text = this.textbox.customClipboard[i];
             const displayText = text.replace(/\n/g, ' ').substring(0, 20) + (text.length > 20 ? '...' : '');
-
             this.menuSpecifications.clipboard.push({
                 type: 'function',
                 text: displayText,
@@ -328,22 +327,14 @@ class Actions {
         }
     }
 
-    _handleSystemCut() {
+    _handleSystemCutOrCopy(isCut) {
         if (this.textbox.cmEditor) {
             const selection = this.textbox.cmEditor.getSelection();
             if (selection) {
                 navigator.clipboard.writeText(selection);
-                this.textbox.cmEditor.replaceSelection('');
-                this.textbox.contextMenuManager._hideAllMenus();
-            }
-        }
-    }
-
-    _handleSystemCopy() {
-        if (this.textbox.cmEditor) {
-            const selection = this.textbox.cmEditor.getSelection();
-            if (selection) {
-                navigator.clipboard.writeText(selection);
+                if (isCut) {
+                    this.textbox.cmEditor.replaceSelection('');
+                }
                 this.textbox.contextMenuManager._hideAllMenus();
             }
         }
