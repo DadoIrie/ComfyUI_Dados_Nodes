@@ -343,14 +343,14 @@ export class Textbox {
                     type: 'function',
                     text: 'Cut',
                     value: 'cut',
-                    callback: (value) => this._handleCutAction(value),
+                    callback: () => this._handleCutAction(),
                     requiresSelection: true
                 },
                 {
                     type: 'function',
                     text: 'Copy',
                     value: 'copy',
-                    callback: (value) => this._handleCopyAction(value),
+                    callback: () => this._handleCopyAction(),
                     requiresSelection: true
                 },
                 {
@@ -378,7 +378,7 @@ export class Textbox {
                     text: (selection) => selection ? `Use "${selection}"` : 'No selection',
                     value: 'selection',
                     dynamic: true,
-                    callback: (value) => this._handleSelectionAction(value),
+                    callback: () => this._handleSelectionAction(),
                     requiresSelection: true
                 }
             ],
@@ -387,7 +387,7 @@ export class Textbox {
                     type: 'function',
                     text: 'Add Wildcard',
                     value: 'add_wildcard',
-                    callback: (value) => this._handleAddWildcard(value)
+                    callback: () => this._handleAddWildcard()
                 },
                 {
                     type: 'submenu',
@@ -562,7 +562,7 @@ export class Textbox {
         menuElement.style.top = `${adjustedY}px`;
     }
 
-    _handleCutAction(value) {
+    _handleCutAction() {
         if (this.cmEditor) {
             const selection = this.cmEditor.getSelection();
             if (selection) {
@@ -588,7 +588,7 @@ export class Textbox {
         }
     }
 
-    _handleCopyAction(value) {
+    _handleCopyAction() {
         if (this.cmEditor) {
             const selection = this.cmEditor.getSelection();
             if (selection) {
@@ -630,14 +630,14 @@ export class Textbox {
         }
     }
 
-    _handleSelectionAction(value) {
+    _handleSelectionAction() {
         const selection = this.cmEditor ? this.cmEditor.getSelection() : '';
         if (selection) {
             this._insertText(selection);
         }
     }
 
-    _handleAddWildcard(value) {
+    _handleAddWildcard() {
         this._insertText('{}');
         if (this.cmEditor) {
             const cursor = this.cmEditor.getCursor();
