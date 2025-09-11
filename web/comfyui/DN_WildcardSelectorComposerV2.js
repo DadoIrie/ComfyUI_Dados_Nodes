@@ -18,6 +18,17 @@ const settingsList = [
             { text: "4 spaces", value: 4 }
         ],
         tooltip: "Number of spaces to insert when Tab is pressed."
+    },
+    {
+        id: "contextMenuMode",
+        name: "Context Menu Mode",
+        type: "combo",
+        defaultValue: "custom",
+        options: [
+            { text: "System (Ctrl+Click for Custom)", value: "system" },
+            { text: "Custom (Ctrl+Click for System)", value: "custom" }
+        ],
+        tooltip: "Determines which context menu opens by default. Use 'Custom' to show custom menu on right-click and system menu with Ctrl+right-click. Use 'System' for the opposite behavior."
     }
 ];
 

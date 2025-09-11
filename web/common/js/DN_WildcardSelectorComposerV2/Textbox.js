@@ -531,15 +531,7 @@ export class Textbox {
         if (this.cmEditor && this.cmEditor.getWrapperElement) {
             const wrapper = this.cmEditor.getWrapperElement();
             wrapper.addEventListener("contextmenu", (e) => {
-                // Check if Ctrl key is pressed
-                if (e.ctrlKey) {
-                    // If Ctrl is pressed, allow the default context menu
-                    return;
-                }
-                
-                // Otherwise, prevent default and show custom context menu
-                e.preventDefault();
-                this._showContextMenu(e.clientX, e.clientY);
+                this._handleContextMenuEvent(e);
             });
         }
 
@@ -548,6 +540,16 @@ export class Textbox {
                 this._hideAllMenus();
             }
         });
+    }
+
+    async _handleContextMenuEvent(e) {
+        const contextMenuMode = await window.app.extensionManager.setting.get("wildcard_selector.contextMenuMode");
+        const showCustomMenu = (contextMenuMode === "custom") ? !e.ctrlKey : e.ctrlKey;
+        
+        if (showCustomMenu) {
+            e.preventDefault();
+            this._showContextMenu(e.clientX, e.clientY);
+        }
     }
 
     _showContextMenu(x, y) {
