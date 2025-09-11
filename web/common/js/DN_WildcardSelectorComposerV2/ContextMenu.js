@@ -316,17 +316,6 @@ class Actions {
         }
     }
 
-    _handleSystemPaste() {
-        if (this.textbox.cmEditor) {
-            navigator.clipboard.readText().then(text => {
-                this.textbox.cmEditor.replaceSelection(text);
-                this.textbox.contextMenuManager._hideAllMenus();
-            }).catch(err => {
-                console.error("Could not access system clipboard", err);
-            });
-        }
-    }
-
     _handleSystemCutOrCopy(isCut) {
         if (this.textbox.cmEditor) {
             const selection = this.textbox.cmEditor.getSelection();
@@ -337,6 +326,17 @@ class Actions {
                 }
                 this.textbox.contextMenuManager._hideAllMenus();
             }
+        }
+    }
+
+    _handleSystemPaste() {
+        if (this.textbox.cmEditor) {
+            navigator.clipboard.readText().then(text => {
+                this.textbox.cmEditor.replaceSelection(text);
+                this.textbox.contextMenuManager._hideAllMenus();
+            }).catch(err => {
+                console.error("Could not access system clipboard", err);
+            });
         }
     }
 
