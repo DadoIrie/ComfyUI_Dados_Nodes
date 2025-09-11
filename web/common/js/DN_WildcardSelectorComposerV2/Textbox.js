@@ -16,6 +16,8 @@ export class Textbox {
         this.contextMenuFactory = null;
         this.customClipboard = [];
         this._initContextMenuCore();
+
+        this.actions = new Actions(this);
     }
 
     async createTextbox() {
@@ -248,7 +250,7 @@ export class Textbox {
                 if (event.shiftKey || isCustomMode) {
                     event.preventDefault();
                     event.stopPropagation();
-                    useSystemAction ? this._handleSystemCut() : this._handleCutAction();
+                    useSystemAction ? this.actions._handleSystemCut() : this.actions._handleCopyOrCutAction(true);
                 }
                 return;
             }
@@ -257,7 +259,7 @@ export class Textbox {
                 if (event.shiftKey || isCustomMode) {
                     event.preventDefault();
                     event.stopPropagation();
-                    useSystemAction ? this._handleSystemCopy() : this._handleCopyAction();
+                    useSystemAction ? this.actions._handleSystemCopy() : this.actions._handleCopyOrCutAction(false);
                 }
                 return;
             }
@@ -266,7 +268,7 @@ export class Textbox {
                 if (event.shiftKey || isCustomMode) {
                     event.preventDefault();
                     event.stopPropagation();
-                    useSystemAction ? this._handleSystemPaste() : this._handlePasteAction();
+                    useSystemAction ? this.actions._handleSystemPaste() : this.actions._handlePasteAction();
                 }
             }
         });
@@ -442,128 +444,6 @@ export class Textbox {
         menuElement.style.left = `${adjustedX}px`;
         menuElement.style.top = `${adjustedY}px`;
     }
-
-    _handleCutAction() {
-        if (this.cmEditor) {
-            const selection = this.cmEditor.getSelection();
-            if (selection) {
-                if (this.customClipboard.length === 0 || this.customClipboard[0] !== selection) {
-                    this.customClipboard.unshift(selection);
-                    
-                    if (this.customClipboard.length > 10) {
-                        this.customClipboard = this.customClipboard.slice(0, 10);
-                    }
-                    
-                    this._updateClipboardMenuEntries();
-                }
-                
-                this.cmEditor.replaceSelection('');
-            }
-        }
-    }
-
-    _handleCopyAction() {
-        if (this.cmEditor) {
-            const selection = this.cmEditor.getSelection();
-            if (selection) {
-                if (this.customClipboard.length === 0 || this.customClipboard[0] !== selection) {
-                    this.customClipboard.unshift(selection);
-                    
-                    if (this.customClipboard.length > 10) {
-                        this.customClipboard = this.customClipboard.slice(0, 10);
-                    }
-                    
-                    this._updateClipboardMenuEntries();
-                }
-            }
-        }
-    }
-
-    _handlePasteAction(value) {
-        if (this.cmEditor) {
-            let textToPaste = '';
-            
-            if (value) {
-                textToPaste = value;
-            } else if (this.customClipboard.length > 0) {
-                textToPaste = this.customClipboard[0];
-            }
-            
-            if (textToPaste) {
-                this.cmEditor.replaceSelection(textToPaste);
-            }
-        }
-    }
-
-    _handleSystemPaste() {
-        if (this.cmEditor) {
-            navigator.clipboard.readText().then(text => {
-                this.cmEditor.replaceSelection(text);
-            }).catch(err => {
-                console.error("Could not access system clipboard", err);
-            });
-        }
-    }
-
-    _handleSystemCut() {
-        if (this.cmEditor) {
-            const selection = this.cmEditor.getSelection();
-            if (selection) {
-                navigator.clipboard.writeText(selection);
-                this.cmEditor.replaceSelection('');
-            }
-        }
-    }
-
-    _handleSystemCopy() {
-        if (this.cmEditor) {
-            const selection = this.cmEditor.getSelection();
-            if (selection) {
-                navigator.clipboard.writeText(selection);
-            }
-        }
-    }
-
-    _handleSelectionAction() {
-        const selection = this.cmEditor ? this.cmEditor.getSelection() : '';
-        if (selection) {
-            this._insertText(selection);
-        }
-    }
-
-    _handleAddWildcard() {
-        this._insertText('{}');
-        if (this.cmEditor) {
-            const cursor = this.cmEditor.getCursor();
-            this.cmEditor.setCursor({ line: cursor.line, ch: cursor.ch - 1 });
-        }
-    }
-
-    _insertText(text) {
-        if (this.cmEditor) {
-            this.cmEditor.replaceSelection(text);
-        }
-    }
-
-    _handleTransformAction(value) {
-        if (!this.cmEditor) return;
-        
-        const selection = this.cmEditor.getSelection();
-        if (!selection) return;
-        
-        let transformedText = selection;
-        
-        switch (value) {
-            case 'uppercase':
-                transformedText = selection.toUpperCase();
-                break;
-            case 'lowercase':
-                transformedText = selection.toLowerCase();
-                break;
-        }
-        
-        this.cmEditor.replaceSelection(transformedText);
-    }
 }
 
 
@@ -577,21 +457,21 @@ class ContextMenuManager {
                     type: 'function',
                     text: 'Cut',
                     value: 'cut',
-                    callback: () => this.textbox._handleCutAction(),
+                    callback: () => this.textbox.actions._handleCopyOrCutAction(true),
                     requiresSelection: true
                 },
                 {
                     type: 'function',
                     text: 'Copy',
                     value: 'copy',
-                    callback: () => this.textbox._handleCopyAction(),
+                    callback: () => this.textbox.actions._handleCopyOrCutAction(false),
                     requiresSelection: true
                 },
                 {
                     type: (this.textbox.customClipboard.length === 1) ? 'function' : 'submenu',
                     text: 'Paste',
                     value: 'paste',
-                    callback: (this.textbox.customClipboard.length === 1) ? (value) => this.textbox._handlePasteAction(value) : null,
+                    callback: (this.textbox.customClipboard.length === 1) ? (value) => this.textbox.actions._handlePasteAction(value) : null,
                     submenu: (this.textbox.customClipboard.length > 1) ? 'clipboard' : null
                 },
                 {
@@ -612,7 +492,7 @@ class ContextMenuManager {
                     text: (selection) => selection ? `Use "${selection}"` : 'No selection',
                     value: 'selection',
                     dynamic: true,
-                    callback: () => this.textbox._handleSelectionAction(),
+                    callback: () => this.textbox.actions._handleSelectionAction(),
                     requiresSelection: true
                 }
             ],
@@ -621,7 +501,7 @@ class ContextMenuManager {
                     type: 'function',
                     text: 'Add Wildcard',
                     value: 'add_wildcard',
-                    callback: () => this.textbox._handleAddWildcard()
+                    callback: () => this.textbox.actions._handleAddWildcard()
                 },
                 {
                     type: 'submenu',
@@ -639,19 +519,19 @@ class ContextMenuManager {
                     type: 'function',
                     text: 'Character',
                     value: '{character}',
-                    callback: (value) => this.textbox._insertText(value)
+                    callback: (value) => this.textbox.actions._insertText(value)
                 },
                 {
                     type: 'function',
                     text: 'Style',
                     value: '{style}',
-                    callback: (value) => this.textbox._insertText(value)
+                    callback: (value) => this.textbox.actions._insertText(value)
                 },
                 {
                     type: 'function',
                     text: 'Setting',
                     value: '{setting}',
-                    callback: (value) => this.textbox._insertText(value)
+                    callback: (value) => this.textbox.actions._insertText(value)
                 }
             ],
             advanced: [
@@ -659,19 +539,19 @@ class ContextMenuManager {
                     type: 'function',
                     text: 'Multiple Choice',
                     value: '{option1|option2|option3}',
-                    callback: (value) => this.textbox._insertText(value)
+                    callback: (value) => this.textbox.actions._insertText(value)
                 },
                 {
                     type: 'function',
                     text: 'Range',
                     value: '{1-10}',
-                    callback: (value) => this.textbox._insertText(value)
+                    callback: (value) => this.textbox.actions._insertText(value)
                 },
                 {
                     type: 'function',
                     text: 'Weighted',
                     value: '{option1::2|option2::1}',
-                    callback: (value) => this.textbox._insertText(value)
+                    callback: (value) => this.textbox.actions._insertText(value)
                 }
             ],
             textops: [
@@ -685,15 +565,13 @@ class ContextMenuManager {
                 {
                     type: 'function',
                     text: 'Uppercase',
-                    value: 'uppercase',
-                    callback: (value) => this.textbox._handleTransformAction(value),
+                    callback: () => this.textbox.actions._handleTransformAction('uppercase'),
                     requiresSelection: true
                 },
                 {
                     type: 'function',
                     text: 'Lowercase',
-                    value: 'lowercase',
-                    callback: (value) => this.textbox._handleTransformAction(value),
+                    callback: () => this.textbox.actions._handleTransformAction('lowercase'),
                     requiresSelection: true
                 }
             ],
@@ -709,7 +587,7 @@ class ContextMenuManager {
 
         this.menuSpecifications.main[2].type = (this.textbox.customClipboard.length === 1) ? 'function' : 'submenu';
         this.menuSpecifications.main[2].callback = (this.textbox.customClipboard.length === 1) ?
-            (value) => this.textbox._handlePasteAction(this.textbox.customClipboard[0]) : null;
+            (value) => this.textbox.actions._handlePasteAction(this.textbox.customClipboard[0]) : null;
         this.menuSpecifications.main[2].submenu = (this.textbox.customClipboard.length > 1) ? 'clipboard' : null;
 
         this._updateClipboardMenuEntries();
@@ -728,7 +606,7 @@ class ContextMenuManager {
                 type: 'function',
                 text: displayText,
                 value: text,
-                callback: (value) => this.textbox._handlePasteAction(value)
+                callback: (value) => this.textbox.actions._handlePasteAction(value)
             });
         }
     }
@@ -795,7 +673,7 @@ class ContextMenuFactory {
                         menu.element.style.pointerEvents = 'none';
                     });
 
-                const submenuEntries = this.textbox.contextMenuManager.menuSpecifications[entry.submenu]; // Fix reference
+                const submenuEntries = this.textbox.contextMenuManager.menuSpecifications[entry.submenu];
                 if (submenuEntries) {
                     this.createMenu(submenuEntries, submenuX, submenuY, level + 1, selection);
                 }
@@ -803,12 +681,146 @@ class ContextMenuFactory {
         } else if (entry.type === 'function') {
             item.onclick = () => {
                 if (!requiresSelection || hasSelection) {
-                    entry.callback(entry.value);
-                    this.textbox._hideAllMenus();
+                    entry.callback();
                 }
             };
         }
-        
+
         return item;
+    }
+}
+
+class Actions {
+    constructor(textbox) {
+        this.textbox = textbox;
+    }
+
+    _handleCopyOrCutAction(isCut) {
+        if (this.textbox.cmEditor) {
+            const selection = this.textbox.cmEditor.getSelection();
+            if (selection) {
+                if (this.textbox.customClipboard.length === 0 || this.textbox.customClipboard[0] !== selection) {
+                    this.textbox.customClipboard.unshift(selection);
+
+                    if (this.textbox.customClipboard.length > 10) {
+                        this.textbox.customClipboard = this.textbox.customClipboard.slice(0, 10);
+                    }
+
+                    this.textbox.contextMenuManager._updateClipboardMenuEntries();
+                }
+
+                if (isCut) {
+                    this.textbox.cmEditor.replaceSelection('');
+                }
+                this.textbox._hideAllMenus();
+            }
+        }
+    }
+
+    _handlePasteAction(value) {
+        if (this.textbox.cmEditor) {
+            let textToPaste = '';
+
+            if (value) {
+                textToPaste = value;
+            } else if (this.textbox.customClipboard.length > 0) {
+                textToPaste = this.textbox.customClipboard[0];
+            }
+
+            if (textToPaste) {
+                this.textbox.cmEditor.replaceSelection(textToPaste);
+                this.textbox._hideAllMenus();
+            }
+        }
+    }
+
+    _handleSystemPaste() {
+        if (this.textbox.cmEditor) {
+            navigator.clipboard.readText().then(text => {
+                this.textbox.cmEditor.replaceSelection(text);
+                this.textbox._hideAllMenus();
+            }).catch(err => {
+                console.error("Could not access system clipboard", err);
+            });
+        }
+    }
+
+    _handleSystemCut() {
+        if (this.textbox.cmEditor) {
+            const selection = this.textbox.cmEditor.getSelection();
+            if (selection) {
+                navigator.clipboard.writeText(selection);
+                this.textbox.cmEditor.replaceSelection('');
+                this.textbox._hideAllMenus();
+            }
+        }
+    }
+
+    _handleSystemCopy() {
+        if (this.textbox.cmEditor) {
+            const selection = this.textbox.cmEditor.getSelection();
+            if (selection) {
+                navigator.clipboard.writeText(selection);
+                this.textbox._hideAllMenus();
+            }
+        }
+    }
+
+    _handleSelectionAction() {
+        const selection = this.textbox.cmEditor ? this.textbox.cmEditor.getSelection() : '';
+        if (selection) {
+            this._insertText(selection);
+            this.textbox._hideAllMenus();
+        }
+    }
+
+    _handleAddWildcard() {
+        this._insertText('{}');
+        if (this.textbox.cmEditor) {
+            const cursor = this.textbox.cmEditor.getCursor();
+            this.textbox.cmEditor.setCursor({ line: cursor.line, ch: cursor.ch - 1 });
+            this.textbox._hideAllMenus();
+        }
+    }
+
+    _insertText(text) {
+        if (this.textbox.cmEditor) {
+            this.textbox.cmEditor.replaceSelection(text);
+        }
+    }
+
+    _handleTransformAction(value) {
+        if (!this.textbox.cmEditor) {
+            console.error("CodeMirror editor is not initialized.");
+            return;
+        }
+
+        const selection = this.textbox.cmEditor.getSelection();
+        if (!selection) {
+            console.warn("No text selected.");
+            return;
+        }
+
+        console.log("Selected text:", selection);
+        console.log("Transformation value:", value);
+
+        let transformedText;
+
+        switch (value) {
+            case 'uppercase':
+                transformedText = selection.toUpperCase();
+                break;
+            case 'lowercase':
+                transformedText = selection.toLowerCase();
+                break;
+            default:
+                console.error("Unrecognized transformation value:", value);
+                return;
+        }
+
+        console.log("Transformed text:", transformedText);
+
+        this.textbox.cmEditor.replaceSelection(transformedText);
+        this.textbox._hideAllMenus();
     }
 }
