@@ -11,11 +11,9 @@ export class Textbox {
         this.saveBtn = null;
         this.searchBtn = null;
         
-        // Context menu initialization
         this.contextMenu = null;
         this.activeMenus = [];
         this.contextMenuFactory = null;
-        // Custom internal clipboard array
         this.customClipboard = [];
         this._initContextMenuCore();
     }
@@ -23,6 +21,11 @@ export class Textbox {
     async createTextbox() {
         this._createTextboxElement();
         await this._initCodeMirror();
+        
+        this.contextMenuMode = await window.app.extensionManager.setting.get(
+            "wildcard_selector.contextMenuMode"
+        );
+        
         this._setupEditorFeatures();
         this._setupActionBar();
         this._setupContextMenuEventListeners();
@@ -233,6 +236,38 @@ export class Textbox {
                 event.stopPropagation();
                 this.saveBtn.click();
                 return;
+            }
+            
+            const key = event.key.toLowerCase();
+            if (!event.ctrlKey || event.altKey || event.metaKey) return;
+            
+            const isCustomMode = this.contextMenuMode === 'custom';
+            const useSystemAction = isCustomMode === event.shiftKey;
+            
+            if (key === 'x') {
+                if (event.shiftKey || isCustomMode) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    useSystemAction ? this._handleSystemCut() : this._handleCutAction();
+                }
+                return;
+            }
+            
+            if (key === 'c') {
+                if (event.shiftKey || isCustomMode) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    useSystemAction ? this._handleSystemCopy() : this._handleCopyAction();
+                }
+                return;
+            }
+            
+            if (key === 'v') {
+                if (event.shiftKey || isCustomMode) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    useSystemAction ? this._handleSystemPaste() : this._handlePasteAction();
+                }
             }
         });
     }
@@ -463,21 +498,17 @@ export class Textbox {
                     requiresSelection: true
                 }
             ],
-            clipboard: [] // This will be populated dynamically
+            clipboard: []
         };
         
-        // Update clipboard menu entries dynamically
         this._updateClipboardMenuEntries();
     }
     
     _updateClipboardMenuEntries() {
-        // Clear existing clipboard entries
         this.menuSpecifications.clipboard = [];
         
-        // Add entries in reverse order (newest first)
         for (let i = this.customClipboard.length - 1; i >= 0; i--) {
             const text = this.customClipboard[i];
-            // Format display text: limit to 20 chars and remove newlines
             const displayText = text.replace(/\n/g, ' ').substring(0, 20) + (text.length > 20 ? '...' : '');
             
             this.menuSpecifications.clipboard.push({
@@ -518,13 +549,11 @@ export class Textbox {
         this._hideAllMenus();
         const selection = this.cmEditor ? this.cmEditor.getSelection() : '';
         
-        // Update the paste menu entry type based on clipboard contents
         this.menuSpecifications.main[2].type = (this.customClipboard.length === 1) ? 'function' : 'submenu';
         this.menuSpecifications.main[2].callback = (this.customClipboard.length === 1) ?
             (value) => this._handlePasteAction(this.customClipboard[0]) : null;
         this.menuSpecifications.main[2].submenu = (this.customClipboard.length > 1) ? 'clipboard' : null;
         
-        // Update clipboard menu entries
         this._updateClipboardMenuEntries();
         
         this.contextMenuFactory.createMenu(this.menuSpecifications.main, x, y, 0, selection);
@@ -566,19 +595,17 @@ export class Textbox {
         if (this.cmEditor) {
             const selection = this.cmEditor.getSelection();
             if (selection) {
-                // Only add to clipboard if it's different from the first item
                 if (this.customClipboard.length === 0 || this.customClipboard[0] !== selection) {
-                    // Add to custom clipboard at the beginning (newest first)
                     this.customClipboard.unshift(selection);
                     
-                    // Keep only the most recent 10 items
                     if (this.customClipboard.length > 10) {
                         this.customClipboard = this.customClipboard.slice(0, 10);
                     }
                     
-                    // Update clipboard menu entries
                     this._updateClipboardMenuEntries();
                 }
+                
+                this.cmEditor.replaceSelection('');
             }
         }
     }
@@ -587,17 +614,13 @@ export class Textbox {
         if (this.cmEditor) {
             const selection = this.cmEditor.getSelection();
             if (selection) {
-                // Only add to clipboard if it's different from the first item
                 if (this.customClipboard.length === 0 || this.customClipboard[0] !== selection) {
-                    // Add to custom clipboard at the beginning (newest first)
                     this.customClipboard.unshift(selection);
                     
-                    // Keep only the most recent 10 items
                     if (this.customClipboard.length > 10) {
                         this.customClipboard = this.customClipboard.slice(0, 10);
                     }
                     
-                    // Update clipboard menu entries
                     this._updateClipboardMenuEntries();
                 }
             }
@@ -608,16 +631,43 @@ export class Textbox {
         if (this.cmEditor) {
             let textToPaste = '';
             
-            // If value is provided, use it (from clipboard submenu)
             if (value) {
                 textToPaste = value;
             } else if (this.customClipboard.length > 0) {
-                // Otherwise use the most recent item
                 textToPaste = this.customClipboard[0];
             }
             
             if (textToPaste) {
                 this.cmEditor.replaceSelection(textToPaste);
+            }
+        }
+    }
+
+    _handleSystemPaste() {
+        if (this.cmEditor) {
+            navigator.clipboard.readText().then(text => {
+                this.cmEditor.replaceSelection(text);
+            }).catch(err => {
+                console.error("Could not access system clipboard", err);
+            });
+        }
+    }
+
+    _handleSystemCut() {
+        if (this.cmEditor) {
+            const selection = this.cmEditor.getSelection();
+            if (selection) {
+                navigator.clipboard.writeText(selection);
+                this.cmEditor.replaceSelection('');
+            }
+        }
+    }
+
+    _handleSystemCopy() {
+        if (this.cmEditor) {
+            const selection = this.cmEditor.getSelection();
+            if (selection) {
+                navigator.clipboard.writeText(selection);
             }
         }
     }
@@ -705,7 +755,6 @@ class ContextMenuFactory {
         item.textContent = text;
         item.onmousedown = (e) => e.preventDefault();
         
-        // Check if the item requires selection and disable if none exists
         const requiresSelection = entry.requiresSelection || false;
         const hasSelection = selection && selection.length > 0;
         

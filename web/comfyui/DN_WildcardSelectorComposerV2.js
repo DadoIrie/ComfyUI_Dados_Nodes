@@ -21,14 +21,14 @@ const settingsList = [
     },
     {
         id: "contextMenuMode",
-        name: "Context Menu Mode",
+        name: "Clipboard & Context Menu Mode",
         type: "combo",
         defaultValue: "custom",
         options: [
-            { text: "System (Ctrl+Click for Custom)", value: "system" },
-            { text: "Custom (Ctrl+Click for System)", value: "custom" }
+            { text: "System (Ctrl+Shift for Custom)", value: "system" },
+            { text: "Custom (Ctrl+Shift for System)", value: "custom" }
         ],
-        tooltip: "Determines which context menu opens by default. Use 'Custom' to show custom menu on right-click and system menu with Ctrl+right-click. Use 'System' for the opposite behavior."
+        tooltip: "Active only in the Wildcard Editor text input.\n'Custom' (default): Ctrl+X/C/V uses internal clipboard, Ctrl+Shift+X/C/V uses system clipboard.\n'System': Ctrl+X/C/V uses system clipboard, Ctrl+Shift+X/C/V uses internal clipboard."
     }
 ];
 
