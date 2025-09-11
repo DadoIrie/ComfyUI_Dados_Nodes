@@ -579,11 +579,6 @@ export class Textbox {
                     // Update clipboard menu entries
                     this._updateClipboardMenuEntries();
                 }
-                
-                // Also update system clipboard for external use
-                navigator.clipboard.writeText(selection).then(() => {
-                    this.cmEditor.replaceSelection('');
-                });
             }
         }
     }
@@ -605,9 +600,6 @@ export class Textbox {
                     // Update clipboard menu entries
                     this._updateClipboardMenuEntries();
                 }
-                
-                // Also update system clipboard for external use
-                navigator.clipboard.writeText(selection);
             }
         }
     }
