@@ -1,72 +1,58 @@
 import { ContextMenuManager, Actions } from './ContextMenu.js';
 
-export class Textbox {
-    constructor(node, mediator, { constants = {}, onStructureUpdate } = {}) {
-        this.node = node;
-        this.mediator = mediator;
-        this.constants = constants;
-        this.onStructureUpdate = onStructureUpdate;
-        this.structureData = null;
-        this.textbox = null;
-        this.cmEditor = null;
-        this.clearBtn = null;
-        this.saveBtn = null;
-        this.searchBtn = null;
+class CodeMirrorLoader {
+    constructor(extensionName) {
+        this.extensionName = extensionName;
+        this.basePath = `/extensions/${extensionName}/common/vendor/js/codemirror/`;
+    }
+
+    async loadCodeMirror() {
+        if (window.CodeMirror) return;
         
-        this.contextMenu = null;
-        this.activeMenus = [];
-        this.customClipboard = [];
-        this._initContextMenuCore();
-
-        this.actions = new Actions(this);
+        await this.loadStylesheet();
+        await this.loadMainScript();
+        await this.loadAdditionalScripts();
     }
 
-    async createTextbox() {
-        this._createTextboxElement();
-        await this._initCodeMirror();
-        
-        this.contextMenuMode = await window.app.extensionManager.setting.get(
-            "wildcard_selector.contextMenuMode"
-        );
-        
-        this._setupEditorFeatures();
-        this._setupActionBar();
-        this._setupContextMenuEventListeners();
-        return this.textbox;
+    async loadStylesheet() {
+        if (!document.getElementById("cm-css")) {
+            const link = document.createElement("link");
+            link.id = "cm-css";
+            link.rel = "stylesheet";
+            link.href = `/extensions/${this.extensionName}/common/vendor/css/codemirror/codemirror.min.css`;
+            document.head.appendChild(link);
+        }
     }
 
-    _initContextMenuCore() {
-        this.contextMenu = document.createElement("div");
-        this.contextMenu.className = "textbox-context-menu";
-        document.body.insertBefore(this.contextMenu, document.body.firstChild);
-
-        this.contextMenuManager = new ContextMenuManager(this);
+    async loadMainScript() {
+        await this.loadScript(`${this.basePath}codemirror.min.js`);
     }
 
-    getContent() {
-        return this.cmEditor.getValue();
+    async loadAdditionalScripts() {
+        await Promise.all([
+            this.loadScript(`${this.basePath}mark-selection.min.js`),
+            this.loadScript(`${this.basePath}searchcursor.min.js`)
+        ]);
     }
 
-    async saveAndSync() {
-        this.mediator.queueEvent('save-request', {});
+    loadScript(scriptSource) {
+        return new Promise((resolve, reject) => {
+            if (document.querySelector(`script[src='${scriptSource}']`)) {
+                resolve();
+                return;
+            }
+            
+            const script = document.createElement("script");
+            script.src = scriptSource;
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
     }
+}
 
-    _createTextboxElement() {
-        this.textbox = document.createElement("div");
-        this.textbox.className = "textbox";
-        const textboxTopbar = document.createElement("div");
-        textboxTopbar.className = "topbar";
-        textboxTopbar.textContent = this.node.title;
-        this.textbox.appendChild(textboxTopbar);
-        this.cmContainer = document.createElement("div");
-        this.cmContainer.className = "textbox-content";
-        this.cmContainer.style.height = "100%";
-        this.textbox.appendChild(this.cmContainer);
-    }
-
-    async _initCodeMirror() {
-        await this.loadCodeMirror();
-        const wildcardsPrompt = this.mediator.getWildcardsPrompt();
+class WildcardsCodeMirrorMode {
+    static register() {
         if (!window.CodeMirror.modes["wildcards"]) {
             window.CodeMirror.defineMode("wildcards", function() {
                 return {
@@ -80,8 +66,377 @@ export class Textbox {
                 };
             });
         }
+    }
+}
+
+class KeyboardShortcutHandler {
+    constructor(editor, saveCallback, textboxActions) {
+        this.editor = editor;
+        this.saveCallback = saveCallback;
+        this.textboxActions = textboxActions;
+    }
+
+    async setupKeyboardHandlers() {
+        const bracketPairs = { '{': '}', '(': ')', '[': ']' };
+        const openingBrackets = Object.keys(bracketPairs);
+        const closingBrackets = Object.values(bracketPairs);
+        
+        this.editor.on("keydown", async (codeMirror, event) => {
+            const document = codeMirror.getDoc();
+            const selections = document.listSelections();
+            
+            if (await this.handleTabKey(event, codeMirror, document, selections)) return;
+            if (this.handleOpeningBrackets(event, bracketPairs, openingBrackets, codeMirror, document, selections)) return;
+            if (this.handleClosingBrackets(event, closingBrackets, codeMirror, document, selections)) return;
+            if (this.handleEnterKey(event, openingBrackets, bracketPairs, codeMirror, document)) return;
+            if (this.handleSaveShortcut(event)) return;
+            
+            await this.handleClipboardShortcuts(event, codeMirror);
+        });
+    }
+
+    async handleTabKey(event, codeMirror, document, selections) {
+        if (event.key === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey) {
+            event.preventDefault();
+            
+            const tabSpaces = await window.app.extensionManager.setting.get("wildcard_selector.tab_spaces");
+            const spaces = " ".repeat(tabSpaces);
+            
+            if (selections.length === 1 && selections[0].empty()) {
+                document.replaceSelection(spaces, "end");
+            } else {
+                codeMirror.execCommand("defaultTab");
+            }
+            return true;
+        }
+        return false;
+    }
+
+    handleOpeningBrackets(event, bracketPairs, openingBrackets, codeMirror, document, selections) {
+        if (openingBrackets.includes(event.key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
+            event.preventDefault();
+            
+            const openBracket = event.key;
+            const closeBracket = bracketPairs[openBracket];
+            
+            if (selections.some(selection => !selection.empty())) {
+                this.wrapSelectionsWithBrackets(document, selections, openBracket, closeBracket);
+            } else {
+                this.insertBracketPair(document, openBracket, closeBracket);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    wrapSelectionsWithBrackets(document, selections, openBracket, closeBracket) {
+        let newSelections = [];
+        
+        for (let index = selections.length - 1; index >= 0; index--) {
+            const selection = selections[index];
+            const fromPosition = selection.anchor;
+            const toPosition = selection.head;
+            const orderedSelection = CodeMirror.cmpPos(fromPosition, toPosition) <= 0 ? 
+                {start: fromPosition, end: toPosition} : 
+                {start: toPosition, end: fromPosition};
+            
+            const selectedText = document.getRange(orderedSelection.start, orderedSelection.end);
+            document.replaceRange(openBracket + selectedText + closeBracket, orderedSelection.start, orderedSelection.end);
+            
+            let startPosition = { line: orderedSelection.start.line, ch: orderedSelection.start.ch + 1 };
+            let endPosition = { line: orderedSelection.end.line, ch: orderedSelection.end.ch + 1 };
+            
+            if (CodeMirror.cmpPos(fromPosition, toPosition) > 0) {
+                newSelections.unshift({ anchor: endPosition, head: startPosition });
+            } else {
+                newSelections.unshift({ anchor: startPosition, head: endPosition });
+            }
+        }
+        
+        document.setSelections(newSelections);
+    }
+
+    insertBracketPair(document, openBracket, closeBracket) {
+        document.replaceSelection(openBracket + closeBracket, "around");
+        const cursor = document.getCursor();
+        document.setCursor({ line: cursor.line, ch: cursor.ch - 1 });
+    }
+
+    handleClosingBrackets(event, closingBrackets, codeMirror, document, selections) {
+        if (closingBrackets.includes(event.key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
+            const closeBracket = event.key;
+            
+            if (selections.some(selection => !selection.empty())) {
+                event.preventDefault();
+                this.moveToAfterClosingBrackets(document, selections, closeBracket);
+                return true;
+            } else {
+                return this.skipOverMatchingClosingBracket(event, document, closeBracket);
+            }
+        }
+        return false;
+    }
+
+    moveToAfterClosingBrackets(document, selections, closeBracket) {
+        let newSelections = [];
+        
+        for (let index = selections.length - 1; index >= 0; index--) {
+            const selection = selections[index];
+            const fromPosition = selection.anchor;
+            const toPosition = selection.head;
+            const orderedSelection = CodeMirror.cmpPos(fromPosition, toPosition) <= 0 ? 
+                {start: fromPosition, end: toPosition} : 
+                {start: toPosition, end: fromPosition};
+            
+            let afterClosePosition = { line: orderedSelection.end.line, ch: orderedSelection.end.ch };
+            const lineContent = document.getLine(afterClosePosition.line);
+            
+            if (lineContent[afterClosePosition.ch] === closeBracket) {
+                afterClosePosition = { line: afterClosePosition.line, ch: afterClosePosition.ch + 1 };
+            }
+            
+            newSelections.unshift({ anchor: afterClosePosition, head: afterClosePosition });
+        }
+        
+        document.setSelections(newSelections);
+    }
+
+    skipOverMatchingClosingBracket(event, document, closeBracket) {
+        const cursor = document.getCursor();
+        const lineContent = document.getLine(cursor.line);
+        
+        if (lineContent[cursor.ch] === closeBracket) {
+            event.preventDefault();
+            document.setCursor({ line: cursor.line, ch: cursor.ch + 1 });
+            return true;
+        }
+        return false;
+    }
+
+    handleEnterKey(event, openingBrackets, bracketPairs, codeMirror, document) {
+        if (event.key === "Enter" && !event.ctrlKey && !event.altKey && !event.metaKey) {
+            const cursor = document.getCursor();
+            const lineContent = document.getLine(cursor.line);
+            const previousCharacter = cursor.ch > 0 ? lineContent[cursor.ch - 1] : "";
+            
+            if (openingBrackets.includes(previousCharacter) && 
+                lineContent[cursor.ch] === bracketPairs[previousCharacter]) {
+                
+                event.preventDefault();
+                this.insertFormattedBracketBlock(document, cursor, lineContent, previousCharacter, bracketPairs);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    insertFormattedBracketBlock(document, cursor, lineContent, openBracket, bracketPairs) {
+        const closeBracket = bracketPairs[openBracket];
+        const openLine = cursor.line;
+        const openCharacter = cursor.ch - 1;
+        
+        const leadingSpaces = this.countLeadingSpaces(lineContent, openCharacter);
+        const cursorIndentation = " ".repeat(leadingSpaces + 2);
+        const closingIndentation = " ".repeat(openCharacter);
+        
+        const middleLineContent = cursorIndentation;
+        
+        document.replaceRange("\n" + middleLineContent + "\n", cursor, cursor);
+        
+        const closeLine = openLine + 2;
+        const targetLineContent = document.getLine(closeLine);
+        const expectedClosing = closingIndentation + closeBracket;
+        
+        if (targetLineContent.startsWith(closeBracket)) {
+            document.replaceRange("", { line: closeLine, ch: 0 }, { line: closeLine, ch: 1 });
+        }
+        
+        const updatedLineContent = document.getLine(closeLine);
+        if (!updatedLineContent.startsWith(expectedClosing)) {
+            document.replaceRange(expectedClosing, { line: closeLine, ch: 0 }, { line: closeLine, ch: 0 });
+        }
+        
+        document.setCursor({ line: openLine + 1, ch: middleLineContent.length });
+    }
+
+    countLeadingSpaces(lineContent, upToCharacter) {
+        let spaceCount = 0;
+        for (let index = 0; index < upToCharacter; index++) {
+            if (lineContent[index] === " ") {
+                spaceCount++;
+            } else {
+                break;
+            }
+        }
+        return spaceCount;
+    }
+
+    handleSaveShortcut(event) {
+        if (event.key === "s" && event.ctrlKey && !event.altKey && !event.metaKey) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (this.saveCallback) {
+                this.saveCallback();
+            }
+            return true;
+        }
+        return false;
+    }
+
+    async handleClipboardShortcuts(event, codeMirror) {
+        const contextMenuMode = await window.app.extensionManager.setting.get("wildcard_selector.contextMenuMode");
+        const keyPressed = event.key.toLowerCase();
+        
+        if (!event.ctrlKey || event.altKey || event.metaKey) return;
+        
+        const isCustomMode = contextMenuMode === 'custom';
+        const useSystemAction = isCustomMode === event.shiftKey;
+        
+        if (keyPressed === 'x' && (event.shiftKey || isCustomMode)) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (useSystemAction) {
+                await this.textboxActions.handleSystemCutOrCopy(true);
+            } else {
+                this.textboxActions.handleCopyOrCutAction(true);
+            }
+        } else if (keyPressed === 'c' && (event.shiftKey || isCustomMode)) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (useSystemAction) {
+                await this.textboxActions.handleSystemCutOrCopy(false);
+            } else {
+                this.textboxActions.handleCopyOrCutAction(false);
+            }
+        } else if (keyPressed === 'v' && (event.shiftKey || isCustomMode)) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (useSystemAction) {
+                await this.textboxActions.handleSystemPaste();
+            } else {
+                this.textboxActions.handlePasteAction();
+            }
+        }
+    }
+}
+
+class TextboxUIBuilder {
+    constructor(nodeTitle) {
+        this.nodeTitle = nodeTitle;
+    }
+
+    createTextboxElement() {
+        const textbox = document.createElement("div");
+        textbox.className = "textbox";
+        
+        const topbar = this.createTopbar();
+        const contentContainer = this.createContentContainer();
+        
+        textbox.appendChild(topbar);
+        textbox.appendChild(contentContainer);
+        
+        return { textbox, contentContainer };
+    }
+
+    createTopbar() {
+        const topbar = document.createElement("div");
+        topbar.className = "topbar";
+        topbar.textContent = this.nodeTitle;
+        return topbar;
+    }
+
+    createContentContainer() {
+        const container = document.createElement("div");
+        container.className = "textbox-content";
+        container.style.height = "100%";
+        return container;
+    }
+
+    createActionBar(buttons) {
+        const actionBar = document.createElement("div");
+        actionBar.className = "textbox-action-bar";
+        
+        buttons.forEach(button => {
+            actionBar.appendChild(button);
+        });
+        
+        return actionBar;
+    }
+
+    createActionButton(buttonText, className) {
+        const button = document.createElement("button");
+        button.className = `textbox-action-btn ${className}`;
+        button.textContent = buttonText;
+        return button;
+    }
+}
+
+export class Textbox {
+    constructor(node, mediator, { constants = {}, onStructureUpdate } = {}) {
+        this.node = node;
+        this.mediator = mediator;
+        this.constants = constants;
+        this.onStructureUpdate = onStructureUpdate;
+        
+        this.codeMirrorLoader = new CodeMirrorLoader(constants.EXTENSION_NAME);
+        this.uiBuilder = new TextboxUIBuilder(node.title);
+        
+        this.structureData = null;
+        this.textbox = null;
+        this.cmEditor = null;
+        this.clearButton = null;
+        this.saveButton = null;
+        this.cmContainer = null;
+        
+        this.contextMenu = null;
+        this.activeMenus = [];
+        this.customClipboard = [];
+        this.contextMenuManager = null;
+        this.actions = null;
+        
+        this.initializeContextMenu();
+    }
+
+    async createTextbox() {
+        this.createTextboxElements();
+        await this.initializeCodeMirror();
+        
+        this.contextMenuMode = await window.app.extensionManager.setting.get(
+            "wildcard_selector.contextMenuMode"
+        );
+        
+        this.setupKeyboardHandlers();
+        this.setupActionBar();
+        this.setupContextMenuEventListeners();
+        
+        return this.textbox;
+    }
+
+    initializeContextMenu() {
+        this.contextMenu = document.createElement("div");
+        this.contextMenu.className = "textbox-context-menu";
+        document.body.insertBefore(this.contextMenu, document.body.firstChild);
+        
+        this.contextMenuManager = new ContextMenuManager(this);
+        this.actions = new Actions(this);
+    }
+
+    createTextboxElements() {
+        const { textbox, contentContainer } = this.uiBuilder.createTextboxElement();
+        this.textbox = textbox;
+        this.cmContainer = contentContainer;
+    }
+
+    async initializeCodeMirror() {
+        await this.codeMirrorLoader.loadCodeMirror();
+        
+        const initialContent = this.mediator.getWildcardsPrompt();
+        WildcardsCodeMirrorMode.register();
+        
+        const lineWrapping = await window.app.extensionManager.setting.get("wildcard_selector.lineWrap");
+        
         this.cmEditor = window.CodeMirror(this.cmContainer, {
-            value: wildcardsPrompt,
+            value: initialContent,
             mode: "wildcards",
             lineNumbers: false,
             theme: "default",
@@ -90,226 +445,84 @@ export class Textbox {
             autofocus: true,
             autoRefresh: true,
             styleSelectedText: true,
-            lineWrapping: await window.app.extensionManager.setting.get("wildcard_selector.lineWrap")
+            lineWrapping: lineWrapping
         });
+        
         setTimeout(() => {
             this.cmEditor.refresh();
             this.cmEditor.focus();
-
-            // not sure if wanna move cursor to end on open - keep it commented for now
-            /* const doc = this.cmEditor.getDoc();
-            const lastLine = doc.lastLine();
-            const lastCh = doc.getLine(lastLine).length;
-            doc.setCursor({ line: lastLine, ch: lastCh }); */
         }, 1);
     }
 
-    async loadCodeMirror() {
-        if (window.CodeMirror) return;
-        if (!document.getElementById("cm-css")) {
-            const link = document.createElement("link");
-            link.id = "cm-css";
-            link.rel = "stylesheet";
-            link.href = `/extensions/${this.constants.EXTENSION_NAME}/common/vendor/css/codemirror/codemirror.min.css`;
-            document.head.appendChild(link);
-        }
-        const basePath = `/extensions/${this.constants.EXTENSION_NAME}/common/vendor/js/codemirror/`;
-        await this.loadScript(`${basePath}codemirror.min.js`);
-        await Promise.all([
-            this.loadScript(`${basePath}mark-selection.min.js`),
-            this.loadScript(`${basePath}searchcursor.min.js`)
-        ]);
+    setupKeyboardHandlers() {
+        const keyboardHandler = new KeyboardShortcutHandler(
+            this.cmEditor,
+            () => this.saveButton?.click(),
+            this.actions
+        );
+        
+        keyboardHandler.setupKeyboardHandlers();
     }
 
-    _setupEditorFeatures() {
-        const pairs = { '{': '}', '(': ')', '[': ']' };
-        const openKeys = Object.keys(pairs);
-        const closeKeys = Object.values(pairs);
-        this.cmEditor.on("keydown", async (cm, event) => {
-            const doc = cm.getDoc();
-            const selections = doc.listSelections();
-            if (event.key === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey) {
-                event.preventDefault();
-                const tabSpaces = await window.app.extensionManager.setting.get("wildcard_selector.tab_spaces");
-                const spaces = " ".repeat(tabSpaces);
-                if (selections.length === 1 && selections[0].empty()) {
-                    doc.replaceSelection(spaces, "end");
-                } else {
-                    cm.execCommand("defaultTab");
-                }
-                return;
-            }
-            if (openKeys.includes(event.key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
-                event.preventDefault();
-                const open = event.key;
-                const close = pairs[open];
-                if (selections.some(sel => !sel.empty())) {
-                    let newSelections = [];
-                    for (let i = selections.length - 1; i >= 0; i--) {
-                        const sel = selections[i];
-                        const from = sel.anchor;
-                        const to = sel.head;
-                        const ordered = CodeMirror.cmpPos(from, to) <= 0 ? {start: from, end: to} : {start: to, end: from};
-                        const selected = doc.getRange(ordered.start, ordered.end);
-                        doc.replaceRange(open + selected + close, ordered.start, ordered.end);
-                        let start = { line: ordered.start.line, ch: ordered.start.ch + 1 };
-                        let end = { line: ordered.end.line, ch: ordered.end.ch + 1 };
-                        if (CodeMirror.cmpPos(from, to) > 0) {
-                            newSelections.unshift({ anchor: end, head: start });
-                        } else {
-                            newSelections.unshift({ anchor: start, head: end });
-                        }
-                    }
-                    doc.setSelections(newSelections);
-                } else {
-                    doc.replaceSelection(open + close, "around");
-                    const cursor = doc.getCursor();
-                    doc.setCursor({ line: cursor.line, ch: cursor.ch - 1 });
-                }
-                return;
-            }
-            if (closeKeys.includes(event.key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
-                const close = event.key;
-                if (selections.some(sel => !sel.empty())) {
-                    event.preventDefault();
-                    let newSelections = [];
-                    for (let i = selections.length - 1; i >= 0; i--) {
-                        const sel = selections[i];
-                        const from = sel.anchor;
-                        const to = sel.head;
-                        const ordered = CodeMirror.cmpPos(from, to) <= 0 ? {start: from, end: to} : {start: to, end: from};
-                        let afterClose = { line: ordered.end.line, ch: ordered.end.ch };
-                        const lineContent = doc.getLine(afterClose.line);
-                        if (lineContent[afterClose.ch] === close) {
-                            afterClose = { line: afterClose.line, ch: afterClose.ch + 1 };
-                        }
-                        newSelections.unshift({ anchor: afterClose, head: afterClose });
-                    }
-                    doc.setSelections(newSelections);
-                } else {
-                    const cursor = doc.getCursor();
-                    const lineContent = doc.getLine(cursor.line);
-                    if (lineContent[cursor.ch] === close) {
-                        event.preventDefault();
-                        doc.setCursor({ line: cursor.line, ch: cursor.ch + 1 });
-                    }
-                }
-                return;
-            }
-            if (event.key === "Enter" && !event.ctrlKey && !event.altKey && !event.metaKey) {
-                const cursor = doc.getCursor();
-                const lineContent = doc.getLine(cursor.line);
-                const prevChar = cursor.ch > 0 ? lineContent[cursor.ch - 1] : "";
-                if (
-                    openKeys.includes(prevChar) &&
-                    lineContent[cursor.ch] === pairs[prevChar]
-                ) {
-                    event.preventDefault();
-                    const close = pairs[prevChar];
-                    const openLine = cursor.line;
-                    const openCh = cursor.ch - 1;
-                    let spaceCount = 0;
-                    for (let i = 0; i < openCh; i++) {
-                        if (lineContent[i] === " ") spaceCount++;
-                        else break;
-                    }
-                    let cursorSpaces = "";
-                    for (let i = 0; i < spaceCount + 2; i++) cursorSpaces += " ";
-                    let closeSpaces = "";
-                    for (let i = 0; i < openCh; i++) closeSpaces += " ";
-                    let middleLine = cursorSpaces;
-                    doc.replaceRange("\n" + middleLine + "\n", cursor, cursor);
-                    let closeLine = openLine + 2;
-                    let targetLineContent = doc.getLine(closeLine);
-                    let expectedClose = closeSpaces + close;
-                    if (targetLineContent.startsWith(close)) {
-                        doc.replaceRange("", { line: closeLine, ch: 0 }, { line: closeLine, ch: 1 });
-                        targetLineContent = doc.getLine(closeLine);
-                    }
-                    if (!targetLineContent.startsWith(expectedClose)) {
-                        doc.replaceRange(expectedClose, { line: closeLine, ch: 0 }, { line: closeLine, ch: 0 });
-                    }
-                    doc.setCursor({ line: openLine + 1, ch: middleLine.length });
-                }
-                return;
-            }
-            if (event.key === "s" && event.ctrlKey && !event.altKey && !event.metaKey) {
-                event.preventDefault();
-                event.stopPropagation();
-                this.saveBtn.click();
-                return;
-            }
-            
-            const key = event.key.toLowerCase();
-            if (!event.ctrlKey || event.altKey || event.metaKey) return;
-            
-            const isCustomMode = this.contextMenuMode === 'custom';
-            const useSystemAction = isCustomMode === event.shiftKey;
-            
-            if (key === 'x') {
-                if (event.shiftKey || isCustomMode) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    useSystemAction ? this.actions._handleSystemCutOrCopy(true) : this.actions._handleCopyOrCutAction(true);
-                }
-                return;
-            }
-
-            if (key === 'c') {
-                if (event.shiftKey || isCustomMode) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    useSystemAction ? this.actions._handleSystemCutOrCopy(false) : this.actions._handleCopyOrCutAction(false);
-                }
-                return;
-            }
-            
-            if (key === 'v') {
-                if (event.shiftKey || isCustomMode) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    useSystemAction ? this.actions._handleSystemPaste() : this.actions._handlePasteAction();
-                }
-            }
-        });
-    }
-
-    _setupActionBar() {
-        const actionBar = document.createElement("div");
-        actionBar.className = "textbox-action-bar";
-        this.clearBtn = this.createActionButton("Clear", "clear");
-        this.saveBtn = this.createActionButton("Save", "save");
-        actionBar.appendChild(this.clearBtn);
-        actionBar.appendChild(this.saveBtn);
+    setupActionBar() {
+        const clearButton = this.uiBuilder.createActionButton("Clear", "clear");
+        const saveButton = this.uiBuilder.createActionButton("Save", "save");
+        
+        const actionBar = this.uiBuilder.createActionBar([clearButton, saveButton]);
+        
+        this.clearButton = clearButton;
+        this.saveButton = saveButton;
+        
+        this.setupButtonEventListeners();
         this.textbox.appendChild(actionBar);
+    }
 
-        this.clearBtn.addEventListener("click", () => {
+    setupButtonEventListeners() {
+        this.clearButton.addEventListener("click", () => {
             this.cmEditor.setValue("");
             this.cmEditor.focus();
             this.structureData = {};
             this.mediator.updateNodeData({ wildcards_structure_data: "{}" });
+            
             if (this.onStructureUpdate) {
                 this.onStructureUpdate(this.structureData);
             }
         });
 
-        this.saveBtn.addEventListener("click", async () => {
+        this.saveButton.addEventListener("click", async () => {
             await this.saveAndSync();
         });
     }
 
-    createActionButton(text, className) {
-        const btn = document.createElement("button");
-        btn.className = `textbox-action-btn ${className}`;
-        btn.textContent = text;
-        return btn;
+    setupContextMenuEventListeners() {
+        if (this.cmEditor && this.cmEditor.getWrapperElement) {
+            const wrapper = this.cmEditor.getWrapperElement();
+            wrapper.addEventListener("contextmenu", (event) => {
+                event.preventDefault();
+                this.contextMenuManager.showContextMenu(event.clientX, event.clientY);
+            });
+        }
+
+        document.addEventListener("mousedown", (event) => {
+            if (!this.contextMenuManager.isClickInsideMenus(event.target)) {
+                this.contextMenuManager.hideAllMenus();
+            }
+        });
+    }
+
+    getContent() {
+        return this.cmEditor.getValue();
+    }
+
+    async saveAndSync() {
+        this.mediator.queueEvent('save-request', {});
     }
 
     showSuccessMessage(message) {
-        const originalText = this.saveBtn.textContent;
-        this.saveBtn.textContent = message;
+        const originalText = this.saveButton.textContent;
+        this.saveButton.textContent = message;
         setTimeout(() => {
-            this.saveBtn.textContent = originalText;
+            this.saveButton.textContent = originalText;
         }, 1000);
     }
 
@@ -317,16 +530,16 @@ export class Textbox {
         alert(message);
     }
 
-    markText(start, end, className = 'wildcard-mark') {
+    markText(startPosition, endPosition, className = 'wildcard-mark') {
         if (!this.cmEditor) return;
         
-        const doc = this.cmEditor.getDoc();
-        const from = doc.posFromIndex(start);
-        const to = doc.posFromIndex(end);
+        const document = this.cmEditor.getDoc();
+        const fromPosition = document.posFromIndex(startPosition);
+        const toPosition = document.posFromIndex(endPosition);
         
-        doc.setSelection(from, to);
-        doc.markText(from, to, { className });
-        this.cmEditor.scrollIntoView({from, to});
+        document.setSelection(fromPosition, toPosition);
+        document.markText(fromPosition, toPosition, { className });
+        this.cmEditor.scrollIntoView({from: fromPosition, to: toPosition});
     }
 
     clearMarks(className = 'wildcard-mark') {
@@ -339,63 +552,33 @@ export class Textbox {
             }
         });
         
-        const doc = this.cmEditor.getDoc();
-        const cursor = doc.getCursor();
-        doc.setSelection(cursor, cursor);
+        const document = this.cmEditor.getDoc();
+        const cursor = document.getCursor();
+        document.setSelection(cursor, cursor);
     }
 
-    mark(str, type = 'button', start = null, end = null, optionIndex = null) {
-        if (!str || !this.cmEditor) return;
+    mark(searchString, markType = 'button', startPosition = null, endPosition = null, optionIndex = null) {
+        if (!searchString || !this.cmEditor) return;
         
-        const className = type === 'option' ? 'option-mark' : 'wildcard-mark';
+        const className = markType === 'option' ? 'option-mark' : 'wildcard-mark';
         
-        if (typeof start === 'number' && typeof end === 'number') {
-            this.markText(start, end, className);
+        if (typeof startPosition === 'number' && typeof endPosition === 'number') {
+            this.markText(startPosition, endPosition, className);
         }
     }
 
-    unmark(type = 'button') {
-        const className = type === 'option' ? 'option-mark' : 'wildcard-mark';
+    unmark(markType = 'button') {
+        const className = markType === 'option' ? 'option-mark' : 'wildcard-mark';
         this.clearMarks(className);
     }
 
-    loadScript(src) {
-        return new Promise((resolve, reject) => {
-            if (document.querySelector(`script[src='${src}']`)) {
-                resolve();
-                return;
-            }
-            const script = document.createElement("script");
-            script.src = src;
-            script.onload = resolve;
-            script.onerror = reject;
-            document.head.appendChild(script);
-        });
-    }
-    
-    _setupContextMenuEventListeners() {
-        if (this.cmEditor && this.cmEditor.getWrapperElement) {
-            const wrapper = this.cmEditor.getWrapperElement();
-            wrapper.addEventListener("contextmenu", (e) => {
-                e.preventDefault(); // Prevent system context menu
-                this.contextMenuManager.showContextMenu(e.clientX, e.clientY); // Use contextMenuManager
-            });
-        }
-
-        document.addEventListener("mousedown", (e) => {
-            if (!this.contextMenuManager._isClickInsideMenus(e.target)) {
-                this.contextMenuManager._hideAllMenus();
-            }
-        });
-    }
-
-    async _handleContextMenuEvent(e) {
+    async handleContextMenuEvent(event) {
         const contextMenuMode = await window.app.extensionManager.setting.get("wildcard_selector.contextMenuMode");
-        const showCustomMenu = (contextMenuMode === "custom") ? !e.ctrlKey : e.ctrlKey;
+        const showCustomMenu = (contextMenuMode === "custom") ? !event.ctrlKey : event.ctrlKey;
 
         if (showCustomMenu) {
-            e.preventDefault();
-            this.contextMenuManager.showContextMenu(e.clientX, e.clientY);
+            event.preventDefault();
+            this.contextMenuManager.showContextMenu(event.clientX, event.clientY);
         }
     }
 }

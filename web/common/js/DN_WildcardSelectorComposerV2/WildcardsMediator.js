@@ -1,356 +1,448 @@
 import { fetchSend } from "../utils.js";
 
+class EventQueueProcessor {
+    constructor() {
+        this.queue = [];
+        this.isProcessing = false;
+    }
+
+    enqueue(eventType, eventData) {
+        this.queue.push({ type: eventType, data: eventData });
+        if (!this.isProcessing) {
+            this.processQueue();
+        }
+    }
+
+    async processQueue() {
+        this.isProcessing = true;
+        
+        while (this.queue.length > 0) {
+            const event = this.queue.shift();
+            try {
+                await this.processEvent(event);
+            } catch (error) {
+                console.error(`Error processing event ${event.type}:`, error);
+            }
+        }
+        
+        this.isProcessing = false;
+    }
+
+    async processEvent(event) {
+        if (this.eventHandler) {
+            await this.eventHandler(event);
+        }
+    }
+
+    setEventHandler(handler) {
+        this.eventHandler = handler;
+    }
+}
+
+class WidgetManager {
+    constructor(node) {
+        this.node = node;
+    }
+
+    getWidget(widgetName) {
+        return this.node.widgets?.find(widget => widget.name === widgetName);
+    }
+
+    getWidgetValue(widgetName) {
+        const widget = this.getWidget(widgetName);
+        return widget ? widget.value : "";
+    }
+
+    setWidgetValue(widgetName, value) {
+        const widget = this.getWidget(widgetName);
+        if (widget) {
+            widget.value = value !== null && value !== undefined ? value : "";
+        }
+    }
+
+    updateWidgets(dataObject) {
+        Object.entries(dataObject).forEach(([key, value]) => {
+            if (value !== undefined) {
+                this.setWidgetValue(key, value);
+            }
+        });
+    }
+}
+
+class StructureDataManager {
+    constructor(widgetManager) {
+        this.widgetManager = widgetManager;
+        this.cachedStructure = null;
+    }
+
+    getStructureData() {
+        const structureString = this.widgetManager.getWidgetValue("wildcards_structure_data");
+        if (!structureString) {
+            return this.getDefaultStructure();
+        }
+        
+        try {
+            this.cachedStructure = JSON.parse(structureString);
+            return this.cachedStructure;
+        } catch (error) {
+            console.error("Error parsing structure data:", error);
+            return this.getDefaultStructure();
+        }
+    }
+
+    getDefaultStructure() {
+        return { nodes: {}, root_nodes: [] };
+    }
+
+    updateStructureData(newStructure) {
+        this.cachedStructure = newStructure;
+        const structureString = JSON.stringify(newStructure);
+        this.widgetManager.setWidgetValue("wildcards_structure_data", structureString);
+    }
+
+    getStructureString() {
+        return this.widgetManager.getWidgetValue("wildcards_structure_data");
+    }
+}
+
+class TextMarkingService {
+    constructor() {
+        this.textboxReference = null;
+    }
+
+    setTextbox(textbox) {
+        this.textboxReference = textbox;
+    }
+
+    markWildcard(wildcardData) {
+        if (!this.validateWildcardData(wildcardData)) return;
+        
+        const startPosition = wildcardData.position?.start;
+        const endPosition = wildcardData.position?.end;
+        const content = this.getTextContent();
+        
+        this.clearAllMarks();
+        
+        if (this.validatePositions(startPosition, endPosition, content)) {
+            this.applyMark(startPosition, endPosition, 'wildcard-mark');
+        }
+    }
+
+    markOption(optionData) {
+        const { displayText, parentWildcard, optionIndex } = optionData;
+        
+        this.clearAllMarks();
+        
+        const startPosition = parentWildcard.position?.start;
+        const endPosition = parentWildcard.position?.end;
+        const content = this.getTextContent();
+        
+        if (!this.validatePositions(startPosition, endPosition, content)) {
+            console.warn("Invalid parent wildcard position for option marking");
+            return;
+        }
+        
+        if (this.isNestedWildcard(displayText)) {
+            this.handleNestedWildcardMarking(displayText, startPosition, endPosition, content);
+        } else if (optionIndex !== undefined && displayText) {
+            this.handleRegularOptionMarking(content, displayText, startPosition, endPosition, optionIndex);
+        }
+    }
+
+    clearAllMarks() {
+        if (this.textboxReference && typeof this.textboxReference.clearMarks === 'function') {
+            this.textboxReference.clearMarks('wildcard-mark');
+            this.textboxReference.clearMarks('option-mark');
+        }
+    }
+
+    validateWildcardData(wildcardData) {
+        return wildcardData && typeof wildcardData.content === 'string';
+    }
+
+    validatePositions(startPosition, endPosition, content) {
+        if (typeof startPosition !== 'number' || typeof endPosition !== 'number') {
+            return false;
+        }
+        if (startPosition < 0 || endPosition < 0 || startPosition >= endPosition) {
+            return false;
+        }
+        if (!content || endPosition > content.length) {
+            return false;
+        }
+        return true;
+    }
+
+    getTextContent() {
+        return this.textboxReference ? this.textboxReference.getContent() : '';
+    }
+
+    applyMark(startPosition, endPosition, className) {
+        if (this.textboxReference) {
+            this.textboxReference.markText(startPosition, endPosition, className);
+        }
+    }
+
+    isNestedWildcard(text) {
+        return typeof text === 'string' && text.startsWith('{') && text.endsWith('}');
+    }
+
+    handleNestedWildcardMarking(displayText, startPosition, endPosition, content) {
+        if (this.validatePositions(startPosition, endPosition, content)) {
+            this.applyMark(startPosition, endPosition, 'option-mark');
+            return;
+        }
+        
+        const wildcardContent = content.substring(startPosition + 1, endPosition - 1);
+        const nestedStart = wildcardContent.indexOf(displayText);
+        
+        if (nestedStart !== -1) {
+            const absoluteStart = startPosition + 1 + nestedStart;
+            const absoluteEnd = absoluteStart + displayText.length;
+            if (this.validatePositions(absoluteStart, absoluteEnd, content)) {
+                this.applyMark(absoluteStart, absoluteEnd, 'option-mark');
+            }
+        }
+    }
+
+    handleRegularOptionMarking(content, displayText, startPosition, endPosition, optionIndex) {
+        const position = this.calculateOptionPosition(
+            content,
+            displayText,
+            startPosition,
+            endPosition,
+            optionIndex
+        );
+        
+        if (position && this.validatePositions(position.start, position.end, content)) {
+            this.applyMark(position.start, position.end, 'option-mark');
+        }
+    }
+
+    calculateOptionPosition(fullText, optionText, wildcardStart, wildcardEnd, optionIndex) {
+        const wildcardContent = fullText.substring(wildcardStart + 1, wildcardEnd - 1);
+        const options = this.parseWildcardOptions(wildcardContent);
+        
+        if (optionIndex < 0 || optionIndex >= options.length) return null;
+        
+        let currentPosition = wildcardStart + 1;
+        
+        for (let index = 0; index < optionIndex; index++) {
+            currentPosition += options[index].length;
+            let pipePosition = currentPosition;
+            
+            while (pipePosition < wildcardEnd - 1 && fullText.charAt(pipePosition) !== '|') {
+                pipePosition++;
+            }
+            
+            if (fullText.charAt(pipePosition) === '|') {
+                currentPosition = pipePosition + 1;
+            }
+        }
+        
+        let searchPosition = currentPosition;
+        while (searchPosition < wildcardEnd - 1 && /\s/.test(fullText.charAt(searchPosition))) {
+            searchPosition++;
+        }
+        
+        const optionStart = searchPosition;
+        
+        while (searchPosition < wildcardEnd - 1 && 
+               fullText.charAt(searchPosition) !== '|' && 
+               fullText.charAt(searchPosition) !== '}') {
+            searchPosition++;
+        }
+        
+        while (searchPosition > optionStart && /\s/.test(fullText.charAt(searchPosition - 1))) {
+            searchPosition--;
+        }
+        
+        return { start: optionStart, end: searchPosition };
+    }
+
+    parseWildcardOptions(wildcardContent) {
+        const options = [];
+        let currentOption = '';
+        let bracketDepth = 0;
+        let position = 0;
+        
+        while (position < wildcardContent.length) {
+            const character = wildcardContent[position];
+            
+            if (character === '{') {
+                bracketDepth++;
+                currentOption += character;
+                position++;
+                
+                while (position < wildcardContent.length && bracketDepth > 0) {
+                    const nestedCharacter = wildcardContent[position];
+                    currentOption += nestedCharacter;
+                    
+                    if (nestedCharacter === '{') {
+                        bracketDepth++;
+                    } else if (nestedCharacter === '}') {
+                        bracketDepth--;
+                    }
+                    
+                    position++;
+                }
+            } else if (character === '|' && bracketDepth === 0) {
+                if (currentOption.trim()) {
+                    options.push(currentOption.trim());
+                }
+                currentOption = '';
+                position++;
+            } else {
+                currentOption += character;
+                position++;
+            }
+        }
+        
+        if (currentOption.trim()) {
+            options.push(currentOption.trim());
+        }
+        
+        return options;
+    }
+}
+
 export class WildcardsMediator extends EventTarget {
     constructor(node, constants) {
         super();
         this.node = node;
         this.constants = constants;
-        this.structureData = this._initializeStructureData();
-        this.textbox = null;
-        this.dropdownManager = null;
-        this.eventQueue = [];
-        this.processingQueue = false;
+        this.widgetManager = new WidgetManager(node);
+        this.structureDataManager = new StructureDataManager(this.widgetManager);
+        this.textMarkingService = new TextMarkingService();
+        this.eventQueueProcessor = new EventQueueProcessor();
+        this.textboxReference = null;
+        this.dropdownManagerReference = null;
+        
+        this.initializeEventProcessor();
     }
 
-    // Component registration
+    initializeEventProcessor() {
+        this.eventQueueProcessor.setEventHandler(async (event) => {
+            switch (event.type) {
+                case 'mark-request':
+                    this.processMarkRequest(event.data);
+                    break;
+                case 'save-request':
+                    await this.saveContent();
+                    break;
+                case 'structure-update':
+                    this.emit('structure-updated', event.data);
+                    break;
+            }
+        });
+    }
+
     setTextbox(textbox) {
-        this.textbox = textbox;
+        this.textboxReference = textbox;
+        this.textMarkingService.setTextbox(textbox);
     }
 
     setDropdownManager(dropdownManager) {
-        this.dropdownManager = dropdownManager;
+        this.dropdownManagerReference = dropdownManager;
     }
 
-    // Centralized widget data management
-    getHiddenWidget(name) {
-        return this.node.widgets?.find(w => w.name === name);
+    getHiddenWidget(widgetName) {
+        return this.widgetManager.getWidget(widgetName);
     }
 
-    getHiddenWidgetValue(name) {
-        const widget = this.getHiddenWidget(name);
-        return widget ? widget.value : "";
+    getHiddenWidgetValue(widgetName) {
+        return this.widgetManager.getWidgetValue(widgetName);
     }
 
-    updateHiddenWidget(name, value) {
-        const widget = this.getHiddenWidget(name);
-        if (widget) {
-            // Don't set to null, only set to empty string if value is null or undefined
-            widget.value = value !== null && value !== undefined ? value : "";
-        }
+    updateHiddenWidget(widgetName, value) {
+        this.widgetManager.setWidgetValue(widgetName, value);
     }
 
     getWildcardsPrompt() {
-        return this.getHiddenWidgetValue("wildcards_prompt");
+        return this.widgetManager.getWidgetValue("wildcards_prompt");
     }
 
     getWildcardsStructure() {
-        return this.getHiddenWidgetValue("wildcards_structure_data");
+        return this.structureDataManager.getStructureString();
     }
 
-    updateNodeData(data) {
-        if (data.wildcards_prompt !== undefined) {
-            this.updateHiddenWidget("wildcards_prompt", data.wildcards_prompt);
-        }
-        if (data.wildcards_structure_data !== undefined) {
-            this.updateHiddenWidget("wildcards_structure_data", data.wildcards_structure_data);
-        }
+    updateNodeData(dataObject) {
+        this.widgetManager.updateWidgets(dataObject);
     }
 
-    // Centralized backend communication
     async saveContent() {
-        // Defensive check: ensure textbox is ready
-        if (!this.textbox || !this.textbox.getContent) {
-            console.warn("Textbox not ready for save operation");
+        if (!this.validateTextboxReady()) {
             this.emit('save-error', "Save failed - textbox not ready");
             return;
         }
 
-        const content = this.textbox.getContent();
-        const structureDataStr = this.getWildcardsStructure();
-        this.structureData = structureDataStr ? JSON.parse(structureDataStr) : {};
-        const currentStructure = JSON.stringify(this.structureData);
+        const content = this.textboxReference.getContent();
+        const currentStructure = this.structureDataManager.getStructureData();
+        const structureString = JSON.stringify(currentStructure);
         
         try {
-            this.updateNodeData({ wildcards_prompt: content });
-            const response = await fetchSend(
-                this.constants.MESSAGE_ROUTE,
-                this.node.id,
-                "update_wildcards_prompt",
-                { content, wildcards_structure_data: currentStructure }
-            );
-            
-            if (response.status === 'success' && response.wildcard_structure_data !== undefined) {
-                this.updateNodeData({
-                    wildcards_structure_data: response.wildcard_structure_data
-                });
-                this.structureData = JSON.parse(response.wildcard_structure_data);
-                
-                // Clear existing marks before emitting structure update
-                // This prevents stale position references
-                this._clearAllTextMarks();
-                
-                // Queue the structure update to ensure proper sequencing
-                this.queueEvent('structure-update', this.structureData);
-            }
-            
-            this.node.setDirtyCanvas(true, true);
-            this.emit('save-success', "Saved!");
+            await this.performSave(content, structureString);
         } catch (error) {
             console.error("Error saving content:", error);
             this.emit('save-error', "Save failed");
         }
     }
 
-    // Clear all text marks to prevent stale position references
-    _clearAllTextMarks() {
-        if (this.textbox && typeof this.textbox.clearMarks === 'function') {
-            this.textbox.clearMarks('wildcard-mark');
-            this.textbox.clearMarks('option-mark');
-        }
+    validateTextboxReady() {
+        return this.textboxReference && typeof this.textboxReference.getContent === 'function';
     }
 
-    // Enhanced position validation before marking
-    _validateMarkingPosition(start, end, content) {
-        if (typeof start !== 'number' || typeof end !== 'number') {
-            return false;
+    async performSave(content, structureString) {
+        this.updateNodeData({ wildcards_prompt: content });
+        
+        const response = await fetchSend(
+            this.constants.MESSAGE_ROUTE,
+            this.node.id,
+            "update_wildcards_prompt",
+            { content, wildcards_structure_data: structureString }
+        );
+        
+        if (response.status === 'success' && response.wildcard_structure_data !== undefined) {
+            this.handleSuccessfulSave(response.wildcard_structure_data);
         }
-        if (start < 0 || end < 0 || start >= end) {
-            return false;
-        }
-        if (!content || end > content.length) {
-            return false;
-        }
-        return true;
+        
+        this.node.setDirtyCanvas(true, true);
+        this.emit('save-success', "Saved!");
     }
 
-    processMarkRequest(rawData) {
-        const { type, data } = rawData;
+    handleSuccessfulSave(newStructureData) {
+        this.updateNodeData({
+            wildcards_structure_data: newStructureData
+        });
+        
+        const parsedStructure = JSON.parse(newStructureData);
+        this.structureDataManager.updateStructureData(parsedStructure);
+        
+        this.textMarkingService.clearAllMarks();
+        this.queueEvent('structure-update', parsedStructure);
+    }
+
+    processMarkRequest(requestData) {
+        const { type, data } = requestData;
         
         switch (type) {
             case 'wildcard':
-                this._processWildcardMark(data);
+                this.textMarkingService.markWildcard(data);
                 break;
             case 'option':
-                this._processOptionMark(data);
+                this.textMarkingService.markOption(data);
                 break;
             case 'unmark':
-                const markType = data.markType || 'button';
-                const className = markType === 'option' ? 'option-mark' : 'wildcard-mark';
-                this.textbox.clearMarks(className);
+                this.textMarkingService.clearAllMarks();
                 break;
         }
     }
 
-    _processWildcardMark(wildcard) {
-        if (!wildcard || typeof wildcard.content !== 'string') return;
-        
-        const start = wildcard.position?.start;
-        const end = wildcard.position?.end;
-        const content = this.textbox.getContent();
-        
-        // Clear previous marks before applying new one
-        this.textbox.clearMarks('wildcard-mark');
-        this.textbox.clearMarks('option-mark');
-        
-        // Validate position before marking
-        if (this._validateMarkingPosition(start, end, content)) {
-            this.textbox.markText(start, end, 'wildcard-mark');
-        }
+    queueEvent(eventType, eventData) {
+        this.eventQueueProcessor.enqueue(eventType, eventData);
     }
 
-    _processOptionMark(data) {
-        const { displayText, parentWildcard, optionIndex } = data;
-        
-        // Clear previous marks before applying new one
-        this.textbox.clearMarks('wildcard-mark');
-        this.textbox.clearMarks('option-mark');
-        
-        const start = parentWildcard.position?.start;
-        const end = parentWildcard.position?.end;
-        const fullText = this.textbox.getContent();
-        
-        // Validate parent wildcard position first
-        if (!this._validateMarkingPosition(start, end, fullText)) {
-            console.warn("Invalid parent wildcard position for option marking");
-            return;
-        }
-        
-        // For nested wildcard options, we need to mark the entire nested wildcard content
-        if (displayText && displayText.startsWith('{') && displayText.endsWith('}')) {
-            // This is a nested wildcard, the position should already be provided in parentWildcard
-            if (this._validateMarkingPosition(start, end, fullText)) {
-                this.textbox.markText(start, end, 'option-mark');
-                return;
-            }
-            
-            // Fallback: find the position in the text
-            const nestedWildcardText = displayText;
-            const wildcardContent = fullText.substring(start + 1, end - 1);
-            
-            // Find the position of the nested wildcard within the parent wildcard
-            const nestedStart = wildcardContent.indexOf(nestedWildcardText);
-            if (nestedStart !== -1) {
-                const absoluteStart = start + 1 + nestedStart;
-                const absoluteEnd = absoluteStart + nestedWildcardText.length;
-                if (this._validateMarkingPosition(absoluteStart, absoluteEnd, fullText)) {
-                    this.textbox.markText(absoluteStart, absoluteEnd, 'option-mark');
-                }
-                return;
-            }
-        }
-        
-        // For regular string options, calculate the specific option position
-        if (optionIndex !== undefined && displayText) {
-            const position = this._calculateOptionPosition(
-                fullText,
-                displayText,
-                start,
-                end,
-                optionIndex
-            );
-            if (position && this._validateMarkingPosition(position.start, position.end, fullText)) {
-                this.textbox.markText(position.start, position.end, 'option-mark');
-            }
-        }
-    }
-
-    // Event queue system for robustness
-    queueEvent(type, data) {
-        this.eventQueue.push({ type, data });
-        if (!this.processingQueue) {
-            this.processEventQueue();
-        }
-    }
-
-    async processEventQueue() {
-        this.processingQueue = true;
-        
-        while (this.eventQueue.length > 0) {
-            const event = this.eventQueue.shift();
-            
-            try {
-                switch (event.type) {
-                    case 'mark-request':
-                        this.processMarkRequest(event.data);
-                        break;
-                    case 'save-request':
-                        await this.saveContent();
-                        break;
-                    case 'structure-update':
-                        this.emit('structure-updated', event.data);
-                        break;
-                }
-            } catch (error) {
-                console.error(`Error processing event ${event.type}:`, error);
-            }
-        }
-        
-        this.processingQueue = false;
-    }
-
-    // Helper methods - centralized for all components
-    _calculateOptionPosition(fullText, optionText, wildcardStart, wildcardEnd, optionIndex) {
-        const wildcardContent = fullText.substring(wildcardStart + 1, wildcardEnd - 1);
-        const options = this._parseWildcardOptions(wildcardContent);
-        
-        if (optionIndex < 0 || optionIndex >= options.length) return null;
-        
-        let currentPos = wildcardStart + 1;
-        for (let i = 0; i < optionIndex; i++) {
-            currentPos += options[i].length;
-            let pipePos = currentPos;
-            while (pipePos < wildcardEnd - 1 && fullText.charAt(pipePos) !== '|') pipePos++;
-            if (fullText.charAt(pipePos) === '|') currentPos = pipePos + 1;
-        }
-        
-        let searchPos = currentPos;
-        while (searchPos < wildcardEnd - 1 && /\s/.test(fullText.charAt(searchPos))) searchPos++;
-        const optionStart = searchPos;
-        
-        while (searchPos < wildcardEnd - 1 && fullText.charAt(searchPos) !== '|' && fullText.charAt(searchPos) !== '}') searchPos++;
-        while (searchPos > optionStart && /\s/.test(fullText.charAt(searchPos - 1))) searchPos--;
-        
-        return { start: optionStart, end: searchPos };
-    }
-
-    _parseWildcardOptions(wildcardContent) {
-        const options = [];
-        let currentOption = '';
-        let bracketDepth = 0;
-        let pos = 0;
-        
-        while (pos < wildcardContent.length) {
-            const char = wildcardContent[pos];
-            
-            if (char === '{') {
-                bracketDepth++;
-                currentOption += char;
-                pos++;
-                
-                while (pos < wildcardContent.length && bracketDepth > 0) {
-                    const nestedChar = wildcardContent[pos];
-                    currentOption += nestedChar;
-                    
-                    if (nestedChar === '{') bracketDepth++;
-                    else if (nestedChar === '}') bracketDepth--;
-                    
-                    pos++;
-                }
-            } else if (char === '|' && bracketDepth === 0) {
-                if (currentOption.trim()) options.push(currentOption.trim());
-                currentOption = '';
-                pos++;
-            } else {
-                currentOption += char;
-                pos++;
-            }
-        }
-        
-        if (currentOption.trim()) options.push(currentOption.trim());
-        return options;
-    }
-
-    _hasDuplicateOptionText(wildcard, searchText) {
-        if (!wildcard.options || !Array.isArray(wildcard.options) || wildcard.options.length <= 1) {
-            return false;
-        }
-        
-        const normalizedSearchText = this._normalizeWildcardText(searchText);
-        let count = 0;
-        
-        for (const option of wildcard.options) {
-            const text = typeof option === 'string' ? option :
-                        (option?.displayText || option?.id || '');
-            
-            if (this._normalizeWildcardText(text) === normalizedSearchText) {
-                count++;
-                if (count > 1) return true;
-            }
-        }
-        
-        return false;
-    }
-    
-    _normalizeWildcardText(text) {
-        return text.replace(/\s*\|\s*/g, '|')
-                  .replace(/{\s*/g, '{')
-                  .replace(/\s*}/g, '}');
-    }
-
-    _initializeStructureData() {
-        const structureDataStr = this.getWildcardsStructure();
-        if (structureDataStr) {
-            try {
-                return JSON.parse(structureDataStr);
-            } catch (e) {
-                console.error("Error parsing structure data:", e);
-            }
-        }
-        return { nodes: {}, root_nodes: [] };
-    }
-
-    // Event emission
-    emit(type, detail) {
-        this.dispatchEvent(new CustomEvent(type, { detail }));
+    emit(eventType, detail) {
+        this.dispatchEvent(new CustomEvent(eventType, { detail }));
     }
 }

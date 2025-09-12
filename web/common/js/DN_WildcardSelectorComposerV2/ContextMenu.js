@@ -1,113 +1,222 @@
-class ContextMenuFactory {
-    constructor(textbox) {
-        this.textbox = textbox;
+class MenuRenderer {
+    constructor(actionHandler) {
+        this.actionHandler = actionHandler;
+        this.activeMenus = [];
     }
 
-    createMenu(entries, x, y, level = 0, selection = '') {
-        const menuElement = document.createElement("div");
-        menuElement.className = "textbox-context-menu";
-        menuElement.style.visibility = 'visible';
-        menuElement.style.pointerEvents = 'auto';
-
+    createMenu(entries, xPosition, yPosition, level = 0, selection = '') {
+        const menuElement = this.createMenuElement();
+        
         entries.forEach(entry => {
-            if (entry.type === 'separator') {
-                const separator = document.createElement("div");
-                separator.className = "textbox-context-menu-separator";
-                menuElement.appendChild(separator);
-            } else {
-                const item = this.createMenuItem(entry, selection, level);
-                this.textbox.actions.logEntryTextOnRightClick(item); // Apply the new behavior to each entry
-                menuElement.appendChild(item);
-            }
+            const menuItem = this.createMenuItem(entry, selection, level);
+            menuElement.appendChild(menuItem);
         });
-
+        
         document.body.appendChild(menuElement);
-        this.textbox.activeMenus.push({ element: menuElement, level });
-
-        this.textbox.contextMenuManager._adjustMenuPosition(menuElement, x, y);
-
+        this.activeMenus.push({ element: menuElement, level });
+        
+        this.positionMenu(menuElement, xPosition, yPosition);
+        
         return menuElement;
     }
 
+    createMenuElement() {
+        const menu = document.createElement("div");
+        menu.className = "textbox-context-menu";
+        menu.style.visibility = 'visible';
+        menu.style.pointerEvents = 'auto';
+        return menu;
+    }
+
     createMenuItem(entry, selection, level) {
+        if (entry.type === 'separator') {
+            return this.createSeparator();
+        }
+        
         const item = document.createElement("div");
         item.className = "textbox-context-menu-item";
+        
+        const itemText = this.getItemText(entry, selection);
+        item.textContent = itemText;
+        
+        this.setupItemBehavior(item, entry, selection, level);
+        this.setupRightClickLogging(item);
+        
+        return item;
+    }
 
-        const text = entry.dynamic && typeof entry.text === 'function'
-            ? entry.text(selection)
-            : entry.text;
+    createSeparator() {
+        const separator = document.createElement("div");
+        separator.className = "textbox-context-menu-separator";
+        return separator;
+    }
 
-        item.textContent = text;
+    getItemText(entry, selection) {
+        if (entry.dynamic && typeof entry.text === 'function') {
+            return entry.text(selection);
+        }
+        return entry.text;
+    }
 
+    setupItemBehavior(item, entry, selection, level) {
         const requiresSelection = entry.requiresSelection || false;
         const hasSelection = selection && selection.length > 0;
-
+        
         if (requiresSelection && !hasSelection) {
-                item.classList.add('disabled');
-    return item;
+            item.classList.add('disabled');
+            return;
         }
-
-        item.addEventListener("contextmenu", (e) => e.preventDefault());
-
+        
+        item.addEventListener("contextmenu", (event) => event.preventDefault());
+        
         if (!item.classList.contains('disabled')) {
             if (entry.type === 'submenu') {
-                item.onmouseenter = (e) => {
-                    const rect = item.getBoundingClientRect();
-                    const submenuX = rect.right;
-                    const submenuY = rect.top;
-
-                    this.textbox.activeMenus
-                        .filter(menu => menu.level > level)
-                        .forEach(menu => {
-                            menu.element.style.visibility = 'hidden';
-                            menu.element.style.pointerEvents = 'none';
-                        });
-
-                    const submenuEntries = this.textbox.contextMenuManager.menuSpecifications[entry.submenu];
-                    if (submenuEntries) {
-                        this.createMenu(submenuEntries, submenuX, submenuY, level + 1, selection);
-                    }
-                };
+                this.setupSubmenuBehavior(item, entry, selection, level);
             } else if (entry.type === 'function') {
-                item.onclick = () => {
-                    if (!requiresSelection || hasSelection) {
-                        entry.callback(entry.value);
-                        this.textbox.contextMenuManager._hideAllMenus();
-                    }
-                };
+                this.setupFunctionBehavior(item, entry);
             }
         }
+    }
 
-        return item;
+    setupSubmenuBehavior(item, entry, selection, level) {
+        item.onmouseenter = () => {
+            const rect = item.getBoundingClientRect();
+            const submenuX = rect.right;
+            const submenuY = rect.top;
+            
+            this.hideSubmenusBeyondLevel(level);
+            
+            if (this.onSubmenuOpen) {
+                this.onSubmenuOpen(entry.submenu, submenuX, submenuY, level + 1, selection);
+            }
+        };
+    }
+
+    setupFunctionBehavior(item, entry) {
+        item.onclick = () => {
+            if (entry.callback) {
+                entry.callback(entry.value);
+            }
+            this.hideAllMenus();
+        };
+    }
+
+    setupRightClickLogging(item) {
+        item.addEventListener("contextmenu", (event) => {
+            event.preventDefault();
+            console.log(item.textContent.trim());
+        });
+    }
+
+    positionMenu(menuElement, xPosition, yPosition) {
+        const rect = menuElement.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        
+        let adjustedX = xPosition;
+        let adjustedY = yPosition;
+        
+        if (xPosition + rect.width > viewportWidth) {
+            adjustedX = viewportWidth - rect.width;
+        }
+        
+        if (yPosition + rect.height > viewportHeight) {
+            adjustedY = viewportHeight - rect.height;
+        }
+        
+        menuElement.style.left = `${adjustedX}px`;
+        menuElement.style.top = `${adjustedY}px`;
+    }
+
+    hideSubmenusBeyondLevel(level) {
+        this.activeMenus
+            .filter(menu => menu.level > level)
+            .forEach(menu => {
+                menu.element.style.visibility = 'hidden';
+                menu.element.style.pointerEvents = 'none';
+            });
+    }
+
+    hideAllMenus() {
+        this.activeMenus.forEach(menu => {
+            menu.element.style.visibility = 'hidden';
+            menu.element.style.pointerEvents = 'none';
+        });
+        this.activeMenus = [];
+    }
+
+    isClickInsideMenus(target) {
+        return this.activeMenus.some(menu => menu.element.contains(target));
     }
 }
 
-class ContextMenuManager {
+class ClipboardManager {
+    constructor() {
+        this.clipboard = [];
+        this.maxClipboardSize = 10;
+    }
+
+    addToClipboard(text) {
+        if (!text) return;
+        
+        if (this.clipboard.length === 0 || this.clipboard[0] !== text) {
+            this.clipboard.unshift(text);
+            
+            if (this.clipboard.length > this.maxClipboardSize) {
+                this.clipboard.pop();
+            }
+        }
+    }
+
+    getClipboard() {
+        return this.clipboard;
+    }
+
+    getLatestItem() {
+        return this.clipboard[0] || '';
+    }
+
+    formatClipboardEntry(text) {
+        const sanitizedText = text.replace(/\n/g, ' ');
+        const maxLength = 20;
+        
+        if (sanitizedText.length > maxLength) {
+            return sanitizedText.substring(0, maxLength) + '...';
+        }
+        
+        return sanitizedText;
+    }
+}
+
+export class ContextMenuManager {
     constructor(textbox) {
         this.textbox = textbox;
-        this.factory = new ContextMenuFactory(textbox);
+        this.clipboardManager = new ClipboardManager();
+        this.menuRenderer = new MenuRenderer();
+        
         this.menuSpecifications = {
             main: [
                 {
                     type: 'function',
                     text: 'Cut',
                     value: 'cut',
-                    callback: () => this.textbox.actions._handleCopyOrCutAction(true),
+                    callback: () => this.textbox.actions.handleCopyOrCutAction(true),
                     requiresSelection: true
                 },
                 {
                     type: 'function',
                     text: 'Copy',
                     value: 'copy',
-                    callback: () => this.textbox.actions._handleCopyOrCutAction(false),
+                    callback: () => this.textbox.actions.handleCopyOrCutAction(false),
                     requiresSelection: true
                 },
                 {
-                    type: (this.textbox.customClipboard.length === 1) ? 'function' : 'submenu',
+                    type: (this.clipboardManager.getClipboard().length === 1) ? 'function' : 'submenu',
                     text: 'Paste',
                     value: 'paste',
-                    callback: (this.textbox.customClipboard.length === 1) ? (value) => this.textbox.actions._handlePasteAction(value) : null,
-                    submenu: (this.textbox.customClipboard.length > 1) ? 'clipboard' : null
+                    callback: (this.clipboardManager.getClipboard().length === 1) ? 
+                        () => this.textbox.actions.handlePasteAction(this.clipboardManager.getLatestItem()) : null,
+                    submenu: (this.clipboardManager.getClipboard().length > 1) ? 'clipboard' : null
                 },
                 {
                     type: 'separator'
@@ -127,7 +236,7 @@ class ContextMenuManager {
                     text: (selection) => selection ? `Use "${selection}"` : 'No selection',
                     value: 'selection',
                     dynamic: true,
-                    callback: () => this.textbox.actions._handleSelectionAction(),
+                    callback: () => this.textbox.actions.handleSelectionAction(),
                     requiresSelection: true
                 }
             ],
@@ -136,7 +245,7 @@ class ContextMenuManager {
                     type: 'function',
                     text: 'Add Wildcard',
                     value: 'add_wildcard',
-                    callback: () => this.textbox.actions._handleAddWildcard()
+                    callback: () => this.textbox.actions.handleAddWildcard()
                 },
                 {
                     type: 'submenu',
@@ -154,19 +263,19 @@ class ContextMenuManager {
                     type: 'function',
                     text: 'Character',
                     value: '{character}',
-                    callback: (value) => this.textbox.actions._insertText(value)
+                    callback: (value) => this.textbox.actions.insertText(value)
                 },
                 {
                     type: 'function',
                     text: 'Style',
                     value: '{style}',
-                    callback: (value) => this.textbox.actions._insertText(value)
+                    callback: (value) => this.textbox.actions.insertText(value)
                 },
                 {
                     type: 'function',
                     text: 'Setting',
                     value: '{setting}',
-                    callback: (value) => this.textbox.actions._insertText(value)
+                    callback: (value) => this.textbox.actions.insertText(value)
                 }
             ],
             advanced: [
@@ -174,19 +283,19 @@ class ContextMenuManager {
                     type: 'function',
                     text: 'Multiple Choice',
                     value: '{option1|option2|option3}',
-                    callback: (value) => this.textbox.actions._insertText(value)
+                    callback: (value) => this.textbox.actions.insertText(value)
                 },
                 {
                     type: 'function',
                     text: 'Range',
                     value: '{1-10}',
-                    callback: (value) => this.textbox.actions._insertText(value)
+                    callback: (value) => this.textbox.actions.insertText(value)
                 },
                 {
                     type: 'function',
                     text: 'Weighted',
                     value: '{option1::2|option2::1}',
-                    callback: (value) => this.textbox.actions._insertText(value)
+                    callback: (value) => this.textbox.actions.insertText(value)
                 }
             ],
             textops: [
@@ -200,197 +309,200 @@ class ContextMenuManager {
                 {
                     type: 'function',
                     text: 'Uppercase',
-                    callback: () => this.textbox.actions._handleTransformAction('uppercase'),
+                    callback: () => this.textbox.actions.handleTransformAction('uppercase'),
                     requiresSelection: true
                 },
                 {
                     type: 'function',
                     text: 'Lowercase',
-                    callback: () => this.textbox.actions._handleTransformAction('lowercase'),
+                    callback: () => this.textbox.actions.handleTransformAction('lowercase'),
                     requiresSelection: true
                 }
             ],
             clipboard: []
         };
-
-        this._updateClipboardMenuEntries();
+        
+        this.setupRendererCallbacks();
+        this.textbox.customClipboard = this.clipboardManager.getClipboard();
+        this.updateClipboardMenuEntries();
     }
 
-    showContextMenu(x, y) {
-        this._hideAllMenus();
+    setupRendererCallbacks() {
+        this.menuRenderer.onSubmenuOpen = (submenuName, x, y, level, selection) => {
+            const submenuEntries = this.menuSpecifications[submenuName];
+            
+            if (submenuEntries) {
+                this.menuRenderer.createMenu(submenuEntries, x, y, level, selection);
+            }
+        };
+    }
+
+    showContextMenu(xPosition, yPosition) {
+        this.hideAllMenus();
+        
         const selection = this.textbox.cmEditor ? this.textbox.cmEditor.getSelection() : '';
-
-        this.menuSpecifications.main[2].type = (this.textbox.customClipboard.length === 1) ? 'function' : 'submenu';
-        this.menuSpecifications.main[2].callback = (this.textbox.customClipboard.length === 1) ?
-            (value) => this.textbox.actions._handlePasteAction(this.textbox.customClipboard[0]) : null;
-        this.menuSpecifications.main[2].submenu = (this.textbox.customClipboard.length > 1) ? 'clipboard' : null;
-
-        this._updateClipboardMenuEntries();
-
-        this.factory.createMenu(this.menuSpecifications.main, x, y, 0, selection);
+        
+        this.updatePasteMenuItem();
+        this.updateClipboardMenuEntries();
+        
+        this.menuRenderer.createMenu(this.menuSpecifications.main, xPosition, yPosition, 0, selection);
     }
 
-    _hideAllMenus() {
-        this.textbox.activeMenus.forEach(menu => {
-            menu.element.style.visibility = 'hidden';
-            menu.element.style.pointerEvents = 'none';
-        });
-        this.textbox.activeMenus = [];
+    updatePasteMenuItem() {
+        const clipboardLength = this.clipboardManager.getClipboard().length;
+        const pasteMenuItem = this.menuSpecifications.main[2];
+        
+        pasteMenuItem.type = (clipboardLength === 1) ? 'function' : 'submenu';
+        pasteMenuItem.callback = (clipboardLength === 1) ?
+            () => this.textbox.actions.handlePasteAction(this.clipboardManager.getLatestItem()) : null;
+        pasteMenuItem.submenu = (clipboardLength > 1) ? 'clipboard' : null;
     }
 
-    _isClickInsideMenus(target) {
-        return this.textbox.activeMenus.some(menu => menu.element.contains(target));
-    }
-
-    _adjustMenuPosition(menuElement, x, y) {
-        const rect = menuElement.getBoundingClientRect();
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-
-        let adjustedX = x;
-        let adjustedY = y;
-
-        if (x + rect.width > viewportWidth) {
-            adjustedX = viewportWidth - rect.width;
-        }
-
-        if (y + rect.height > viewportHeight) {
-            adjustedY = viewportHeight - rect.height;
-        }
-
-        menuElement.style.left = `${adjustedX}px`;
-        menuElement.style.top = `${adjustedY}px`;
-    }
-
-    _updateClipboardMenuEntries() {
+    updateClipboardMenuEntries() {
         this.menuSpecifications.clipboard = [];
-
-        for (let i = this.textbox.customClipboard.length - 1; i >= 0; i--) {
-            const text = this.textbox.customClipboard[i];
-            const displayText = text.replace(/\n/g, ' ').substring(0, 20) + (text.length > 20 ? '...' : '');
+        const clipboard = this.clipboardManager.getClipboard();
+        
+        for (let index = clipboard.length - 1; index >= 0; index--) {
+            const clipboardText = clipboard[index];
+            const displayText = this.clipboardManager.formatClipboardEntry(clipboardText);
+            
             this.menuSpecifications.clipboard.push({
                 type: 'function',
                 text: displayText,
-                value: text,
-                callback: (value) => this.textbox.actions._handlePasteAction(value)
+                value: clipboardText,
+                callback: (value) => this.textbox.actions.handlePasteAction(value)
             });
         }
+        
+        this.textbox.customClipboard = clipboard;
+    }
+
+    hideAllMenus() {
+        this.menuRenderer.hideAllMenus();
+    }
+
+    isClickInsideMenus(target) {
+        return this.menuRenderer.isClickInsideMenus(target);
+    }
+
+    addToClipboard(text) {
+        this.clipboardManager.addToClipboard(text);
+        this.updateClipboardMenuEntries();
     }
 }
 
-class Actions {
+export class Actions {
     constructor(textbox) {
         this.textbox = textbox;
     }
 
     logEntryTextOnRightClick(entryElement) {
-        entryElement.addEventListener("contextmenu", (e) => {
-            e.preventDefault(); // Block the system context menu
-            console.log(entryElement.textContent.trim()); // Log the visible text of the entry
+        entryElement.addEventListener("contextmenu", (event) => {
+            event.preventDefault();
+            console.log(entryElement.textContent.trim());
         });
     }
 
-    _handleCopyOrCutAction(isCut) {
-        if (this.textbox.cmEditor) {
-            const selection = this.textbox.cmEditor.getSelection();
-            if (selection) {
-                if (this.textbox.customClipboard.length === 0 || this.textbox.customClipboard[0] !== selection) {
-                    this.textbox.customClipboard.unshift(selection);
-
-                    if (this.textbox.customClipboard.length > 10) {
-                        this.textbox.customClipboard.pop();
-                    }
-
-                    this.textbox.contextMenuManager._updateClipboardMenuEntries();
-                }
-
-                if (isCut) {
-                    this.textbox.cmEditor.replaceSelection('');
-                }
-                this.textbox.contextMenuManager._hideAllMenus();
+    handleCopyOrCutAction(isCut) {
+        if (!this.textbox.cmEditor) return;
+        
+        const selection = this.textbox.cmEditor.getSelection();
+        if (selection) {
+            if (this.textbox.contextMenuManager) {
+                this.textbox.contextMenuManager.addToClipboard(selection);
             }
+            
+            if (isCut) {
+                this.textbox.cmEditor.replaceSelection('');
+            }
+            
+            this.textbox.contextMenuManager?.hideAllMenus();
         }
     }
 
-    _handlePasteAction(value) {
-        if (this.textbox.cmEditor) {
-            let textToPaste = '';
-
-            if (value) {
-                textToPaste = value;
-            } else if (this.textbox.customClipboard.length > 0) {
-                textToPaste = this.textbox.customClipboard[0];
-            }
-
-            if (textToPaste) {
-                this.textbox.cmEditor.replaceSelection(textToPaste);
-                this.textbox.contextMenuManager._hideAllMenus();
-            }
+    handlePasteAction(value) {
+        if (!this.textbox.cmEditor) return;
+        
+        let textToPaste = '';
+        
+        if (value) {
+            textToPaste = value;
+        } else if (this.textbox.customClipboard && this.textbox.customClipboard.length > 0) {
+            textToPaste = this.textbox.customClipboard[0];
+        }
+        
+        if (textToPaste) {
+            this.textbox.cmEditor.replaceSelection(textToPaste);
+            this.textbox.contextMenuManager?.hideAllMenus();
         }
     }
 
-    _handleSystemCutOrCopy(isCut) {
-        if (this.textbox.cmEditor) {
-            const selection = this.textbox.cmEditor.getSelection();
-            if (selection) {
-                navigator.clipboard.writeText(selection);
-                if (isCut) {
-                    this.textbox.cmEditor.replaceSelection('');
-                }
-                this.textbox.contextMenuManager._hideAllMenus();
+    async handleSystemCutOrCopy(isCut) {
+        if (!this.textbox.cmEditor) return;
+        
+        const selection = this.textbox.cmEditor.getSelection();
+        if (selection) {
+            await navigator.clipboard.writeText(selection);
+            
+            if (isCut) {
+                this.textbox.cmEditor.replaceSelection('');
             }
+            
+            this.textbox.contextMenuManager?.hideAllMenus();
         }
     }
 
-    _handleSystemPaste() {
-        if (this.textbox.cmEditor) {
-            navigator.clipboard.readText().then(text => {
-                this.textbox.cmEditor.replaceSelection(text);
-                this.textbox.contextMenuManager._hideAllMenus();
-            }).catch(err => {
-                console.error("Could not access system clipboard", err);
-            });
+    async handleSystemPaste() {
+        if (!this.textbox.cmEditor) return;
+        
+        try {
+            const text = await navigator.clipboard.readText();
+            this.textbox.cmEditor.replaceSelection(text);
+            this.textbox.contextMenuManager?.hideAllMenus();
+        } catch (error) {
+            console.error("Could not access system clipboard", error);
         }
     }
 
-    _handleSelectionAction() {
+    handleSelectionAction() {
         const selection = this.textbox.cmEditor ? this.textbox.cmEditor.getSelection() : '';
         if (selection) {
-            this._insertText(selection);
-            this.textbox.contextMenuManager._hideAllMenus();
+            this.insertText(selection);
+            this.textbox.contextMenuManager?.hideAllMenus();
         }
     }
 
-    _handleAddWildcard() {
-        this._insertText('{}');
+    handleAddWildcard() {
+        this.insertText('{}');
+        
         if (this.textbox.cmEditor) {
             const cursor = this.textbox.cmEditor.getCursor();
             this.textbox.cmEditor.setCursor({ line: cursor.line, ch: cursor.ch - 1 });
-            this.textbox.contextMenuManager._hideAllMenus();
+            this.textbox.contextMenuManager?.hideAllMenus();
         }
     }
 
-    _insertText(text) {
+    insertText(text) {
         if (this.textbox.cmEditor) {
             this.textbox.cmEditor.replaceSelection(text);
         }
     }
 
-    _handleTransformAction(value) {
+    handleTransformAction(transformationType) {
         if (!this.textbox.cmEditor) {
-            console.error("CodeMirror editor is not initialized.");
+            console.error("CodeMirror editor is not initialized");
             return;
         }
-
+        
         const selection = this.textbox.cmEditor.getSelection();
         if (!selection) {
-            console.warn("No text selected.");
+            console.warn("No text selected");
             return;
         }
-
+        
         let transformedText;
-
-        switch (value) {
+        
+        switch (transformationType) {
             case 'uppercase':
                 transformedText = selection.toUpperCase();
                 break;
@@ -398,13 +510,11 @@ class Actions {
                 transformedText = selection.toLowerCase();
                 break;
             default:
-                console.error("Unrecognized transformation value:", value);
+                console.error("Unrecognized transformation type:", transformationType);
                 return;
         }
-
+        
         this.textbox.cmEditor.replaceSelection(transformedText);
-        this.textbox.contextMenuManager._hideAllMenus();
+        this.textbox.contextMenuManager?.hideAllMenus();
     }
 }
-
-export { ContextMenuManager, Actions };
