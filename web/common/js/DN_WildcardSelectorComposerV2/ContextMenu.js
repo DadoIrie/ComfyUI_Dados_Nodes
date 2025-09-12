@@ -29,9 +29,7 @@ class MenuRenderer {
     }
 
     createMenuItem(entry, selection, level) {
-        if (entry.type === 'separator') {
-            return this.createSeparator();
-        }
+        if (entry.type === 'separator') return this.createSeparator();
         
         const item = document.createElement("div");
         item.className = "textbox-context-menu-item";
@@ -86,9 +84,7 @@ class MenuRenderer {
             
             this.hideSubmenusBeyondLevel(level);
             
-            if (this.onSubmenuOpen) {
-                this.onSubmenuOpen(entry.submenu, submenuX, submenuY, level + 1, selection);
-            }
+            if (this.onSubmenuOpen) this.onSubmenuOpen(entry.submenu, submenuX, submenuY, level + 1, selection);
         };
     }
 
@@ -162,9 +158,7 @@ class ClipboardManager {
         if (this.clipboard.length === 0 || this.clipboard[0] !== text) {
             this.clipboard.unshift(text);
             
-            if (this.clipboard.length > this.maxClipboardSize) {
-                this.clipboard.pop();
-            }
+            if (this.clipboard.length > this.maxClipboardSize) this.clipboard.pop();
         }
     }
 
@@ -180,9 +174,7 @@ class ClipboardManager {
         const sanitizedText = text.replace(/\n/g, ' ');
         const maxLength = 20;
         
-        if (sanitizedText.length > maxLength) {
-            return sanitizedText.substring(0, maxLength) + '...';
-        }
+        if (sanitizedText.length > maxLength) return sanitizedText.substring(0, maxLength) + '...';
         
         return sanitizedText;
     }
@@ -331,9 +323,7 @@ export class ContextMenuManager {
         this.menuRenderer.onSubmenuOpen = (submenuName, x, y, level, selection) => {
             const submenuEntries = this.menuSpecifications[submenuName];
             
-            if (submenuEntries) {
-                this.menuRenderer.createMenu(submenuEntries, x, y, level, selection);
-            }
+            if (submenuEntries) this.menuRenderer.createMenu(submenuEntries, x, y, level, selection);
         };
     }
 
@@ -408,13 +398,8 @@ export class Actions {
         
         const selection = this.textbox.cmEditor.getSelection();
         if (selection) {
-            if (this.textbox.contextMenuManager) {
-                this.textbox.contextMenuManager.addToClipboard(selection);
-            }
-            
-            if (isCut) {
-                this.textbox.cmEditor.replaceSelection('');
-            }
+            if (this.textbox.contextMenuManager) this.textbox.contextMenuManager.addToClipboard(selection);
+            if (isCut) this.textbox.cmEditor.replaceSelection('');
             
             this.textbox.contextMenuManager?.hideAllMenus();
         }
@@ -444,9 +429,7 @@ export class Actions {
         if (selection) {
             await navigator.clipboard.writeText(selection);
             
-            if (isCut) {
-                this.textbox.cmEditor.replaceSelection('');
-            }
+            if (isCut) this.textbox.cmEditor.replaceSelection('');
             
             this.textbox.contextMenuManager?.hideAllMenus();
         }
@@ -483,9 +466,7 @@ export class Actions {
     }
 
     insertText(text) {
-        if (this.textbox.cmEditor) {
-            this.textbox.cmEditor.replaceSelection(text);
-        }
+        if (this.textbox.cmEditor) this.textbox.cmEditor.replaceSelection(text);
     }
 
     handleTransformAction(transformationType) {

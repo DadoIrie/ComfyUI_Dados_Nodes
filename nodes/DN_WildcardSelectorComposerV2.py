@@ -4,6 +4,8 @@
 @description: Processes and catalogs sections and wildcards, mapping their structure and relationships for UI representation.
 """
 import json
+import os
+import folder_paths
 from typing import Dict, Any, ClassVar
 from aiohttp import web
 from dynamicprompts.generators import RandomPromptGenerator
@@ -74,6 +76,17 @@ async def handle_wildcard_selector_composer_operations(request):
         valid_operations = [
             'update_wildcards_prompt', 'process_wildcards'
         ]
+        
+        # Log ComfyUI user folder paths
+        try:
+            user_dir_abs = folder_paths.get_user_directory()
+            user_dir_rel = os.path.relpath(user_dir_abs)
+            current_dir = os.getcwd()
+            
+            print(f"ComfyUI User Directory - Absolute: {user_dir_abs}")
+            print(f"ComfyUI User Directory - Relative: {user_dir_rel} (relative to: {current_dir})")
+        except Exception as e:
+            print(f"Failed to get ComfyUI user directory: {str(e)}")
         
         if operation not in valid_operations:
             return None
