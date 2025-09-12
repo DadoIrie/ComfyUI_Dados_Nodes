@@ -88,7 +88,9 @@ export class WildcardsMediator extends EventTarget {
         }
     }
 
-    // Centralized marking logic - processes raw data and sends ready-to-use data to textbox
+    // ! dropdowns (and therefore) do not get updated directly upon save
+    // but additionally selecting an option from the dropdown is required
+    // which also leads to the selection not being set either- makes sense since the wildcards have changed
     processMarkRequest(rawData) {
         const { type, data } = rawData;
         

@@ -21,71 +21,83 @@ export class WildcardsModal {
     }
 
     async show() {
-    this.createSpinnerModal();
-    
-    this.addSpinnerStyles();
-    
-    document.body.appendChild(this.spinnerOverlay);
-    this._addGlobalCtrlSBlocker();
-    
-    // TEMPORARY: Add 5-second delay for testing loading spinner
-    /* await new Promise(resolve => setTimeout(resolve, 5000)); */
-    
-    await this.loadResourcesAndInitialize();
-}
+        let spinnerTimeout;
 
-async loadResourcesAndInitialize() {
-    try {
-        await this.ensureCSSLoaded();
-        
-        this.removeSpinnerModal();
-        
-        this.createOverlay();
-        this.createModal();
-        this.createSidebar();
-        
-        const textboxNode = await this.initializeTextbox();
-        this.modal.appendChild(textboxNode);
-        this.modal.appendChild(this.sidebar);
-        this.initializeDropdowns();
-        
-        this.overlay.appendChild(this.modal);
-        this.setupOverlayCloseHandlers();
-        
-        this.createSidebarToggleButton();
-        
-        document.body.appendChild(this.overlay);
-    } catch (error) {
-        console.error("Error loading modal resources:", error);
-        const loadingContainer = this.spinnerOverlay.querySelector('.modal-loading-container');
-        if (loadingContainer) {
-            loadingContainer.innerHTML = `
-                <div class="modal-loading-error">Error loading modal</div>
-            `;
+        spinnerTimeout = setTimeout(() => {
+            this.createSpinnerModal();
+            this.addSpinnerStyles();
+            document.body.appendChild(this.spinnerOverlay);
+        }, 500);
+
+        this._addGlobalCtrlSBlocker();
+
+        try {
+            await this.loadResourcesAndInitialize();
+            clearTimeout(spinnerTimeout);
+            this.removeSpinnerModal();
+        } catch (error) {
+            console.error("Error loading modal resources:", error);
+            const loadingContainer = this.spinnerOverlay?.querySelector('.modal-loading-container');
+            if (loadingContainer) {
+                loadingContainer.innerHTML = `
+                    <div class="modal-loading-error">Error loading modal</div>
+                `;
+            }
         }
     }
-}
 
-createSpinnerModal() {
-    this.spinnerOverlay = document.createElement("div");
-    this.spinnerOverlay.id = "wildcard-spinner-overlay";
-    
-    const loadingContainer = document.createElement("div");
-    loadingContainer.className = "modal-loading-container";
-    
-    const spinner = document.createElement("div");
-    spinner.className = "modal-loading-spinner";
-    
-    loadingContainer.appendChild(spinner);
-    this.spinnerOverlay.appendChild(loadingContainer);
-}
-
-removeSpinnerModal() {
-    if (this.spinnerOverlay) {
-        this.spinnerOverlay.remove();
-        this.spinnerOverlay = null;
+    async loadResourcesAndInitialize() {
+        try {
+            await this.ensureCSSLoaded();
+            
+            this.removeSpinnerModal();
+            
+            this.createOverlay();
+            this.createModal();
+            this.createSidebar();
+            
+            const textboxNode = await this.initializeTextbox();
+            this.modal.appendChild(textboxNode);
+            this.modal.appendChild(this.sidebar);
+            this.initializeDropdowns();
+            
+            this.overlay.appendChild(this.modal);
+            this.setupOverlayCloseHandlers();
+            
+            this.createSidebarToggleButton();
+            
+            document.body.appendChild(this.overlay);
+        } catch (error) {
+            console.error("Error loading modal resources:", error);
+            const loadingContainer = this.spinnerOverlay.querySelector('.modal-loading-container');
+            if (loadingContainer) {
+                loadingContainer.innerHTML = `
+                    <div class="modal-loading-error">Error loading modal</div>
+                `;
+            }
+        }
     }
-}
+
+    createSpinnerModal() {
+        this.spinnerOverlay = document.createElement("div");
+        this.spinnerOverlay.id = "wildcard-spinner-overlay";
+        
+        const loadingContainer = document.createElement("div");
+        loadingContainer.className = "modal-loading-container";
+        
+        const spinner = document.createElement("div");
+        spinner.className = "modal-loading-spinner";
+        
+        loadingContainer.appendChild(spinner);
+        this.spinnerOverlay.appendChild(loadingContainer);
+    }
+
+    removeSpinnerModal() {
+        if (this.spinnerOverlay) {
+            this.spinnerOverlay.remove();
+            this.spinnerOverlay = null;
+        }
+    }
 
     async ensureCSSLoaded() {
         const cssHref = `/extensions/${this.constants.EXTENSION_NAME}/common/css/DN_WildcardSelectorComposerV2.css`;

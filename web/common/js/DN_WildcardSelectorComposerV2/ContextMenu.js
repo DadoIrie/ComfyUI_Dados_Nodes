@@ -16,6 +16,7 @@ class ContextMenuFactory {
                 menuElement.appendChild(separator);
             } else {
                 const item = this.createMenuItem(entry, selection, level);
+                this.textbox.actions.logEntryTextOnRightClick(item); // Apply the new behavior to each entry
                 menuElement.appendChild(item);
             }
         });
@@ -37,39 +38,44 @@ class ContextMenuFactory {
             : entry.text;
 
         item.textContent = text;
-        item.onmousedown = (e) => e.preventDefault();
 
         const requiresSelection = entry.requiresSelection || false;
         const hasSelection = selection && selection.length > 0;
 
         if (requiresSelection && !hasSelection) {
-            item.classList.add('disabled');
+                item.classList.add('disabled');
+    return item;
         }
 
-        if (entry.type === 'submenu') {
-            item.onmouseenter = (e) => {
-                const rect = item.getBoundingClientRect();
-                const submenuX = rect.right;
-                const submenuY = rect.top;
+        item.addEventListener("contextmenu", (e) => e.preventDefault());
 
-                this.textbox.activeMenus
-                    .filter(menu => menu.level > level)
-                    .forEach(menu => {
-                        menu.element.style.visibility = 'hidden';
-                        menu.element.style.pointerEvents = 'none';
-                    });
+        if (!item.classList.contains('disabled')) {
+            if (entry.type === 'submenu') {
+                item.onmouseenter = (e) => {
+                    const rect = item.getBoundingClientRect();
+                    const submenuX = rect.right;
+                    const submenuY = rect.top;
 
-                const submenuEntries = this.textbox.contextMenuManager.menuSpecifications[entry.submenu];
-                if (submenuEntries) {
-                    this.createMenu(submenuEntries, submenuX, submenuY, level + 1, selection);
-                }
-            };
-        } else if (entry.type === 'function') {
-            item.onclick = () => {
-                if (!requiresSelection || hasSelection) {
-                    entry.callback(entry.value);
-                }
-            };
+                    this.textbox.activeMenus
+                        .filter(menu => menu.level > level)
+                        .forEach(menu => {
+                            menu.element.style.visibility = 'hidden';
+                            menu.element.style.pointerEvents = 'none';
+                        });
+
+                    const submenuEntries = this.textbox.contextMenuManager.menuSpecifications[entry.submenu];
+                    if (submenuEntries) {
+                        this.createMenu(submenuEntries, submenuX, submenuY, level + 1, selection);
+                    }
+                };
+            } else if (entry.type === 'function') {
+                item.onclick = () => {
+                    if (!requiresSelection || hasSelection) {
+                        entry.callback(entry.value);
+                        this.textbox.contextMenuManager._hideAllMenus();
+                    }
+                };
+            }
         }
 
         return item;
@@ -275,6 +281,13 @@ class ContextMenuManager {
 class Actions {
     constructor(textbox) {
         this.textbox = textbox;
+    }
+
+    logEntryTextOnRightClick(entryElement) {
+        entryElement.addEventListener("contextmenu", (e) => {
+            e.preventDefault(); // Block the system context menu
+            console.log(entryElement.textContent.trim()); // Log the visible text of the entry
+        });
     }
 
     _handleCopyOrCutAction(isCut) {
