@@ -134,6 +134,11 @@ export class WildcardsModal {
         this.mediator.addEventListener('structure-updated', (event) => {
             this.structureData = event.detail;
             this.initializeDropdowns();
+            // Clear any existing text marks since positions may have changed
+            if (this.textbox && this.textbox.clearMarks) {
+                this.textbox.clearMarks('wildcard-mark');
+                this.textbox.clearMarks('option-mark');
+            }
         });
         
         return this.textbox.createTextbox();
@@ -199,21 +204,35 @@ export class WildcardsModal {
     }
 
     initializeDropdowns() {
-        const structureDataStr = this.mediator.getWildcardsStructure();
+        // Use existing structureData if available, otherwise get from mediator
+        let structureData = this.structureData;
+        if (!structureData) {
+            const structureDataStr = this.mediator.getWildcardsStructure();
+            if (structureDataStr) {
+                try {
+                    structureData = JSON.parse(structureDataStr);
+                    this.structureData = structureData;
+                } catch (error) {
+                    console.error("Error parsing structure data:", error);
+                    return;
+                }
+            }
+        }
         
-        if (structureDataStr) {
-            this.structureData = JSON.parse(structureDataStr);
-            
+        if (structureData) {
             if (!this.dropdownManager) {
                 this.dropdownManager = new DropdownManager(
                     this.sidebarDropdownsScroll,
-                    this.structureData,
+                    structureData,
                     this.mediator
                 );
             } else {
-                this.dropdownManager.structureData = this.structureData;
+                // Update existing dropdown manager with new data
+                this.dropdownManager.structureData = structureData;
                 this.dropdownManager.sidebar = this.sidebarDropdownsScroll;
                 this.dropdownManager.mediator = this.mediator;
+                // CRITICAL FIX: Render the updated dropdowns
+                this.dropdownManager.render();
             }
             
             this.mediator.setDropdownManager(this.dropdownManager);

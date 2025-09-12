@@ -58,6 +58,13 @@ export class WildcardsMediator extends EventTarget {
 
     // Centralized backend communication
     async saveContent() {
+        // Defensive check: ensure textbox is ready
+        if (!this.textbox || !this.textbox.getContent) {
+            console.warn("Textbox not ready for save operation");
+            this.emit('save-error', "Save failed - textbox not ready");
+            return;
+        }
+
         const content = this.textbox.getContent();
         const structureDataStr = this.getWildcardsStructure();
         this.structureData = structureDataStr ? JSON.parse(structureDataStr) : {};
@@ -77,7 +84,13 @@ export class WildcardsMediator extends EventTarget {
                     wildcards_structure_data: response.wildcard_structure_data
                 });
                 this.structureData = JSON.parse(response.wildcard_structure_data);
-                this.emit('structure-updated', this.structureData);
+                
+                // Clear existing marks before emitting structure update
+                // This prevents stale position references
+                this._clearAllTextMarks();
+                
+                // Queue the structure update to ensure proper sequencing
+                this.queueEvent('structure-update', this.structureData);
             }
             
             this.node.setDirtyCanvas(true, true);
@@ -88,9 +101,28 @@ export class WildcardsMediator extends EventTarget {
         }
     }
 
-    // ! dropdowns (and therefore) do not get updated directly upon save
-    // but additionally selecting an option from the dropdown is required
-    // which also leads to the selection not being set either- makes sense since the wildcards have changed
+    // Clear all text marks to prevent stale position references
+    _clearAllTextMarks() {
+        if (this.textbox && typeof this.textbox.clearMarks === 'function') {
+            this.textbox.clearMarks('wildcard-mark');
+            this.textbox.clearMarks('option-mark');
+        }
+    }
+
+    // Enhanced position validation before marking
+    _validateMarkingPosition(start, end, content) {
+        if (typeof start !== 'number' || typeof end !== 'number') {
+            return false;
+        }
+        if (start < 0 || end < 0 || start >= end) {
+            return false;
+        }
+        if (!content || end > content.length) {
+            return false;
+        }
+        return true;
+    }
+
     processMarkRequest(rawData) {
         const { type, data } = rawData;
         
@@ -114,12 +146,14 @@ export class WildcardsMediator extends EventTarget {
         
         const start = wildcard.position?.start;
         const end = wildcard.position?.end;
+        const content = this.textbox.getContent();
         
         // Clear previous marks before applying new one
         this.textbox.clearMarks('wildcard-mark');
         this.textbox.clearMarks('option-mark');
         
-        if (typeof start === 'number' && typeof end === 'number') {
+        // Validate position before marking
+        if (this._validateMarkingPosition(start, end, content)) {
             this.textbox.markText(start, end, 'wildcard-mark');
         }
     }
@@ -135,10 +169,16 @@ export class WildcardsMediator extends EventTarget {
         const end = parentWildcard.position?.end;
         const fullText = this.textbox.getContent();
         
+        // Validate parent wildcard position first
+        if (!this._validateMarkingPosition(start, end, fullText)) {
+            console.warn("Invalid parent wildcard position for option marking");
+            return;
+        }
+        
         // For nested wildcard options, we need to mark the entire nested wildcard content
         if (displayText && displayText.startsWith('{') && displayText.endsWith('}')) {
             // This is a nested wildcard, the position should already be provided in parentWildcard
-            if (typeof start === 'number' && typeof end === 'number') {
+            if (this._validateMarkingPosition(start, end, fullText)) {
                 this.textbox.markText(start, end, 'option-mark');
                 return;
             }
@@ -152,13 +192,15 @@ export class WildcardsMediator extends EventTarget {
             if (nestedStart !== -1) {
                 const absoluteStart = start + 1 + nestedStart;
                 const absoluteEnd = absoluteStart + nestedWildcardText.length;
-                this.textbox.markText(absoluteStart, absoluteEnd, 'option-mark');
+                if (this._validateMarkingPosition(absoluteStart, absoluteEnd, fullText)) {
+                    this.textbox.markText(absoluteStart, absoluteEnd, 'option-mark');
+                }
                 return;
             }
         }
         
         // For regular string options, calculate the specific option position
-        if (typeof start === 'number' && typeof end === 'number' && optionIndex !== undefined && displayText) {
+        if (optionIndex !== undefined && displayText) {
             const position = this._calculateOptionPosition(
                 fullText,
                 displayText,
@@ -166,9 +208,8 @@ export class WildcardsMediator extends EventTarget {
                 end,
                 optionIndex
             );
-            if (position) {
+            if (position && this._validateMarkingPosition(position.start, position.end, fullText)) {
                 this.textbox.markText(position.start, position.end, 'option-mark');
-                return;
             }
         }
     }

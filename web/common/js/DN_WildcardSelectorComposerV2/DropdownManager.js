@@ -521,10 +521,22 @@ export class DropdownManager {
     }
 
     handleUserSelection(wildcard, selectedValue, selectedIndex, container) {
+        // Defensive check: ensure wildcard is valid
+        if (!wildcard || !this.structureData) {
+            console.warn("Invalid wildcard or structure data for selection");
+            return;
+        }
+        
         this.setSelected(wildcard, selectedValue, container);
     }
 
     setSelected(wildcard, selectedValue, container) {
+        // Defensive checks
+        if (!wildcard) {
+            console.warn("Cannot set selection: invalid wildcard");
+            return;
+        }
+        
         // Handle both string and object options
         let actualSelectedValue = selectedValue;
         
@@ -532,7 +544,7 @@ export class DropdownManager {
             actualSelectedValue = selectedValue.id;
         } else if (typeof selectedValue === 'string') {
             // Check if this string corresponds to a nested wildcard option
-            const option = wildcard.options.find(opt =>
+            const option = wildcard.options?.find(opt =>
                 (typeof opt === 'object' && opt !== null && opt.id === selectedValue) ||
                 (typeof opt === 'string' && opt === selectedValue)
             );
@@ -551,6 +563,13 @@ export class DropdownManager {
 
     processDropdownSelection(data) {
         const { wildcard, selectedValue } = data;
+        
+        // Defensive checks
+        if (!wildcard || !this.structureData || !this.structureData.nodes) {
+            console.warn("Cannot process dropdown selection: invalid data");
+            return;
+        }
+        
         wildcard.selection = selectedValue;
         
         // Update the selection in the structure data nodes
@@ -562,10 +581,12 @@ export class DropdownManager {
             }
         }
         
-        // Update the node data through the mediator
-        this.mediator.updateNodeData({
-            wildcards_structure_data: JSON.stringify(this.structureData)
-        });
+        // Update the node data through the mediator with defensive check
+        if (this.mediator && typeof this.mediator.updateNodeData === 'function') {
+            this.mediator.updateNodeData({
+                wildcards_structure_data: JSON.stringify(this.structureData)
+            });
+        }
         
         // Refresh the dropdowns to show/hide nested ones based on selection
         this.refresh();
@@ -767,11 +788,27 @@ export class DropdownManager {
     }
 
     render() {
-        const dropdownsData = this.buildDropdownsData();
-        this.ui.render(dropdownsData);
+        // Defensive check: ensure structure data is valid
+        if (!this.structureData || !this.structureData.nodes) {
+            console.warn("Cannot render dropdowns: invalid structure data");
+            return;
+        }
+        
+        try {
+            const dropdownsData = this.buildDropdownsData();
+            this.ui.render(dropdownsData);
+        } catch (error) {
+            console.error("Error rendering dropdowns:", error);
+        }
     }
 
     refresh() {
+        // Defensive check before refreshing
+        if (!this.structureData) {
+            console.warn("Cannot refresh: no structure data available");
+            return;
+        }
+        
         this._notifyObservers();
     }
 }
