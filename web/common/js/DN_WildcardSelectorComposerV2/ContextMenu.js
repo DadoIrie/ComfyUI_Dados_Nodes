@@ -1,6 +1,5 @@
 class MenuRenderer {
-    constructor(actionHandler) {
-        this.actionHandler = actionHandler;
+    constructor() {
         this.activeMenus = [];
     }
 
@@ -38,7 +37,8 @@ class MenuRenderer {
         item.textContent = itemText;
         
         this.setupItemBehavior(item, entry, selection, level);
-        this.setupRightClickLogging(item);
+        // Right-click behavior: prevent native menu + log entry
+        item.addEventListener("contextmenu", (event) => { event.preventDefault(); console.log(item.textContent.trim()); });
         
         return item;
     }
@@ -64,8 +64,6 @@ class MenuRenderer {
             item.classList.add('disabled');
             return;
         }
-        
-        item.addEventListener("contextmenu", (event) => event.preventDefault());
         
         if (!item.classList.contains('disabled')) {
             if (entry.type === 'submenu') {
@@ -97,12 +95,7 @@ class MenuRenderer {
         };
     }
 
-    setupRightClickLogging(item) {
-        item.addEventListener("contextmenu", (event) => {
-            event.preventDefault();
-            console.log(item.textContent.trim());
-        });
-    }
+
 
     positionMenu(menuElement, xPosition, yPosition) {
         const rect = menuElement.getBoundingClientRect();
@@ -330,7 +323,7 @@ export class ContextMenuManager {
     showContextMenu(xPosition, yPosition) {
         this.hideAllMenus();
         
-        const selection = this.textbox.cmEditor ? this.textbox.cmEditor.getSelection() : '';
+        const selection = this.getSelectionText();
         
         this.updatePasteMenuItem();
         this.updateClipboardMenuEntries();
@@ -338,14 +331,50 @@ export class ContextMenuManager {
         this.menuRenderer.createMenu(this.menuSpecifications.main, xPosition, yPosition, 0, selection);
     }
 
+    buildClipboardMenu(clipboard) {
+        const items = [];
+        for (let index = clipboard.length - 1; index >= 0; index--) {
+            const clipboardText = clipboard[index];
+            const displayText = this.clipboardManager.formatClipboardEntry(clipboardText);
+            items.push({
+                type: 'function',
+                text: displayText,
+                value: clipboardText,
+                callback: (value) => this.textbox.actions.handlePasteAction(value)
+            });
+        }
+        return items;
+    }
+
+    buildPasteEntry(clipboard) {
+        if (clipboard.length === 1) {
+            return {
+                type: 'function',
+                text: 'Paste',
+                value: 'paste',
+                callback: () => this.textbox.actions.handlePasteAction(this.clipboardManager.getLatestItem())
+            };
+        }
+        if (clipboard.length > 1) {
+            return {
+                type: 'submenu',
+                text: 'Paste',
+                value: 'paste',
+                submenu: 'clipboard'
+            };
+        }
+        // clipboard empty → match existing behavior (no callback, no submenu, keep text/value)
+        return { type: 'function', text: 'Paste', value: 'paste', callback: null };
+    }
+
     updatePasteMenuItem() {
-        const clipboardLength = this.clipboardManager.getClipboard().length;
+        const cb = this.clipboardManager.getClipboard();
+        const paste = this.buildPasteEntry(cb);
         const pasteMenuItem = this.menuSpecifications.main[2];
-        
-        pasteMenuItem.type = (clipboardLength === 1) ? 'function' : 'submenu';
-        pasteMenuItem.callback = (clipboardLength === 1) ?
-            () => this.textbox.actions.handlePasteAction(this.clipboardManager.getLatestItem()) : null;
-        pasteMenuItem.submenu = (clipboardLength > 1) ? 'clipboard' : null;
+
+        pasteMenuItem.type = paste.type;
+        pasteMenuItem.callback = paste.callback || null;
+        pasteMenuItem.submenu = paste.submenu || null;
     }
 
     updateClipboardMenuEntries() {
@@ -364,6 +393,7 @@ export class ContextMenuManager {
             });
         }
         
+        this.menuSpecifications.clipboard = this.buildClipboardMenu(clipboard);
         this.textbox.customClipboard = clipboard;
     }
 
@@ -378,6 +408,9 @@ export class ContextMenuManager {
     addToClipboard(text) {
         this.clipboardManager.addToClipboard(text);
         this.updateClipboardMenuEntries();
+    }
+    getSelectionText() {
+        return this.textbox.cmEditor ? this.textbox.cmEditor.getSelection() : '';
     }
 }
 
