@@ -99,7 +99,7 @@ class KeyboardShortcutHandler {
         if (event.key === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey) {
             event.preventDefault();
             
-            const tabSpaces = await window.app.extensionManager.setting.get("wildcard_selector.tab_spaces");
+            const tabSpaces = await window.app.extensionManager.setting.get("dadosNodes.wildcard_selector.tab_spaces");
             const spaces = " ".repeat(tabSpaces);
             
             if (selections.length === 1 && selections[0].empty()) {
@@ -284,7 +284,7 @@ class KeyboardShortcutHandler {
     }
 
     async handleClipboardShortcuts(event, codeMirror) {
-        const contextMenuMode = await window.app.extensionManager.setting.get("wildcard_selector.contextMenuMode");
+        const contextMenuMode = await window.app.extensionManager.setting.get("dadosNodes.wildcard_selector.contextMenuMode");
         const keyPressed = event.key.toLowerCase();
         
         if (!event.ctrlKey || event.altKey || event.metaKey) return;
@@ -402,7 +402,7 @@ export class Textbox {
         await this.initializeCodeMirror();
         
         this.contextMenuMode = await window.app.extensionManager.setting.get(
-            "wildcard_selector.contextMenuMode"
+            "dadosNodes.wildcard_selector.contextMenuMode"
         );
         
         this.setupKeyboardHandlers();
@@ -433,7 +433,7 @@ export class Textbox {
         const initialContent = this.mediator.getWildcardsPrompt();
         WildcardsCodeMirrorMode.register();
         
-        const lineWrapping = await window.app.extensionManager.setting.get("wildcard_selector.lineWrap");
+        const lineWrapping = await window.app.extensionManager.setting.get("dadosNodes.wildcard_selector.lineWrap");
         
         this.cmEditor = window.CodeMirror(this.cmContainer, {
             value: initialContent,
@@ -573,7 +573,7 @@ export class Textbox {
     }
 
     async handleContextMenuEvent(event) {
-        const contextMenuMode = await window.app.extensionManager.setting.get("wildcard_selector.contextMenuMode");
+        const contextMenuMode = await window.app.extensionManager.setting.get("dadosNodes.wildcard_selector.contextMenuMode");
         const showCustomMenu = (contextMenuMode === "custom") ? !event.ctrlKey : event.ctrlKey;
 
         if (showCustomMenu) {

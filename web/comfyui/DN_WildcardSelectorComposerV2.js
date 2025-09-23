@@ -34,7 +34,7 @@ const settingsList = [
 
 function createSettings() {
     return settingsList.map(settingDef => ({
-        id: `wildcard_selector.${settingDef.id}`,
+        id: `dadosNodes.wildcard_selector.${settingDef.id}`,
         name: settingDef.name,
         type: settingDef.type,
         defaultValue: settingDef.defaultValue,

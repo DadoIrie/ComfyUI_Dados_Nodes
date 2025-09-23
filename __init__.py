@@ -31,6 +31,7 @@ from .nodes.DN_SmolVLMNode import DN_SmolVLMNode
 # from .nodes.pinterest_fetch import PinterestFetch
 from .nodes.DN_MiaoshouAITaggerNode import DN_MiaoshouAITaggerNode
 from .nodes.DN_JoyTaggerNode import DN_JoyTaggerNode
+from .nodes.DN_PixAITaggerNode import DN_PixAITaggerNode
 
 from .nodes.utils.api_routes import register_routes
 
@@ -48,6 +49,7 @@ NODE_CLASS_MAPPINGS = {
     # "PinterestFetch": PinterestFetch,
     "DN_MiaoshouAITaggerNode": DN_MiaoshouAITaggerNode,
     "DN_JoyTaggerNode": DN_JoyTaggerNode,
+    "DN_PixAITaggerNode": DN_PixAITaggerNode,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -64,6 +66,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     # "PinterestNode": "Pinterest Node",
     "DN_MiaoshouAITaggerNode": "MiaoshouAI Tagger",
     "DN_JoyTaggerNode": "JoyTagger",
+    "DN_PixAITaggerNode": "PixAI Tagger",
 }
 
 register_routes()

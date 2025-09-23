@@ -65,6 +65,11 @@ class MenuRenderer {
             return;
         }
         
+        if (entry.disabled) {
+            item.classList.add('disabled');
+            return;
+        }
+        
         if (!item.classList.contains('disabled')) {
             if (entry.type === 'submenu') {
                 this.setupSubmenuBehavior(item, entry, selection, level);
@@ -333,7 +338,7 @@ export class ContextMenuManager {
 
     buildClipboardMenu(clipboard) {
         const items = [];
-        for (let index = clipboard.length - 1; index >= 0; index--) {
+        for (let index = 0; index < clipboard.length; index++) {
             const clipboardText = clipboard[index];
             const displayText = this.clipboardManager.formatClipboardEntry(clipboardText);
             items.push({
@@ -347,24 +352,23 @@ export class ContextMenuManager {
     }
 
     buildPasteEntry(clipboard) {
-        if (clipboard.length === 1) {
-            return {
-                type: 'function',
-                text: 'Paste',
-                value: 'paste',
-                callback: () => this.textbox.actions.handlePasteAction(this.clipboardManager.getLatestItem())
-            };
+        const baseEntry = {
+            text: 'Paste',
+            value: 'paste',
+            type: 'function'
+        };
+
+        if (clipboard.length === 0) {
+            return { ...baseEntry, callback: null };
         }
-        if (clipboard.length > 1) {
-            return {
-                type: 'submenu',
-                text: 'Paste',
-                value: 'paste',
-                submenu: 'clipboard'
-            };
-        }
-        // clipboard empty → match existing behavior (no callback, no submenu, keep text/value)
-        return { type: 'function', text: 'Paste', value: 'paste', callback: null };
+
+        return {
+            ...baseEntry,
+            ...(clipboard.length === 1
+                ? { callback: () => this.textbox.actions.handlePasteAction(this.clipboardManager.getLatestItem()) }
+                : { type: 'submenu', submenu: 'clipboard' }
+            )
+        };
     }
 
     updatePasteMenuItem() {
@@ -375,23 +379,12 @@ export class ContextMenuManager {
         pasteMenuItem.type = paste.type;
         pasteMenuItem.callback = paste.callback || null;
         pasteMenuItem.submenu = paste.submenu || null;
+        
+        pasteMenuItem.disabled = cb.length === 0;
     }
 
     updateClipboardMenuEntries() {
-        this.menuSpecifications.clipboard = [];
         const clipboard = this.clipboardManager.getClipboard();
-        
-        for (let index = clipboard.length - 1; index >= 0; index--) {
-            const clipboardText = clipboard[index];
-            const displayText = this.clipboardManager.formatClipboardEntry(clipboardText);
-            
-            this.menuSpecifications.clipboard.push({
-                type: 'function',
-                text: displayText,
-                value: clipboardText,
-                callback: (value) => this.textbox.actions.handlePasteAction(value)
-            });
-        }
         
         this.menuSpecifications.clipboard = this.buildClipboardMenu(clipboard);
         this.textbox.customClipboard = clipboard;
