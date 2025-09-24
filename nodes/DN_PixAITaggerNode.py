@@ -43,7 +43,7 @@ def get_model():
     return model
 
 def download_pixaitagger():
-    logout()
+    logout()  # ! DEBUG purpose - remove on release
     if DN_PixAITaggerNode._hf_token:
         login(DN_PixAITaggerNode._hf_token)
     else:
@@ -98,6 +98,7 @@ class DN_PixAITaggerNode:
         self.model = None
         self.tag_map = None
         self.index_to_tag_map = None
+        self.character_ip_mapping = None
         self.gen_tag_count = 0
         self.character_tag_count = 0
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -120,57 +121,68 @@ class DN_PixAITaggerNode:
                     "min": 0.0,
                     "max": 1.0,
                     "step": 0.01,
+                    "tooltip": "Minimum confidence score for general tags to be included. Higher scores may result in fewer tags."
                 }),
                 "threshold_character": ("FLOAT", {
-                    "default": 0.75,
+                    "default": 0.85,
                     "min": 0.0,
                     "max": 1.0,
                     "step": 0.01,
+                    "tooltip": "Minimum confidence score for character tags to be included. Higher scores may result in fewer tags."
                 }),
-                "tokens_general": ("INT", {
+                "tags_count": ("INT", {
                     "default": 128,
                     "min": 1,
                     "max": 1000,
                     "step": 1,
-                }),
-                "tokens_character": ("INT", {
-                    "default": 128,
-                    "min": 1,
-                    "max": 1000,
-                    "step": 1,
-                }),
-                "include_scores": ("BOOLEAN", {
-                    "default": False,
+                    "tooltip": "Maximum number of tags. Higher thresholds may result in fewer tags than this value."
                 }),
                 "underscore_separated": ("BOOLEAN", {
                     "default": True,
+                    "tooltip": "Use underscores instead of spaces between words in tags."
+                }),
+                "percentage_scores": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "Display scores as percentage (0-100%) instead of decimal (0.0-1.0)"
                 }),
             },
         }
 
-    RETURN_TYPES = ("STRING",)
+    RETURN_TYPES = ("STRING", "STRING", "STRING")
+    RETURN_NAMES = ("tags", "tags_with_scores", "tags_json_with_score")
     FUNCTION = "generate_tags"
     CATEGORY = "Dado's Nodes/VLM Nodes"
 
-    def _format_tag(self, tag_name, score, include_scores, underscore_separated):
+    def _format_tag(self, tag_name, score, include_scores, underscore_separated, percentage_scores=False):
         if not underscore_separated:
             tag_name = tag_name.replace("_", " ")
         
         if include_scores:
-            return f"{tag_name}({score:.2f})"
+            if percentage_scores:
+                return f"{tag_name}({score*100:.2f}%)"
+            else:
+                return f"{tag_name}({score})"
         return tag_name
 
-    def generate_tags(self, image, threshold_general, threshold_character, tokens_general, tokens_character, include_scores, underscore_separated):
+    def generate_tags(self, image, threshold_general, threshold_character, tags_count, underscore_separated, percentage_scores):
         model_path = download_pixaitagger()
         
-        if self.model is None or self.tag_map is None:
+        if self.model is None or self.tag_map is None or self.character_ip_mapping is None:
             self.model = DN_PixAITaggerNode._get_shared_model(model_path, self.device)
-            with open(Path(model_path) / 'tags_v0.9_13k.json', 'r') as f:
+            
+            tags_file = Path(model_path) / 'tags_v0.9_13k.json'
+            mapping_file = Path(model_path) / 'char_ip_map.json'
+
+            with open(tags_file, 'r') as f:
                 tag_info = json.load(f)
                 self.tag_map = tag_info["tag_map"]
                 self.gen_tag_count = tag_info["tag_split"]["gen_tag_count"]
                 self.character_tag_count = tag_info["tag_split"]["character_tag_count"]
-                self.index_to_tag_map = {i: tag for i, tag in enumerate(self.tag_map.keys())}
+                # Invert the tag_map for efficient index-to-tag lookups
+                self.index_to_tag_map = {v: k for k, v in self.tag_map.items()}
+
+            with open(mapping_file, 'r') as f:
+                self.character_ip_mapping = json.load(f)
         
         pil_image = Image.fromarray((image[0].cpu().numpy() * 255).astype('uint8'))
         
@@ -188,38 +200,54 @@ class DN_PixAITaggerNode:
                 character_mask.nonzero(as_tuple=True)[0] + self.gen_tag_count
             )
 
-            general_tags = []
-            character_tags = []
-
-            processed_general_tags_count = 0
+            cur_gen_tags = []
+            cur_char_tags = []
+            
             for i in general_indices:
                 idx = i.item()
                 tag_name = self.index_to_tag_map[idx]
-                
-                if tag_name in self.tags_to_exclude:
-                    continue
-
-                score = probs[idx].item()
-                if processed_general_tags_count < tokens_general:
-                    general_tags.append(self._format_tag(tag_name, score, include_scores, underscore_separated))
-                    processed_general_tags_count += 1
-
-            processed_character_tags_count = 0
+                if tag_name not in self.tags_to_exclude:
+                    cur_gen_tags.append((tag_name, probs[idx].item()))
+            
             for i in character_indices:
                 idx = i.item()
                 tag_name = self.index_to_tag_map[idx]
-                
-                if tag_name in self.tags_to_exclude:
-                    continue
+                if tag_name not in self.tags_to_exclude:
+                    cur_char_tags.append((tag_name, probs[idx].item()))
 
-                score = probs[idx].item()
-                if processed_character_tags_count < tokens_character:
-                    character_tags.append(self._format_tag(tag_name, score, include_scores, underscore_separated))
-                    processed_character_tags_count += 1
+            ip_tags_set = set()
+            for tag_name, _ in cur_char_tags:
+                if tag_name in self.character_ip_mapping:
+                    ip_tags_set.update(self.character_ip_mapping[tag_name])
+            ip_tags = sorted(list(ip_tags_set))
+
+            cur_gen_tags.sort(key=lambda x: x[1], reverse=True)
+            cur_char_tags.sort(key=lambda x: x[1], reverse=True)
+
+            final_gen_tags = cur_gen_tags[:tags_count]
+            final_char_tags = cur_char_tags[:tags_count]
+
+            unified_tags_data = final_gen_tags + final_char_tags
+            unified_tags_data.sort(key=lambda x: x[1], reverse=True)
+
+            all_tags_str_list = []
+            all_tags_with_scores_str_list = []
             
-            all_tags = general_tags + character_tags
-            result = ', '.join(all_tags)
-            return (result,)
+            json_output = {
+                "general": {tag: score * 100 if percentage_scores else score for tag, score in final_gen_tags},
+                "character": {tag: score * 100 if percentage_scores else score for tag, score in final_char_tags},
+                "ip": ip_tags
+            }
+
+            for tag_name, score in unified_tags_data:
+                all_tags_str_list.append(self._format_tag(tag_name, score, False, underscore_separated, percentage_scores))
+                all_tags_with_scores_str_list.append(self._format_tag(tag_name, score, True, underscore_separated, percentage_scores))
+            
+            result_unified_tags = ', '.join(all_tags_str_list)
+            result_unified_tags_with_scores = ', '.join(all_tags_with_scores_str_list)
+            result_structured_json = json.dumps(json_output)
+
+            return (result_unified_tags, result_unified_tags_with_scores, result_structured_json)
 
 @register_operation_handler
 async def handle_pixai_tagger_operations(request):
