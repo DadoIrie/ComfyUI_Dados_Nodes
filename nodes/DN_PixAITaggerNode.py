@@ -164,6 +164,13 @@ class DN_PixAITaggerNode:
                 return f"{tag_name}({score})"
         return tag_name
 
+    def _process_indices_for_tags(self, indices, probs, target_list):
+        for i in indices:
+            idx = i.item()
+            tag_name = self.index_to_tag_map[idx]
+            if tag_name not in self.tags_to_exclude:
+                target_list.append((tag_name, probs[idx].item()))
+
     def generate_tags(self, image, threshold_general, threshold_character, tags_count, underscore_separated, percentage_scores):
         model_path = download_pixaitagger()
         
@@ -178,7 +185,6 @@ class DN_PixAITaggerNode:
                 self.tag_map = tag_info["tag_map"]
                 self.gen_tag_count = tag_info["tag_split"]["gen_tag_count"]
                 self.character_tag_count = tag_info["tag_split"]["character_tag_count"]
-                # Invert the tag_map for efficient index-to-tag lookups
                 self.index_to_tag_map = {v: k for k, v in self.tag_map.items()}
 
             with open(mapping_file, 'r') as f:
@@ -203,31 +209,34 @@ class DN_PixAITaggerNode:
             cur_gen_tags = []
             cur_char_tags = []
             
-            for i in general_indices:
-                idx = i.item()
-                tag_name = self.index_to_tag_map[idx]
-                if tag_name not in self.tags_to_exclude:
-                    cur_gen_tags.append((tag_name, probs[idx].item()))
-            
-            for i in character_indices:
-                idx = i.item()
-                tag_name = self.index_to_tag_map[idx]
-                if tag_name not in self.tags_to_exclude:
-                    cur_char_tags.append((tag_name, probs[idx].item()))
-
-            ip_tags_set = set()
-            for tag_name, _ in cur_char_tags:
-                if tag_name in self.character_ip_mapping:
-                    ip_tags_set.update(self.character_ip_mapping[tag_name])
-            ip_tags = sorted(list(ip_tags_set))
+            self._process_indices_for_tags(general_indices, probs, cur_gen_tags)
+            self._process_indices_for_tags(character_indices, probs, cur_char_tags)
 
             cur_gen_tags.sort(key=lambda x: x[1], reverse=True)
-            cur_char_tags.sort(key=lambda x: x[1], reverse=True)
-
             final_gen_tags = cur_gen_tags[:tags_count]
-            final_char_tags = cur_char_tags[:tags_count]
+            
+            processed_char_tags = []
+            ip_tags_with_scores_map = {}
 
-            unified_tags_data = final_gen_tags + final_char_tags
+            for tag_name, score in cur_char_tags:
+                if tag_name in self.character_ip_mapping:
+                    if "_(" in tag_name and tag_name.endswith(")"):
+                        base_char_name = tag_name.split("_(")[0]
+                        processed_char_tags.append((base_char_name, score))
+                    else:
+                        processed_char_tags.append((tag_name, score))
+
+                    for ip_tag_name in self.character_ip_mapping[tag_name]:
+                        if ip_tag_name not in ip_tags_with_scores_map or score > ip_tags_with_scores_map[ip_tag_name]:
+                            ip_tags_with_scores_map[ip_tag_name] = score
+                else:
+                    processed_char_tags.append((tag_name, score))
+            
+            final_char_tags = processed_char_tags
+            
+            ip_tags_with_scores = sorted([(tag, score) for tag, score in ip_tags_with_scores_map.items()], key=lambda x: x[1], reverse=True)
+
+            unified_tags_data = final_gen_tags + final_char_tags + ip_tags_with_scores
             unified_tags_data.sort(key=lambda x: x[1], reverse=True)
 
             all_tags_str_list = []
@@ -236,7 +245,7 @@ class DN_PixAITaggerNode:
             json_output = {
                 "general": {tag: score * 100 if percentage_scores else score for tag, score in final_gen_tags},
                 "character": {tag: score * 100 if percentage_scores else score for tag, score in final_char_tags},
-                "ip": ip_tags
+                "ip": {tag: score * 100 if percentage_scores else score for tag, score in ip_tags_with_scores}
             }
 
             for tag_name, score in unified_tags_data:
