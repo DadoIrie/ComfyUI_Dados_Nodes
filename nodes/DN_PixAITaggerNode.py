@@ -161,7 +161,7 @@ class DN_PixAITaggerNode:
             if percentage_scores:
                 return f"{tag_name}({score*100:.2f}%)"
             else:
-                return f"{tag_name}({score:.10f})"
+                return f"{tag_name}({score})"
         return tag_name
 
     def _process_indices_for_tags(self, indices, probs, target_list):
