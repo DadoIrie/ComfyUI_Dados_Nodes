@@ -161,7 +161,7 @@ class DN_PixAITaggerNode:
             if percentage_scores:
                 return f"{tag_name}({score*100:.2f}%)"
             else:
-                return f"{tag_name}({score})"
+                return f"{tag_name}({score:.10f})"
         return tag_name
 
     def _process_indices_for_tags(self, indices, probs, target_list):
@@ -219,22 +219,24 @@ class DN_PixAITaggerNode:
             ip_tags_with_scores_map = {}
 
             for tag_name, score in cur_char_tags:
+                current_char_tag_to_add = tag_name
+
                 if tag_name in self.character_ip_mapping:
                     if "_(" in tag_name and tag_name.endswith(")"):
-                        base_char_name = tag_name.split("_(")[0]
-                        processed_char_tags.append((base_char_name, score))
-                    else:
-                        processed_char_tags.append((tag_name, score))
-
+                        current_char_tag_to_add = tag_name.split("_(")[0]
+                    
                     for ip_tag_name in self.character_ip_mapping[tag_name]:
-                        if ip_tag_name not in ip_tags_with_scores_map or score > ip_tags_with_scores_map[ip_tag_name]:
+                        if ip_tag_name not in ip_tags_with_scores_map:
                             ip_tags_with_scores_map[ip_tag_name] = score
-                else:
-                    processed_char_tags.append((tag_name, score))
+                
+                processed_char_tags.append((current_char_tag_to_add, score))
             
             final_char_tags = processed_char_tags
-            
+
             ip_tags_with_scores = sorted([(tag, score) for tag, score in ip_tags_with_scores_map.items()], key=lambda x: x[1], reverse=True)
+
+            for tag_list in [final_gen_tags, final_char_tags, ip_tags_with_scores]:
+                tag_list[:] = [(tag.replace(':', ''), score) for tag, score in tag_list]
 
             unified_tags_data = final_gen_tags + final_char_tags + ip_tags_with_scores
             unified_tags_data.sort(key=lambda x: x[1], reverse=True)
