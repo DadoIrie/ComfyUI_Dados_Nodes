@@ -137,31 +137,40 @@ class DN_PixAITaggerNode:
                     "step": 1,
                     "tooltip": "Maximum number of tags. Higher thresholds may result in fewer tags than this value."
                 }),
+                "exclude_tags": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "tooltip": "Exclude tags from the final generated tags. Tags with spaces or underscores will be treated as the same for matching.\nExample:'exlusion_one,exclusion two'"
+                }),
                 "underscore_separated": ("BOOLEAN", {
                     "default": True,
                     "tooltip": "Use underscores instead of spaces between words in tags."
                 }),
-                "percentage_scores": ("BOOLEAN", {
+                "single_char_ip": ("BOOLEAN", {
                     "default": False,
-                    "tooltip": "Display scores as percentage (0-100%) instead of decimal (0.0-1.0)"
+                    "tooltip": "If true, only use the top 1 character tag and its associated IP tags."
                 }),
             },
         }
 
-    RETURN_TYPES = ("STRING", "STRING", "STRING")
-    RETURN_NAMES = ("tags", "tags_with_scores", "tags_json_with_score")
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("tags",)
     FUNCTION = "generate_tags"
     CATEGORY = "Dado's Nodes/VLM Nodes"
 
-    def _format_tag(self, tag_name, score, include_scores, underscore_separated, percentage_scores=False):
+    def _exclude_tags(self, exclude_tags):
+        exclude_list = set()
+        if exclude_tags.strip():
+            for item in exclude_tags.split(','):
+                cleaned = item.strip()
+                if cleaned:
+                    cleaned = cleaned.replace(' ', '_')
+                    exclude_list.add(cleaned)
+        return exclude_list
+
+    def _remove_underscore(self, tag_name, underscore_separated):
         if not underscore_separated:
             tag_name = tag_name.replace("_", " ")
-        
-        if include_scores:
-            if percentage_scores:
-                return f"{tag_name}({score*100:.2f}%)"
-            else:
-                return f"{tag_name}({score})"
         return tag_name
 
     def _process_indices_for_tags(self, indices, probs, target_list):
@@ -171,7 +180,7 @@ class DN_PixAITaggerNode:
             if tag_name not in self.tags_to_exclude:
                 target_list.append((tag_name, probs[idx].item()))
 
-    def generate_tags(self, image, threshold_general, threshold_character, tags_count, underscore_separated, percentage_scores):
+    def generate_tags(self, image, threshold_general, threshold_character, tags_count, exclude_tags, underscore_separated, single_char_ip):
         model_path = download_pixaitagger()
         
         if self.model is None or self.tag_map is None or self.character_ip_mapping is None:
@@ -212,8 +221,14 @@ class DN_PixAITaggerNode:
             self._process_indices_for_tags(general_indices, probs, cur_gen_tags)
             self._process_indices_for_tags(character_indices, probs, cur_char_tags)
 
+            if single_char_ip:
+                cur_char_tags.sort(key=lambda x: x[1], reverse=True)
+                cur_char_tags = cur_char_tags[:1]
+
             cur_gen_tags.sort(key=lambda x: x[1], reverse=True)
-            final_gen_tags = cur_gen_tags[:tags_count]
+            exclude_list = self._exclude_tags(exclude_tags)
+            filtered_gen_tags = [tag for tag in cur_gen_tags if tag[0] not in exclude_list]
+            final_gen_tags = filtered_gen_tags[:tags_count]
             
             processed_char_tags = []
             ip_tags_with_scores_map = {}
@@ -226,39 +241,38 @@ class DN_PixAITaggerNode:
                         current_char_tag_to_add = tag_name.split("_(")[0]
                     
                     for ip_tag_name in self.character_ip_mapping[tag_name]:
-                        if ip_tag_name not in ip_tags_with_scores_map:
-                            ip_tags_with_scores_map[ip_tag_name] = score
+                        ip_tags_with_scores_map[ip_tag_name] = max(ip_tags_with_scores_map.get(ip_tag_name, 0), score)
                 
                 processed_char_tags.append((current_char_tag_to_add, score))
-            
-            final_char_tags = processed_char_tags
 
             ip_tags_with_scores = sorted([(tag, score) for tag, score in ip_tags_with_scores_map.items()], key=lambda x: x[1], reverse=True)
 
-            for tag_list in [final_gen_tags, final_char_tags, ip_tags_with_scores]:
+            for i, (tag, score) in enumerate(ip_tags_with_scores):
+                if "_(" in tag and tag.endswith(")"):
+                    processed_tag = tag.split("_(")[0]
+                    ip_tags_with_scores[i] = (processed_tag, score)
+
+            char_and_ip_tags = processed_char_tags + ip_tags_with_scores
+            char_and_ip_tags.sort(key=lambda x: x[1], reverse=True)
+
+            for tag_list in [final_gen_tags, char_and_ip_tags]:
                 tag_list[:] = [(tag.replace(':', ''), score) for tag, score in tag_list]
 
-            unified_tags_data = final_gen_tags + final_char_tags + ip_tags_with_scores
-            unified_tags_data.sort(key=lambda x: x[1], reverse=True)
+            unified_tags_data = char_and_ip_tags + final_gen_tags
 
             all_tags_str_list = []
-            all_tags_with_scores_str_list = []
-            
-            json_output = {
-                "general": {tag: score * 100 if percentage_scores else score for tag, score in final_gen_tags},
-                "character": {tag: score * 100 if percentage_scores else score for tag, score in final_char_tags},
-                "ip": {tag: score * 100 if percentage_scores else score for tag, score in ip_tags_with_scores}
-            }
 
             for tag_name, score in unified_tags_data:
-                all_tags_str_list.append(self._format_tag(tag_name, score, False, underscore_separated, percentage_scores))
-                all_tags_with_scores_str_list.append(self._format_tag(tag_name, score, True, underscore_separated, percentage_scores))
+                all_tags_str_list.append(self._remove_underscore(tag_name, underscore_separated))
             
             result_unified_tags = ', '.join(all_tags_str_list)
-            result_unified_tags_with_scores = ', '.join(all_tags_with_scores_str_list)
-            result_structured_json = json.dumps(json_output)
 
-            return (result_unified_tags, result_unified_tags_with_scores, result_structured_json)
+            # DEBUG: log scores for verification
+            print("DEBUG: Tag scores:")
+            for tag, score in unified_tags_data:
+                print(f"  {tag}: {score}")
+
+            return (result_unified_tags,)
 
 @register_operation_handler
 async def handle_pixai_tagger_operations(request):

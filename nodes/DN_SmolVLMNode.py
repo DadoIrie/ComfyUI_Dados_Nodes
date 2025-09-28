@@ -2,7 +2,7 @@ import torch
 from PIL import Image
 from pathlib import Path
 from huggingface_hub import snapshot_download
-from transformers import AutoProcessor, AutoModelForVision2Seq, AutoModelForCausalLM
+from transformers import AutoProcessor, AutoModelForVision2Seq, AutoModelForImageTextToText
 from .. import constants
 
 BASE_DIR = constants.BASE_DIR
@@ -56,6 +56,7 @@ class DN_SmolVLMNode:
         self.model = None
         self.processor = None
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.current_model_key = None
     
     @classmethod
     def INPUT_TYPES(cls):
@@ -81,16 +82,26 @@ class DN_SmolVLMNode:
     def describe_image(self, image, prompt, max_tokens, model):
         model_path = download_smolvlm(model)
     
-        if self.model is None or self.processor is None:
-            print(f"Loading {model} model and processor...")
-        
+        if model != self.current_model_key:
+            print(f"Switching to {model} model and processor...")
+            # Clear previous model and processor to free up memory
+            if self.model is not None:
+                del self.model
+            if self.processor is not None:
+                del self.processor
+            self.model = None
+            self.processor = None
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            
             self.processor = AutoProcessor.from_pretrained(model_path)
-        
+
             if "SmolVLM2" in model:
-                self.model = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True).to(self.device)
+                self.model = AutoModelForImageTextToText.from_pretrained(model_path, trust_remote_code=True).to(self.device)
             else:
                 self.model = AutoModelForVision2Seq.from_pretrained(model_path).to(self.device)
-        
+            
+            self.current_model_key = model
             print(f"{model} model loaded successfully")
     
         pil_image = Image.fromarray((image[0] * 255).numpy().astype('uint8'))
