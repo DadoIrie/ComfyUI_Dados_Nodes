@@ -41,7 +41,7 @@ app.registerExtension({
                 await this.updateBackend();
             }, 100);
             
-            const textWidget = this.addWidget("STRING", "", "", (value) => {
+            this.addWidget("STRING", "", "", (value) => {
                 this.properties.textValue = value;
                 
                 this.regenerateDropdownEntries(value, dropdownWidget);

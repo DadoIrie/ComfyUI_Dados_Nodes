@@ -32,6 +32,7 @@ from .nodes.DN_SmolVLMNode import DN_SmolVLMNode
 from .nodes.DN_JoyTaggerNode import DN_JoyTaggerNode
 from .nodes.DN_PixAITaggerNode import DN_PixAITaggerNode
 from .nodes.DN_TagOpsNode import DN_TagOpsNode
+from .nodes.DN_pyPinNode import DN_pyPinNode
 
 from .nodes.utils.api_routes import register_routes
 
@@ -50,6 +51,7 @@ NODE_CLASS_MAPPINGS = {
     "DN_JoyTaggerNode": DN_JoyTaggerNode,
     "DN_PixAITaggerNode": DN_PixAITaggerNode,
     "DN_TagOpsNode": DN_TagOpsNode,
+    "DN_pyPinNode": DN_pyPinNode,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -67,6 +69,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "DN_JoyTaggerNode": "JoyTagger",
     "DN_PixAITaggerNode": "PixAI Tagger",
     "DN_TagOpsNode": "TagOps",
+    "DN_pyPinNode": "PyPin Node",
 }
 
 register_routes()

@@ -1,4 +1,4 @@
-import { app } from "../../scripts/app.js";
+/* import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
 let EXTENSION_NAME, MESSAGE_ROUTE, chainCallback, fetchSend;
@@ -353,4 +353,4 @@ app.registerExtension({
             node.setDirtyCanvas(true);
         });
     }
-});
+}); */
