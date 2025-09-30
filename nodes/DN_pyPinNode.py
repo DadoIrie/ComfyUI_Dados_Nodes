@@ -1,9 +1,11 @@
 import torch
+import torch.nn.functional as F
 import requests
 import contextlib
 import io
 import json
 import random
+import hashlib
 from PIL import Image
 import numpy as np
 
@@ -45,7 +47,7 @@ def check_user_exists(username):
             return False
         return False
 
-def get_board_sections(pinterest, board_id, sections_map):
+def get_board_sections(pinterest, board_id, sections_map, max_images=100):
     sections = []
     section_batch = pinterest.get_board_sections(board_id=board_id)
     while section_batch:
@@ -55,73 +57,89 @@ def get_board_sections(pinterest, board_id, sections_map):
     for section in sections:
         section_id = section['id']
         title = section.get('title', '')
-        sections_map[title] = section_id
         processed_images = []
         preview_pins = section.get('preview_pins', [])
         for pin in preview_pins:
+            if len(processed_images) >= max_images:
+                break
             if not pin['is_video'] and 'image_medium_url' in pin:
                 new_url = pin['image_medium_url'].replace('200x', '736x')
                 processed_images.append(new_url)
+        display_name = f"{title} ({len(processed_images)})" if title else f"Unnamed ({len(processed_images)})"
+        sections_map[display_name] = section_id  # Key is display_name
         sections_data[section_id] = {
             "section-id": section_id,
             "title": title,
-            "images": processed_images
+            "images": processed_images,
+            "display_name": display_name
         }
     return sections_data
 
 
-def get_user_boards(username):
+def get_board_images_via_feed(pinterest, board_id, board_name, max_images=100):
+    all_pins = []
+    batch_count = 0
+    print(f"Starting board_feed for board {board_name}, max images: {max_images}")
+    while len(all_pins) < max_images:
+        feed_batch = pinterest.board_feed(board_id=board_id)
+        if not feed_batch:
+            break
+
+        batch_count += 1
+        remaining = max_images - len(all_pins)
+        pins_to_add = feed_batch[:remaining]
+        all_pins += pins_to_add
+        print(f"Batch {batch_count}: {len(feed_batch)} pins available, added {len(pins_to_add)}, total so far: {len(all_pins)}")
+
+    print(f"Finished board_feed for board {board_name}, total pins: {len(all_pins)}")
+
+    # Extract original image URLs from all pins
+    all_images = []
+    for pin in all_pins:
+        if "images" in pin and "orig" in pin["images"]:
+            image_url = pin["images"]["orig"]["url"]
+            all_images.append(image_url)
+    print(f"Extracted {len(all_images)} image URLs")
+    return all_images
+
+
+def get_board_map(username):
     cred_root = constants.BASE_DIR + "/.cred_root"
     with suppress_specific_output():
         pinterest = Pinterest(username=username, cred_root=cred_root)
-    boards = pinterest.boards(username=username)
-
-    # Test board_feed for first board
-    if boards:
-        first_board = boards[0]
-        print("Getting board_feed for first board")
-        feed = pinterest.board_feed(board_id=first_board['id'])
-        print("Writing to debug_log.txt")
-        with open('./debug_log.txt', 'w') as f:
-            f.write(json.dumps(feed, indent=2))
-        print("Written")
+    boards = pinterest.boards(username=username, page_size=1000)
 
     board_map = {}
-    boards_data = {}
     for board in boards:
         board_id = board['id']
         board_name = board['name']
         board_map[board_name] = board_id
+    return board_map
 
-        # Process images
-        board_images = board.get('images', {})
-        processed_images = []
-        if '236x' in board_images:
-            for img_obj in board_images['236x']:
-                if 'url' in img_obj:
-                    new_url = img_obj['url'].replace('236x', '736x')
-                    processed_images.append(new_url)
+def get_board_data(pinterest, board, max_images):
+    board_id = board['id']
+    board_name = board['name']
+    processed_images = get_board_images_via_feed(pinterest, board_id, board_name, max_images)
 
-        # Check section_count
-        sections = {}
-        sections_map = {}
-        if board.get('section_count', 0) > 0:
-            sections = get_board_sections(pinterest, board_id, sections_map)
+    sections = {}
+    sections_map = {}
+    if board.get('section_count', 0) > 0:
+        sections = get_board_sections(pinterest, board_id, sections_map, max_images)
 
-        # Exclude section images from board images
-        all_section_images = set()
-        for sec_data in sections.values():
-            all_section_images.update(sec_data.get('images', []))
-        processed_images = [img for img in processed_images if img not in all_section_images]
+    all_section_images = set()
+    for sec_data in sections.values():
+        all_section_images.update(sec_data.get('images', []))
+    processed_images = [img for img in processed_images if img not in all_section_images]
 
-        boards_data[board_id] = {
-            "board-id": board_id,
-            "board-name": board_name,
-            "sections": sections,
-            "sections_map": sections_map,
-            "images": processed_images
-        }
-    return boards_data, board_map
+    board_data = {
+        "board-id": board_id,
+        "board-name": board_name,
+        "display_name": f"{board_name} ({len(processed_images)})",
+        "sections": sections,
+        "sections_map": sections_map,
+        "images": processed_images
+    }
+    return board_data
 
 
 def load_image_from_url(url):
@@ -136,8 +154,8 @@ def handle_username_data_fetch(username):
     if not check_user_exists(username):
         return {"error": "User not found"}
 
-    boards, board_map = get_user_boards(username)
-    return {"board_map": board_map, "boards": boards}
+    board_map = get_board_map(username)
+    return {"board_map": board_map}
 
 
 class DN_pyPinNode:
@@ -146,12 +164,100 @@ class DN_pyPinNode:
         self.used_pools = {}
         self.last_boards = {}
         self.last_sections = {}
+        self.last_boards_hash = None
+
+    def _reset_pools(self):
+        self.current_pools = {}
+        self.used_pools = {}
+        self.last_boards = {}
+        self.last_sections = {}
+    
+    def _get_all_images(self, selected_board, section, boards):
+        if selected_board == 'all':
+            all_images = []
+            for board_data in boards.values():
+                all_images.extend(board_data.get('images', []))
+                for sec_data in board_data.get('sections', {}).values():
+                    all_images.extend(sec_data.get('images', []))
+            return all_images
+        
+        board_data = next(
+            (b for b in boards.values() if b.get('board-name') == selected_board),
+            None
+        )
+        if not board_data:
+            return []
+        
+        board_images = board_data.get('images', [])
+        sections = board_data.get('sections', {})
+        sections_map = board_data.get('sections_map', {})
+        
+        if section == 'included':
+            all_images = board_images.copy()
+            for sec_data in sections.values():
+                all_images.extend(sec_data.get('images', []))
+            return all_images
+        
+        if section == 'excluded':
+            return board_images
+        
+        if section in sections_map:
+            sec_id = sections_map[section]
+            if sec_id in sections:
+                return sections[sec_id].get('images', [])
+        
+        return []
+    
+    def _select_chaotic_draw(self, all_images, unique_id, board, section):
+        if not all_images:
+            return ''
+        self.last_boards[unique_id] = board
+        self.last_sections[unique_id] = section
+        return random.choice(all_images)
+    
+    def _select_fixed(self, all_images, unique_id, board, section, last_image):
+        last_board = self.last_boards.get(unique_id)
+        last_section = self.last_sections.get(unique_id)
+        changed = last_board != board or last_section != section
+        
+        if changed or not last_image:
+            if not all_images:
+                return ''
+            self.last_boards[unique_id] = board
+            self.last_sections[unique_id] = section
+            return random.choice(all_images)
+        return last_image
+    
+    def _select_circular_shuffle(self, all_images, unique_id, board, section):
+        last_board = self.last_boards.get(unique_id)
+        last_section = self.last_sections.get(unique_id)
+        changed = last_board != board or last_section != section
+        
+        if changed:
+            self.last_boards[unique_id] = board
+            self.last_sections[unique_id] = section
+            self.current_pools[unique_id] = all_images.copy()
+            self.used_pools[unique_id] = []
+        
+        if unique_id not in self.current_pools or not self.current_pools[unique_id]:
+            return ''
+        
+        selected_image = random.choice(self.current_pools[unique_id])
+        self.current_pools[unique_id].remove(selected_image)
+        self.used_pools[unique_id].append(selected_image)
+        
+        if not self.current_pools[unique_id]:
+            self.current_pools[unique_id] = self.used_pools[unique_id].copy()
+            self.used_pools[unique_id] = []
+        
+        return selected_image
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "node_data": ("STRING", {"default": "", "multiline": False}),
+                "node_configs": ("STRING", {"default": "{}", "multiline": False}),
+                "pinterest_data": ("STRING", {"default": "{}", "multiline": False}),
                 "username": ("STRING", {"default": "", "multiline": False}),
             },
             "hidden": {
@@ -159,96 +265,74 @@ class DN_pyPinNode:
             },
         }
 
-    RETURN_TYPES = ("IMAGE", "JSON")
-    RETURN_NAMES = ("image", "data")
+    RETURN_TYPES = ("IMAGE", "JSON", "JSON")
+    RETURN_NAMES = ("image", "configs", "data")
 
     FUNCTION = "get_image"
     CATEGORY = "Dado's Nodes"
 
-    def get_image(self, node_data, username, unique_id):
-        parsed = json.loads(node_data) if node_data else {}
-        configs = parsed.get('configs', {})
-        data = parsed.get('data', {})
-        image_output = configs.get('image_output')
-        board = configs.get('board')
-        section = configs.get('section')
-        last_image = configs.get('last_image')
+    def get_image(self, node_configs, pinterest_data, username, unique_id):
+        configs = json.loads(node_configs) if node_configs else {}
+        data = json.loads(pinterest_data) if pinterest_data else {}
+
+        # Check for manual pool reset
+        if configs.get('reset_pool'):
+            self._reset_pools()
+            self.last_boards_hash = None
+            configs['reset_pool'] = False
+
+        # Extract config values
+        image_output, board, section, last_image, resize_image = [
+            configs.get(k) for k in ('image_output', 'board', 'section', 'last_image', 'resize_image')
+        ]
         boards = data.get('boards', {})
 
-        def get_all_images(selected_board, section, boards):
-            if selected_board == 'all':
-                all_images = []
-                for board_data in boards.values():
-                    all_images.extend(board_data.get('images', []))
-                    # Include all section images
-                    for sec_data in board_data.get('sections', {}).values():
-                        all_images.extend(sec_data.get('images', []))
-                return all_images
-            # Find the selected board
-            for b_data in boards.values():
-                if b_data.get('board-name') == selected_board:
-                    board_images = b_data.get('images', [])
-                    sections = b_data.get('sections', {})
-                    sections_map = b_data.get('sections_map', {})
-                    if section == 'included':
-                        all_images = board_images.copy()
-                        for sec_data in sections.values():
-                            all_images.extend(sec_data.get('images', []))
-                        return all_images
-                    if section == 'excluded':
-                        return board_images
-                    if section not in ['included', 'excluded']:
-                        # Specific section
-                        if section in sections_map:
-                            sec_id = sections_map[section]
-                            if sec_id in sections:
-                                return sections[sec_id].get('images', [])
-                        return []
-            return []
+        # Reset dictionaries if boards data has changed
+        boards_str = json.dumps(boards, sort_keys=True)
+        current_hash = hashlib.md5(boards_str.encode()).hexdigest()
+        if self.last_boards_hash != current_hash:
+            self._reset_pools()
+            self.last_boards_hash = current_hash
 
-        def update_last_state(uid, b, s):
-            self.last_boards[uid] = b
-            self.last_sections[uid] = s
-
-        all_images = get_all_images(board, section, boards)
-        selected_image = ''
-
-        last_board = self.last_boards.get(unique_id)
-        last_section = self.last_sections.get(unique_id)
-        changed = last_board != board or last_section != section
-
-        if image_output == 'chaotic draw':
-            if all_images:
-                selected_image = random.choice(all_images)
-                update_last_state(unique_id, board, section)
-        elif image_output == 'fixed':
-            if changed or not last_image:
-                if all_images:
-                    selected_image = random.choice(all_images)
-                    update_last_state(unique_id, board, section)
-            else:
-                selected_image = last_image
-        elif image_output == 'circular shuffle':
-            if changed:
-                update_last_state(unique_id, board, section)
-                self.current_pools[unique_id] = all_images.copy()
-                self.used_pools[unique_id] = []
-            if self.current_pools.get(unique_id, []):
-                selected_image = random.choice(self.current_pools[unique_id])
-                self.current_pools[unique_id].remove(selected_image)
-                self.used_pools[unique_id].append(selected_image)
-                if not self.current_pools[unique_id]:
-                    self.current_pools[unique_id] = self.used_pools[unique_id].copy()
-                    self.used_pools[unique_id] = []
+        all_images = self._get_all_images(board, section, boards)
+        
+        mode_strategies = {
+            'chaotic draw': lambda: self._select_chaotic_draw(all_images, unique_id, board, section),
+            'fixed': lambda: self._select_fixed(all_images, unique_id, board, section, last_image),
+            'circular shuffle': lambda: self._select_circular_shuffle(all_images, unique_id, board, section)
+        }
+        
+        selection_strategy = mode_strategies.get(image_output)
+        selected_image = selection_strategy() if selection_strategy else ''
 
         configs['last_image'] = selected_image
         img_tensor = load_image_from_url(selected_image)
 
-        parsed['configs'] = configs
-        pretty_data = json.dumps(parsed, indent=2)
+        # Resize image if resize_image is set to a positive integer
+        if resize_image:
+            resize_str = resize_image.strip()
+            if resize_str.isdigit() and int(resize_str) > 0:
+                target_longest = int(resize_str)
+                _, h, w, _ = img_tensor.shape
+                if h == w:
+                    new_h = new_w = target_longest
+                else:
+                    longest = max(h, w)
+                    scale = target_longest / longest
+                    new_h = int(h * scale)
+                    new_w = int(w * scale)
+                img_tensor = F.interpolate(img_tensor.permute(0, 3, 1, 2), size=(new_h, new_w), mode='bilinear', align_corners=False).permute(0, 2, 3, 1)
 
-        # Return UI data to trigger executed event
-        return {"ui": {"node_data": pretty_data}, "result": (img_tensor, pretty_data)}
+        pretty_configs = json.dumps(configs, indent=2)
+        pretty_data = json.dumps(data, indent=2)
+
+        return {
+            "ui": {
+                "node_configs": pretty_configs,
+                "pinterest_data": pretty_data
+            },
+            "result": (img_tensor, pretty_configs, pretty_data)
+        }
 
     @classmethod
     def IS_CHANGED(cls, node_data, username, unique_id):
@@ -261,16 +345,51 @@ async def handle_username_changed(request):
         data = await request.json()
         operation = data.get('operation')
 
-        if operation not in ['username_changed']:
+        if operation not in ['username_changed', 'board_selected']:
             return None
 
         if operation == 'username_changed':
             # node_id = str(data.get('id', ''))
             payload = data.get('payload', {})
             username = payload.get('username', '')
+            max_images = payload.get('max_images', 100)
 
             result = handle_username_data_fetch(username)
             return web.json_response({"data": result})
+
+        if operation == 'board_selected':
+            payload = data.get('payload', {})
+            username = payload.get('username', '')
+            board_display_name = payload.get('board_display_name', '')
+            max_images = payload.get('max_images', 100)
+
+            if not check_user_exists(username):
+                return web.json_response({"error": "User not found"}, status=400)
+
+            cred_root = constants.BASE_DIR + "/.cred_root"
+            with suppress_specific_output():
+                pinterest = Pinterest(username=username, cred_root=cred_root)
+            boards = pinterest.boards(username=username, page_size=1000)
+
+            fresh_board_map = {board['name']: board['id'] for board in boards}
+
+            if board_display_name == 'all':
+                all_boards_data = {}
+                for board in boards:
+                    board_data = get_board_data(pinterest, board, max_images)
+                    all_boards_data[board['id']] = board_data
+                return web.json_response({"data": all_boards_data, "board_map": fresh_board_map})
+            else:
+                board_id = fresh_board_map.get(board_display_name)
+                if not board_id:
+                    return web.json_response({"error": "Board not found"}, status=400)
+
+                board = next((b for b in boards if b['id'] == board_id), None)
+                if not board:
+                    return web.json_response({"error": "Board not found"}, status=400)
+
+                board_data = get_board_data(pinterest, board, max_images)
+                return web.json_response({"data": {board_id: board_data}, "board_map": None})
 
         return web.json_response({"error": "Invalid operation"}, status=400)
 
