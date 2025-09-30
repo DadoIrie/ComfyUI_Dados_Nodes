@@ -5,9 +5,8 @@ from huggingface_hub import snapshot_download, login, logout
 from torchvision import transforms
 import timm
 import json
-from aiohttp import web
+import folder_paths
 from .. import constants
-from .utils.api_routes import register_operation_handler
 
 BASE_DIR = constants.BASE_DIR
 
@@ -43,9 +42,20 @@ def get_model():
     return model
 
 def download_pixaitagger():
-    logout()  # ! DEBUG purpose - remove on release
-    if DN_PixAITaggerNode._hf_token:
-        login(DN_PixAITaggerNode._hf_token)
+    # Get user directory from folder_paths
+    user_dir = folder_paths.get_user_directory()
+    default_user = "default"  # TODO determine how to find the correct user - for now its 'default'
+    settings_file = Path(user_dir) / default_user / "comfy.settings.json"
+
+    hf_token = None
+    if settings_file.exists():
+        with open(settings_file, 'r', encoding='utf-8') as f:
+            settings = json.load(f)
+            hf_token = settings.get('dadosNodes.hf_token')
+
+    logout()  # ! DEBUG PURPOSE
+    if hf_token:
+        login(hf_token)
     else:
         raise ValueError("Hugging Face access token needs to be set in the settings for PixAI Tagger.")
     
@@ -78,11 +88,6 @@ def pil_to_rgb(image: Image.Image) -> Image.Image:
 
 class DN_PixAITaggerNode:
     _shared_model = None
-    _hf_token = None
-
-    @classmethod
-    def set_hf_token(cls, token):
-        cls._hf_token = token if token else None
 
     @classmethod
     def _get_shared_model(cls, model_path, device):
@@ -273,30 +278,3 @@ class DN_PixAITaggerNode:
                 print(f"  {tag}: {score}")
 
             return (result_unified_tags,)
-
-@register_operation_handler
-async def handle_pixai_tagger_operations(request):
-    try:
-        data = await request.json()
-        operation = data.get('operation')
-
-        valid_operations = ['set_hf_token']
-        
-        if operation not in valid_operations:
-            return None
-
-        if operation == 'set_hf_token':
-            payload = data.get('payload', {})
-            hf_token = payload.get('hf_token', '')
-            DN_PixAITaggerNode.set_hf_token(hf_token)
-            return web.json_response({
-                "status": "success",
-                "message": "Hugging Face token updated."
-            })
-
-    except Exception as e:
-        return web.json_response(
-            {"status": "error", "message": str(e)},
-            status=500
-        )
-        
