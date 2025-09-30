@@ -237,6 +237,13 @@ class DN_pyPinNode {
         }
     }
 
+    updateImageUrl() {
+        if (this.nodeDataWidget?.value) {
+            const nodeData = JSON.parse(this.nodeDataWidget.value);
+            this.imageUrl = nodeData.configs?.last_image || '';
+        }
+    }
+
     initializeNodeData() {
         if (this.nodeDataWidget) {
             let current = JSON.parse(this.nodeDataWidget.value || '{"configs":{},"data":{}}');
@@ -262,15 +269,20 @@ app.registerExtension({
             chainCallback(nodeType.prototype, 'onNodeCreated', async function () {
                 const pyPinNode = new DN_pyPinNode(this);
                 this.pyPinNode = pyPinNode;
+                //this.pyPinNode.updateImageUrl();
+                //console.log(this.loadedImage.src)
+                setTimeout(() => this.pyPinNode.updateImageUrl(), 0);
+
             });
 
             chainCallback(nodeType.prototype, 'onDrawBackground', function(ctx) {
                 if (this.flags?.collapsed || !this.pyPinNode || !this.pyPinNode.nodeDataWidget) {
                     return;
                 }
-
-                const nodeData = JSON.parse(this.pyPinNode.nodeDataWidget.value);
-                const imageUrl = nodeData.configs?.last_image;
+/*                 if (!this.pyPinNode.imageUrl) {
+                    this.pyPinNode.updateImageUrl();
+                } */
+                const imageUrl = this.pyPinNode.imageUrl;
 
                 if (this.loadedImage && this.loadedImage.src !== imageUrl) {
                     this.loadedImage = null;
@@ -315,6 +327,7 @@ app.registerExtension({
             chainCallback(nodeType.prototype, 'onExecuted', function(event) {
                 if (this.pyPinNode) {
                     this.pyPinNode.nodeDataWidget.value = event.node_data.join('');
+                    this.pyPinNode.updateImageUrl()
                 }
             });
 

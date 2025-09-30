@@ -206,32 +206,33 @@ class DN_pyPinNode:
                         return []
             return []
 
+        def update_last_state(uid, b, s):
+            self.last_boards[uid] = b
+            self.last_sections[uid] = s
+
         all_images = get_all_images(board, section, boards)
         selected_image = ''
+
+        last_board = self.last_boards.get(unique_id)
+        last_section = self.last_sections.get(unique_id)
+        changed = last_board != board or last_section != section
 
         if image_output == 'chaotic draw':
             if all_images:
                 selected_image = random.choice(all_images)
-                self.last_boards[unique_id] = board
-                self.last_sections[unique_id] = section
+                update_last_state(unique_id, board, section)
         elif image_output == 'fixed':
-            last_board = self.last_boards.get(unique_id)
-            last_section = self.last_sections.get(unique_id)
-            if last_board != board or last_section != section or not last_image:
+            if changed or not last_image:
                 if all_images:
                     selected_image = random.choice(all_images)
-                    self.last_boards[unique_id] = board
-                    self.last_sections[unique_id] = section
+                    update_last_state(unique_id, board, section)
             else:
                 selected_image = last_image
         elif image_output == 'circular shuffle':
-            last_board = self.last_boards.get(unique_id)
-            last_section = self.last_sections.get(unique_id)
-            if last_board != board or last_section != section:
+            if changed:
+                update_last_state(unique_id, board, section)
                 self.current_pools[unique_id] = all_images.copy()
                 self.used_pools[unique_id] = []
-                self.last_boards[unique_id] = board
-                self.last_sections[unique_id] = section
             if self.current_pools.get(unique_id, []):
                 selected_image = random.choice(self.current_pools[unique_id])
                 self.current_pools[unique_id].remove(selected_image)
@@ -239,8 +240,6 @@ class DN_pyPinNode:
                 if not self.current_pools[unique_id]:
                     self.current_pools[unique_id] = self.used_pools[unique_id].copy()
                     self.used_pools[unique_id] = []
-            else:
-                selected_image = ''
 
         configs['last_image'] = selected_image
         img_tensor = load_image_from_url(selected_image)
