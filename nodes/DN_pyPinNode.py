@@ -160,11 +160,7 @@ def handle_username_data_fetch(username):
 
 class DN_pyPinNode:
     def __init__(self):
-        self.current_pools = {}
-        self.used_pools = {}
-        self.last_boards = {}
-        self.last_sections = {}
-        self.last_boards_hash = None
+        self._reset_pools()
 
     def _reset_pools(self):
         self.current_pools = {}
@@ -236,7 +232,7 @@ class DN_pyPinNode:
         if changed:
             self.last_boards[unique_id] = board
             self.last_sections[unique_id] = section
-            self.current_pools[unique_id] = all_images.copy()
+            self.current_pools[unique_id] = random.sample(all_images, len(all_images)) if all_images else []
             self.used_pools[unique_id] = []
         
         if unique_id not in self.current_pools or not self.current_pools[unique_id]:
@@ -247,7 +243,7 @@ class DN_pyPinNode:
         self.used_pools[unique_id].append(selected_image)
         
         if not self.current_pools[unique_id]:
-            self.current_pools[unique_id] = self.used_pools[unique_id].copy()
+            self.current_pools[unique_id] = random.sample(self.used_pools[unique_id], len(self.used_pools[unique_id])) if self.used_pools[unique_id] else []
             self.used_pools[unique_id] = []
         
         return selected_image
@@ -278,7 +274,7 @@ class DN_pyPinNode:
         # Check for manual pool reset
         if configs.get('reset_pool'):
             self._reset_pools()
-            self.last_boards_hash = None
+            configs['last_boards_hash'] = None
             configs['reset_pool'] = False
 
         # Extract config values
@@ -290,9 +286,9 @@ class DN_pyPinNode:
         # Reset dictionaries if boards data has changed
         boards_str = json.dumps(boards, sort_keys=True)
         current_hash = hashlib.md5(boards_str.encode()).hexdigest()
-        if self.last_boards_hash != current_hash:
+        if configs.get('last_boards_hash') != current_hash:
             self._reset_pools()
-            self.last_boards_hash = current_hash
+            configs['last_boards_hash'] = current_hash
 
         all_images = self._get_all_images(board, section, boards)
         
