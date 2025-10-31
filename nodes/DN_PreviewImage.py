@@ -57,10 +57,14 @@ class DN_PreviewImage:
 
         if mp4_path is not None and isinstance(mp4_path, str) and mp4_path.lower().endswith(".mp4"):
             # If it's an MP4 path, return it directly
+            subfolder_path = os.path.dirname(mp4_path)
+            comfyui_index = subfolder_path.find("ComfyUI/")
+            after_comfyui = subfolder_path[comfyui_index + 8:]
+            type_value = after_comfyui.split('/')[0]
             return {"ui": {
                 "videos": [{
                     "filename": os.path.basename(mp4_path),
-                    "subfolder": os.path.dirname(mp4_path),
-                    "type": "temp"
+                    "subfolder": subfolder_path,
+                    "type": type_value
                 }]
             }}
