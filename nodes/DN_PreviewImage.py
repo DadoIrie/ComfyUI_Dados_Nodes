@@ -2,6 +2,7 @@ import folder_paths
 import os
 import numpy as np
 from PIL import Image
+import re
 
 class DN_PreviewImage:
     @classmethod
@@ -55,12 +56,21 @@ class DN_PreviewImage:
                 }]
             }}
 
-        if mp4_path is not None and isinstance(mp4_path, str) and mp4_path.lower().endswith(".mp4"):
-            # If it's an MP4 path, return it directly
+        if mp4_path is not None and isinstance(mp4_path, str):
+            # First try direct mp4 path
+            if mp4_path.lower().endswith(".mp4"):
+                video_path = mp4_path
+            else:
+                # Extract mp4 path from string representation if needed
+                mp4_match = re.search(r'\"(.*?\.mp4)\"', mp4_path)
+                if mp4_match:
+                    video_path = mp4_match.group(1)
+            
+            # Return the video path in ComfyUI's expected format
             return {"ui": {
                 "videos": [{
-                    "filename": os.path.basename(mp4_path),
-                    "subfolder": os.path.dirname(mp4_path),
+                    "filename": os.path.basename(video_path),
+                    "subfolder": os.path.dirname(video_path),
                     "type": "temp"
                 }]
             }}
