@@ -1,6 +1,10 @@
 import { app } from "../../scripts/app.js"
 import { api } from "../../scripts/api.js"
 
+// TODO clean up setDirtyCanvas where needed and where redundant
+
+// TODO if 'cached' no 
+
 let EXTENSION_NAME, MESSAGE_ROUTE, chainCallback, fetchSend;
 (async () => {
   const constants = await fetch('/dadosConstants').then(response => response.json());
@@ -20,13 +24,22 @@ class DN_pyPinNode {
         this.boardWidget = null;
         this.sectionWidget = null;
         this.usernameWidget = null;
+        this.cachedUsernamesWidget = null;
         this.imageOutputWidget = null;
         this.apiRequestsWidget = null;
-
+        this.displayToBoardName = {};
+        this.displayToSectionName = {};
         this.isLoading = false;
         this.originalOnDrawForeground = null;
         
         this.widgetDataList = [
+            {
+                name: "cached_usernames",
+                type: "combo",
+                value: "none",
+                options: ["none"],
+                tooltip: "Select cached username to load boards from"
+            },
             {
                 name: "board",
                 type: "combo",
@@ -57,25 +70,80 @@ class DN_pyPinNode {
             },
             {
                 name: "resize_image",
-                type: "string",
-                value: "",
-                tooltip: "Resize image by setting the target size for the longest side (maintains aspect ratio, leave empty for original size)"
+                type: "number",
+                value: 0,
+                options: { min: 0, max: 10000, step: 1, precision: 0 },
+                tooltip: "Resize image by setting the target size for the longest side (maintains aspect ratio, 0 for original size)"
             },
             {
                 name: "max_images",
                 type: "number",
                 value: 100,
-                options: { min: 0, max: 1000, step: 1, precision: 0 },
+                options: { min: 0, max: 10000, step: 1, precision: 0 },
                 tooltip: "Max image amount per board/section\nIMPORTANT: 100 is recommended, anything above that at own risk"
             },
             {
                 name: "Select Image",
-                type: "button", action: function() { },
+                type: "button",
+                action: () => {
+                    this.handleSelectImage();
+                },
                 tooltip: "Browse Pinterest for images"
             },
         ];
 
         this.initializeWidgets();
+    }
+
+    buildDisplayToNameMappings(type) {
+        const data = this.getPinterestData();
+        
+        // Always build board mappings if type is "board"
+        if (type === "board") {
+            this.displayToBoardName = {};
+            this.displayToBoardName["all"] = "all";
+            
+            for (const boardId in data.boards) {
+                const board = data.boards[boardId];
+                this.displayToBoardName[board.display_name] = board['board-name'];
+            }
+        }
+        
+        // Build section mappings if type is "section" or "board"
+        if (type === "section" || type === "board") {
+            this.displayToSectionName = {};
+            this.displayToSectionName["included"] = "included";
+            this.displayToSectionName["excluded"] = "excluded";
+            
+            const selectedBoard = this.boardWidget ? this.boardWidget.value : null;
+            
+            if (selectedBoard && selectedBoard !== "all" && data.board_map) {
+                const boardName = this.displayToBoardName[selectedBoard] || selectedBoard;
+                const boardId = data.board_map[boardName];
+                
+                if (boardId && data.boards[boardId]) {
+                    const boardData = data.boards[boardId];
+                    const sections = boardData.sections || {};
+                    
+                    for (const sectionId in sections) {
+                        const section = sections[sectionId];
+                        const displayName = section.display_name;
+                        const title = section.title;
+                        if (displayName && title) {
+                            this.displayToSectionName[displayName] = title;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    getBoardName(displayName) {
+        return this.displayToBoardName[displayName];
+    }
+    
+    getSectionName(displayName) {
+        return this.displayToSectionName[displayName];
     }
 
     createWidget({ name, type, value, options, tooltip, action }) {
@@ -90,7 +158,7 @@ class DN_pyPinNode {
         };
 
         const [widgetType, callback, widgetOptions] = widgetTypes[type];
-        const widget = this.node.addWidget(widgetType, name, value, callback, widgetOptions);
+        const widget = this.node.addWidget(widgetType, name, value, callback.bind(this), widgetOptions);
         widget.tooltip = tooltip;
 
         return widget;
@@ -105,7 +173,12 @@ class DN_pyPinNode {
             this.pinterestDataWidget.computeSize = () => [0, -4];
         }
 
-        this.widgetDataList.forEach(widgetData => this.createWidget(widgetData));
+        // In initializeWidgets method
+        this.widgetDataList.forEach(widgetData => {
+            const boundCallback = widgetData.callback ? widgetData.callback.bind(this) : null;
+            this.createWidget({...widgetData, callback: boundCallback});
+        });
+
 
         this.usernameWidget = this.node.widgets?.find(w => w.name === "username");
         if (this.usernameWidget) {
@@ -116,6 +189,7 @@ class DN_pyPinNode {
         }
 
         setTimeout(() => {
+            this.cachedUsernamesWidget = this.node.widgets?.find(w => w.name === "cached_usernames");
             this.imageOutputWidget = this.node.widgets?.find(w => w.name === "image_output");
             this.apiRequestsWidget = this.node.widgets?.find(w => w.name === "api_requests");
             if (this.imageOutputWidget && this.imageOutputWidget.value === "circular shuffle") {
@@ -124,40 +198,45 @@ class DN_pyPinNode {
             if (this.apiRequestsWidget && this.apiRequestsWidget.value === "cached") {
                 this.updateBoardButtonHandler("add");
             }
-            // Cache board and section widgets after all widgets are created
+
             this.sectionWidget = this.node.widgets?.find(w => w.name === "section");
             this.boardWidget = this.node.widgets?.find(w => w.name === "board");
             this.initializeNodeData();
-            
 
-            // Update widget options from saved pinterest_data on reload
-            this.updateWidgetsFromData();
+
+            this.buildDisplayToNameMappings("board");
+            const data = this.getPinterestData();
+            this.updateBoardOptions(data);
+            this.updateSectionOptions(data);
+            this.node.setDirtyCanvas(true);
         }, 0);
-
-        this.node.setDirtyCanvas(true);
+        
     }
 
     widgetCallback(changedWidget) {
         this.updateNodeConfigs(changedWidget.name, changedWidget.value);
 
         if (changedWidget.name === "board") {
-            // Single entry point for section control
             const data = this.getPinterestData();
+            this.buildDisplayToNameMappings("section");
             this.updateSectionOptions(data);
+            
             if (changedWidget.value && this.usernameWidget && this.apiRequestsWidget.value != "cached") {
                 this.fetchCurrentBoardData(changedWidget.value);
             }
         } else if (changedWidget.name === "username") {
-            // Always reset board widget to defaults from widgetDataList
             const boardData = this.widgetDataList.find(w => w.name === "board");
             this.boardWidget.value = boardData.value;
             this.boardWidget.options.values = boardData.options;
 
-            // Exit early if api_requests is "cached" to prevent API call
             if (this.apiRequestsWidget.value === "cached") return;
-
+            
+            if (!changedWidget.value || changedWidget.value.trim() === '') {
+                console.log("Username is empty, skipping backend call");
+                return;
+            }
+            
             this.startLoading();
-
             const maxImagesWidget = this.node.widgets?.find(w => w.name === "max_images");
             const maxImages = maxImagesWidget ? maxImagesWidget.value : 100;
             fetchSend(MESSAGE_ROUTE, this.node.id, "username_changed", { username: changedWidget.value, max_images: maxImages })
@@ -165,7 +244,10 @@ class DN_pyPinNode {
                     if (this.pinterestDataWidget) {
                         this.setPinterestData(response.data);
                     }
-                    this.updateWidgetsFromData();
+                    this.buildDisplayToNameMappings("board");
+                    const data = this.getPinterestData();
+                    this.updateBoardOptions(data);
+                    this.updateSectionOptions(data);
                     this.fetchCurrentBoardData(this.boardWidget.value);
                     this.node.setDirtyCanvas(true);
                 })
@@ -183,9 +265,81 @@ class DN_pyPinNode {
         } else if (changedWidget.name === "api_requests") {
             if (changedWidget.value === "cached") {
                 this.updateBoardButtonHandler("add");
+                if (this.usernameWidget.value && this.boardWidget.options.values.length > 1) {
+                    fetchSend(MESSAGE_ROUTE, this.node.id, "switch_to_cached", { username: this.usernameWidget.value });
+                }
             } else {
                 this.updateBoardButtonHandler("remove");
+                const data = this.getPinterestData();
+                if (this.usernameWidget.value && (!data.boards || Object.keys(data.boards).length === 0)) {
+                    this.startLoading();
+                    this.fetchCurrentBoardData("all");
+                }
             }
+        } else if (changedWidget.name === "cached_usernames") {
+            if (changedWidget.value === "none") {
+                this.usernameWidget.value = "";
+                this.boardWidget.value = "all";
+                this.boardWidget.options.values = ["all"];
+                this.sectionWidget.value = "excluded";
+                this.sectionWidget.options.values = ["included", "excluded"];
+                this.displayToBoardName = {};
+                this.displayToBoardName["all"] = "all";
+                this.displayToSectionName = {};
+                this.displayToSectionName["included"] = "included";
+                this.displayToSectionName["excluded"] = "excluded";
+                this.setPinterestData({});
+                this.node.setDirtyCanvas(true);
+            } else {
+                this.apiRequestsWidget.value = "cached";
+                this.usernameWidget.value = changedWidget.value;
+                this.boardWidget.value = "all";
+                this.sectionWidget.value = "excluded";
+                this.sectionWidget.options.values = ["included", "excluded"];
+                this.updateNodeConfigs("username", changedWidget.value);
+                this.updateNodeConfigs("board", "all");
+                this.updateNodeConfigs("section", "excluded");
+                this.loadCachedDataForUsername(changedWidget.value);
+            }
+        }
+    }
+    
+    async handleSelectImage() {
+        try {
+            const constants = { EXTENSION_NAME, MESSAGE_ROUTE };
+            const { showPinterestModal } = await import(`/extensions/${EXTENSION_NAME}/common/js/DN_pyPinNode/PinterestModal.js`);
+            
+            const currentConfigs = this.getConfigs();
+            
+            const selectedImageUrl = await showPinterestModal(this.node, constants, fetchSend, {
+                displayToBoardName: this.displayToBoardName,
+                displayToSectionName: this.displayToSectionName
+            });
+            
+            if (selectedImageUrl) {
+                let configs = this.getConfigs();
+                configs.last_image = selectedImageUrl;
+                configs.image_output = "fixed";
+                
+                if (this.boardWidget) {
+                    configs.board = this.getBoardName(this.boardWidget.value);
+                }
+                if (this.sectionWidget) {
+                    configs.section = this.getSectionName(this.sectionWidget.value);
+                }
+                
+                this.setConfigs(configs);
+                
+                if (this.imageOutputWidget) {
+                    this.imageOutputWidget.value = "fixed";
+                }
+                
+                this.updateImageUrl();
+                
+                api.dispatchCustomEvent('graphChanged', app.graph.serialize());
+            }
+        } catch (error) {
+            console.error("Error loading modal:", error);
         }
     }
 
@@ -199,24 +353,41 @@ class DN_pyPinNode {
                     name: buttonName,
                     type: "button",
                     action: () => {
-                        console.log("Reset pool button clicked");
                         this.updateNodeConfigs("reset_pool", true);
                         this.node.setDirtyCanvas(true);
                     },
                     tooltip: "Reshuffle the pool with all images from chosen board/section"
                 });
-                console.log("Reset pool button added");
             }
         } else if (action === "remove") {
             if (existingButton) {
                 const index = this.node.widgets.indexOf(existingButton);
                 if (index > -1) {
                     this.node.widgets.splice(index, 1);
-                    console.log("Reset pool button removed");
                 }
             }
         }
         this.node.setDirtyCanvas(true);
+    }
+
+    loadCachedDataForUsername(username) {
+        fetchSend(MESSAGE_ROUTE, this.node.id, "load_cached_data", { username })
+            .then(response => {
+                const currentData = {};
+                currentData.boards = response.data;
+                currentData.board_map = response.board_map;
+                this.setPinterestData(currentData);
+                this.buildDisplayToNameMappings("board");
+                this.updateBoardOptions(currentData);
+                this.updateSectionOptions(currentData);
+                if (response.cached_usernames && this.cachedUsernamesWidget) {
+                    this.cachedUsernamesWidget.options.values = response.cached_usernames;
+                }
+                this.node.setDirtyCanvas(true);
+            })
+            .catch(error => {
+                console.error("Error loading cached data:", error);
+            });
     }
 
     updateBoardButtonHandler(action) {
@@ -229,20 +400,17 @@ class DN_pyPinNode {
                     name: buttonName,
                     type: "button",
                     action: () => {
-                        console.log("Update board data button clicked");
                         this.startLoading();
                         this.fetchCurrentBoardData(this.boardWidget.value);
                     },
                     tooltip: "Fetch/update images and sections for the currently selected board"
                 });
-                console.log("Update board data button added");
             }
         } else if (action === "remove") {
             if (existingButton) {
                 const index = this.node.widgets.indexOf(existingButton);
                 if (index > -1) {
                     this.node.widgets.splice(index, 1);
-                    console.log("Update board data button removed");
                 }
             }
         }
@@ -258,16 +426,28 @@ class DN_pyPinNode {
         const usernameWidget = this.node.widgets?.find(w => w.name === "username");
         const username = usernameWidget ? usernameWidget.value : '';
 
-        fetchSend(MESSAGE_ROUTE, this.node.id, "board_selected", { username, board_display_name: selectedBoard, max_images })
+        // Don't make backend calls if username is empty
+        if (!username || username.trim() === '') {
+            console.log("Username is empty, skipping backend call");
+            return;
+        }
+        
+        fetchSend(MESSAGE_ROUTE, this.node.id, "board_selected", { username, board_name: this.getBoardName(selectedBoard), max_images, api_requests: this.apiRequestsWidget.value })
             .then(response => {
                 const currentData = this.getPinterestData();
                 if (!currentData.boards) currentData.boards = {};
-                Object.assign(currentData.boards, response.data);
+                currentData.boards = response.data;
                 if (response.board_map) {
                     currentData.board_map = response.board_map;
-                    this.updateBoardOptions(currentData);
                 }
                 this.setPinterestData(currentData);
+                if (response.board_map) {
+                    this.buildDisplayToNameMappings("board");
+                    this.updateBoardOptions(currentData);
+                }
+                if (response.cached_usernames && this.cachedUsernamesWidget) {
+                    this.cachedUsernamesWidget.options.values = response.cached_usernames;
+                }
                 this.updateSectionOptions(currentData);
                 this.stopLoading();
                 this.node.setDirtyCanvas(true);
@@ -294,22 +474,26 @@ class DN_pyPinNode {
         this.pinterestDataWidget.value = JSON.stringify(data, null, 2);
     }
 
-    updateWidgetsFromData() {
-        const data = this.getPinterestData();
-        this.updateBoardOptions(data);
-        this.updateSectionOptions(data);
-    }
 
     updateBoardOptions(data) {
         if (!data.board_map) return;
-        const boardMap = data.board_map;
-        const boardOptions = ["all", ...Object.keys(boardMap)];
+        const boardOptions = Object.keys(this.displayToBoardName);
         if (!this.boardWidget) return;
 
+        const currentSelection = this.boardWidget.value;
+        
         this.boardWidget.options.values = boardOptions;
-        const boardData = this.widgetDataList.find(w => w.name === "board");
-        if (boardData && !boardOptions.includes(this.boardWidget.value)) {
-            this.boardWidget.value = boardOptions.includes(boardData.value) ? boardData.value : boardOptions[0];
+        
+        if (currentSelection) {
+            if (currentSelection === "all" || boardOptions.includes(currentSelection)) {
+                this.boardWidget.value = currentSelection;
+            } else {
+                const boardName = currentSelection.split(' (')[0];
+                const matchingOption = boardOptions.find(opt => opt.startsWith(boardName + " ("));
+                if (matchingOption) {
+                    this.boardWidget.value = matchingOption;
+                }
+            }
         }
         this.node.setDirtyCanvas(true);
     }
@@ -320,28 +504,12 @@ class DN_pyPinNode {
         const sectionData = this.widgetDataList.find(w => w.name === "section");
         if (!sectionData) return;
 
-        // Build options based on selected board
-        let options = [...sectionData.options];
-        const selectedBoard = this.boardWidget.value;
+        const sectionOptions = Object.keys(this.displayToSectionName);
         
-        if (selectedBoard !== "all" && data.board_map) {
-            const boardMap = data.board_map;
-            const boardId = boardMap[selectedBoard];
-            if (boardId) {
-                const boardData = data.boards?.[boardId];
-                const sectionsMap = boardData?.sections_map || {};
-                if (Object.keys(sectionsMap).length > 0) {
-                    options.push(...Object.keys(sectionsMap));
-                }
-            }
-        }
-
-        // Update options
-        this.sectionWidget.options.values = options;
+        this.sectionWidget.options.values = sectionOptions;
         
-        // Reset to first option if current value is invalid
-        if (!options.includes(this.sectionWidget.value)) {
-            this.sectionWidget.value = options[0];
+        if (!sectionOptions.includes(this.sectionWidget.value)) {
+            this.sectionWidget.value = sectionOptions[0];
             this.updateNodeConfigs("section", this.sectionWidget.value);
         }
         
@@ -354,7 +522,13 @@ class DN_pyPinNode {
             let configs = this.getConfigs();
             const widget = this.node.widgets?.find(w => w.name === widgetName);
             if (!widget || widget.type !== "button") {
-                configs[widgetName] = value;
+                if (widgetName === "board") {
+                    configs[widgetName] = this.getBoardName(value);
+                } else if (widgetName === "section") {
+                    configs[widgetName] = this.getSectionName(value);
+                } else {
+                    configs[widgetName] = value;
+                }
                 this.setConfigs(configs);
             }
         }
@@ -377,24 +551,42 @@ class DN_pyPinNode {
             for (const widget of widgets) {
                 if (widget.name !== "node_configs" && widget.name !== "pinterest_data" && widget.type !== "button") {
                     if (!(widget.name in configs)) {
-                        configs[widget.name] = widget.value;
+                        if (widget.name === "board") {
+                            configs[widget.name] = this.getBoardName(widget.value);
+                        } else if (widget.name === "section") {
+                            configs[widget.name] = this.getSectionName(widget.value);
+                        } else {
+                            configs[widget.name] = widget.value;
+                        }
                     }
                 }
             }
             this.setConfigs(configs);
         }
+        if (this.cachedUsernamesWidget) {
+            fetchSend(MESSAGE_ROUTE, this.node.id, "get_cached_usernames").then(response => {
+                if (response.cached_usernames) {
+                    this.cachedUsernamesWidget.options.values = response.cached_usernames;
+                }
+            });
+        }
     }
 
     startLoading() {
         if (this.isLoading) return;
+        
         this.originalOnDrawForeground = this.node.onDrawForeground;
         this.isLoading = true;
-        this.node.onDrawForeground = function(ctx) {
+        
+        this.node.onDrawForeground = (ctx) => {
             ctx.strokeStyle = "#FFFF00";
             ctx.lineWidth = 1;
-            ctx.strokeRect(0, 0, this.size[0], this.size[1]);
-            if (this.pyPinNode.originalOnDrawForeground) this.pyPinNode.originalOnDrawForeground.call(this, ctx);
+            ctx.strokeRect(0, 0, this.node.size[0], this.node.size[1]);
+            if (this.originalOnDrawForeground) {
+                this.originalOnDrawForeground.call(this.node, ctx);
+            }
         };
+        
         this.node.setDirtyCanvas(true);
     }
 
@@ -437,7 +629,6 @@ app.registerExtension({
                     if (!this.loadedImage) {
                         this.loadedImage = new Image();
                         this.loadedImage.src = imageUrl;
-                        console.log(this.loadedImage.src);
                         this.loadedImage.onload = () => {
                             this.cachedImgAspectRatio = this.loadedImage.height / this.loadedImage.width;
                             if (!this.hasAdjustedHeight) {
@@ -470,6 +661,24 @@ app.registerExtension({
                     this.pyPinNode.configsWidget.value = configsValue;
                     this.pyPinNode.pinterestDataWidget.value = dataValue;
                     
+                    const configs = this.pyPinNode.getConfigs();
+                    
+                    if (configs.board && configs.board !== "all") {
+                        const actualBoardName = this.pyPinNode.displayToBoardName[configs.board];
+                        if (actualBoardName) {
+                            configs.board = actualBoardName;
+                            this.pyPinNode.setConfigs(configs);
+                        }
+                    }
+                    
+                    if (configs.section && configs.section !== "included" && configs.section !== "excluded") {
+                        const actualSectionName = this.pyPinNode.displayToSectionName[configs.section];
+                        if (actualSectionName) {
+                            configs.section = actualSectionName;
+                            this.pyPinNode.setConfigs(configs);
+                        }
+                    }
+                    
                     this.pyPinNode.updateImageUrl();
                     setTimeout(() => {
                         api.dispatchCustomEvent('graphChanged', app.graph.serialize());
@@ -477,10 +686,19 @@ app.registerExtension({
                 }
             });
 
-            chainCallback(nodeType.prototype, 'onResize', function(size) {
+            const originalOnNodeRemoved = app.graph.onNodeRemoved;
+            app.graph.onNodeRemoved = function(node) {
+                if (node.type === "DN_pyPinNode") {
+                    fetchSend(MESSAGE_ROUTE, node.id, "remove_boards_cache");
+                }
+                originalOnNodeRemoved?.apply(this, arguments);
+            };
+
+/*            chainCallback(nodeType.prototype, 'onResize', function(size) {
                 this.setDirtyCanvas(true);
-            });
+            });*/
         }
     }
 });
+
 

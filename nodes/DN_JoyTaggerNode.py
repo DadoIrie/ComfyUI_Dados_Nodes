@@ -53,7 +53,7 @@ class DN_JoyTaggerNode:
     def __init__(self):
         self.model = None
         self.top_tags = None
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.current_device = None  # Track the currently loaded device
 
     def _parse_exclude_tags(self, exclude_tags):
         exclude_list = set()
@@ -97,6 +97,8 @@ class DN_JoyTaggerNode:
                     "default": False,
                     "tooltip": "Use underscores instead of spaces between words in tags."
                 }),
+                "use_cpu": ("BOOLEAN", {"default": False, "tooltip": "If true, unload the model from GPU and use CPU instead."}),
+                "keep_loaded": ("BOOLEAN", {"default": False, "tooltip": "If false, unload the model from memory after use."}),
             },
         }
 
@@ -104,29 +106,38 @@ class DN_JoyTaggerNode:
     FUNCTION = "generate_tags"
     CATEGORY = "Dado's Nodes/VLM Nodes"
 
-    def generate_tags(self, image, tag_count, threshold, exclude_tags, underscore_separated):
+    def generate_tags(self, image, tag_count, threshold, exclude_tags, underscore_separated, use_cpu, keep_loaded):
         model_path = download_joytag()
 
-        if self.model is None or self.top_tags is None:
-            print("Loading JoyTagger model...")
+        target_device = "cpu" if use_cpu else ("cuda" if torch.cuda.is_available() else "cpu")
 
-            self.model = Models.VisionModel.load_model(Path(model_path), device=self.device)
+        if self.model is None or self.top_tags is None or (self.model is not None and next(self.model.parameters()).device != target_device):
+            if self.model is not None:
+                print(f"Unloading JoyTagger model from {next(self.model.parameters()).device}...")
+                self.model.cpu()
+                del self.model
+                torch.cuda.empty_cache()
+                self.model = None
+            
+            print(f"Loading JoyTagger model to {target_device}...")
+            self.model = Models.VisionModel.load_model(Path(model_path), device=target_device)
             self.model.eval()
+            self.current_device = target_device
 
             with open(Path(model_path) / 'top_tags.txt', 'r') as f:
                 self.top_tags = [line.strip() for line in f.readlines() if line.strip()]
 
-            print("JoyTagger model loaded successfully")
+            print(f"JoyTagger model loaded successfully on {target_device}")
 
         pil_image = transforms.ToPILImage()(image[0].permute(2, 0, 1))
 
         with torch.no_grad():
             image_tensor = prepare_image(pil_image, self.model.image_size)
             batch = {
-                'image': image_tensor.unsqueeze(0).to(self.device),
+                'image': image_tensor.unsqueeze(0).to(target_device),
             }
 
-            with torch.amp.autocast_mode.autocast(self.device, enabled=True):
+            with torch.amp.autocast_mode.autocast(target_device, enabled=True):
                 preds = self.model(batch)
                 tag_preds = preds['tags'].sigmoid().cpu()
 
@@ -144,4 +155,17 @@ class DN_JoyTaggerNode:
 
         result = ', '.join([self._add_underscore(tag, underscore_separated) for tag in top_tags_filtered])
 
-        return (result,)
+        output = (result,)
+
+        if not keep_loaded:
+            print(f"Unloading JoyTagger model from {self.current_device} after use.")
+            if self.model is not None:
+                self.model.cpu()
+                del self.model
+                self.model = None
+            self.top_tags = None
+            self.current_device = None
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        
+        return output

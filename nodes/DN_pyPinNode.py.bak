@@ -8,6 +8,7 @@ import random
 import hashlib
 import os
 import glob
+import traceback
 from PIL import Image
 import numpy as np
 
@@ -63,6 +64,7 @@ def get_board_sections(pinterest, board_id, sections_map, max_images=100):
         title = section.get('title', '')
         processed_images = []
         
+        # Get all pins from the section, following the example code pattern with smaller page size
         print(f"Fetching pins for section: {title} (ID: {section_id})")
         pin_count = 0
         all_section_pins = []
@@ -80,11 +82,12 @@ def get_board_sections(pinterest, board_id, sections_map, max_images=100):
                         processed_images.append(orig_url)
             if len(processed_images) >= max_images:
                 break
+            # Get next batch of pins
             section_pins = pinterest.get_section_pins(section_id=section_id, page_size=50)
         
         print(f"Section {title}: {pin_count} pins")
         display_name = f"{title} ({pin_count})" if title else f"Unnamed ({pin_count})"
-        sections_map[title] = section_id
+        sections_map[display_name] = section_id  # Key is display_name
         sections_data[section_id] = {
             "section-id": section_id,
             "title": title,
@@ -107,9 +110,11 @@ def get_board_images_via_feed(pinterest, board_id, board_name, max_images):
         pins_to_add = feed_batch[:remaining]
         all_pins.extend(pins_to_add)
         print(f"Batch {batch_count}: {len(feed_batch)} pins available, added {len(pins_to_add)}, total so far: {len(all_pins)}")
+        # Check if we've reached the max
         if len(all_pins) >= max_images:
             break
     print(f"Finished board_feed for board {board_name}, total pins: {len(all_pins)}")
+    # Extract original image URLs from all pins
     all_images = []
     for pin in all_pins:
         if "images" in pin and "orig" in pin["images"]:
@@ -186,7 +191,7 @@ def get_cached_usernames():
     for f in files:
         basename = os.path.basename(f)
         if basename.endswith("_boards.json"):
-            username = basename[:-12]
+            username = basename[:-12]  # remove "_boards.json"
             usernames.append(username)
     return usernames
 
@@ -268,15 +273,18 @@ class DN_pyPinNode:
     #         return random.choice(all_images)
     #     return last_image
 
-    def _select_fixed(self, all_images, unique_id, board, section, last_image, image_output):
-        if image_output == 'fixed' and last_image and last_image in all_images:
-            self.last_boards[unique_id] = board
-            self.last_sections[unique_id] = section
-            return last_image
+    def _select_fixed(self, all_images, unique_id, board, section, last_image):
+        if last_image:
+            last_board = self.last_boards.get(unique_id)
+            last_section = self.last_sections.get(unique_id)
+            
+            if last_board is not None and last_section is not None:
+                changed = last_board != board or last_section != section
+                if not changed:
+                    return last_image
         
         if not all_images:
             return ''
-        
         selected = random.choice(all_images)
         self.last_boards[unique_id] = board
         self.last_sections[unique_id] = section
@@ -336,26 +344,31 @@ class DN_pyPinNode:
             with open(cache_path, 'r') as f:
                 data = json.load(f)
 
+        # Check for manual pool reset
         if configs.get('reset_pool'):
             self._reset_pools()
             configs['last_boards_hash'] = None
             configs['reset_pool'] = False
 
+        # Extract config values
         image_output, board, section, last_image, resize_image = [
             configs.get(k) for k in ('image_output', 'board', 'section', 'last_image', 'resize_image')
         ]
         boards = data.get('boards')
 
+        # MAYBE
         if board and section and unique_id not in self.last_boards:
             self.last_boards[unique_id] = board
             self.last_sections[unique_id] = section
 
+        # Reset dictionaries if boards data has changed
         boards_str = json.dumps(boards, sort_keys=True)
         current_hash = hashlib.md5(boards_str.encode()).hexdigest()
         if configs.get('last_boards_hash') != current_hash:
             self._reset_pools()
             configs['last_boards_hash'] = current_hash
             
+            # MAYBE
             if board and section:
                 self.last_boards[unique_id] = board
                 self.last_sections[unique_id] = section
@@ -364,7 +377,7 @@ class DN_pyPinNode:
         
         mode_strategies = {
             'chaotic draw': lambda: self._select_chaotic_draw(all_images, unique_id, board, section),
-            'fixed': lambda: self._select_fixed(all_images, unique_id, board, section, last_image, image_output),
+            'fixed': lambda: self._select_fixed(all_images, unique_id, board, section, last_image),
             'circular shuffle': lambda: self._select_circular_shuffle(all_images, unique_id, board, section)
         }
         
@@ -374,8 +387,9 @@ class DN_pyPinNode:
         configs['last_image'] = selected_image
         img_tensor = load_image_from_url(selected_image)
 
+        # Resize image if resize_image is set to a positive integer
         if resize_image:
-            resize_str = str(resize_image).strip()
+            resize_str = resize_image.strip()
             if resize_str.isdigit() and int(resize_str) > 0:
                 target_longest = int(resize_str)
                 _, h, w, _ = img_tensor.shape
@@ -401,191 +415,233 @@ class DN_pyPinNode:
         }
 
     @classmethod
-    def IS_CHANGED(cls, node_configs, pinterest_data, username, unique_id):
+    def IS_CHANGED(cls, node_data, username, unique_id):
         return random.random()
 
 @register_operation_handler
 async def handle_username_changed(request):
     """Handle username change messages from frontend"""
-    data = await request.json()
+    try:
+        data = await request.json()
 
-    operation = data.get('operation')
-    if operation not in ['username_changed', 'board_selected', 'remove_boards_cache', 'switch_to_cached', 'get_cached_usernames', 'load_cached_data', 'get_pinterest_pins']:
-        return None
-        
-    node_id = str(data.get('id', 'unknown'))
-
-    if operation == 'username_changed':
-        # node_id = str(data.get('id', ''))
-        payload = data.get('payload', {})
-        username = payload.get('username', '')
-        max_images = round(payload.get('max_images'))
-        result = handle_username_data_fetch(username)
-        
-        return web.json_response({"data": result})
-    if operation == 'board_selected':
-        node_id = str(data.get('id'))
-        payload = data.get('payload', {})
-        username = payload.get('username')
-        board_name = payload.get('board_name')
-        max_images = round(payload.get('max_images'))
-        api_requests = payload.get('api_requests')
-        if not check_user_exists(username):
-            return web.json_response({"error": "User not found"}, status=400)
-        cred_root = constants.BASE_DIR + "/.cred_root"
-        with suppress_specific_output():
-            pinterest = Pinterest(username=username, cred_root=cred_root)
-        boards = pinterest.boards(username=username, page_size=1000)
-        fresh_board_map = {board['name']: board['id'] for board in boards}
-        os.makedirs(CACHE_DIR, exist_ok=True)
-        cached_file = os.path.join(CACHE_DIR, f"{username}_boards.json")
-        if not board_name or board_name == 'all':
-            all_boards_data = {}
-            for i, board in enumerate(boards):
-                board_data = get_board_data(pinterest, board, max_images)
-                all_boards_data[board['id']] = board_data
-            print("All boards processed")
-            if api_requests == "live":
-                DN_pyPinNode.instance_caches[node_id] = {"boards": all_boards_data, "board_map": fresh_board_map}
-            elif api_requests == "cached":
-                cache_data = {
-                    "boards": all_boards_data,
-                    "board_map": fresh_board_map
-                }
-                
-                with open(cached_file, 'w', encoding='utf-8') as f:
-                    json.dump(cache_data, f)
-                
-            stripped_boards = strip_images(all_boards_data)
-            cached_usernames = get_cached_usernames()
-            if api_requests == "cached":
-                if username not in cached_usernames:
-                    cached_usernames.append(username)
-            return web.json_response({"data": stripped_boards, "board_map": fresh_board_map, "cached_usernames": cached_usernames})
-        else:
-            board_id = fresh_board_map.get(board_name)
-            if not board_id:
-                return web.json_response({"error": "Board not found"}, status=400)
-            board = next((b for b in boards if b['id'] == board_id), None)
-            if not board:
-                return web.json_response({"error": "Board not found"}, status=400)
-            board_data = get_board_data(pinterest, board, max_images)
-            if api_requests == "live":
-                existing_data = DN_pyPinNode.instance_caches.get(node_id, {"boards": {}, "board_map": {}})
-                existing_data["boards"][board_id] = board_data
-                existing_data["board_map"] = fresh_board_map
-                DN_pyPinNode.instance_caches[node_id] = existing_data
-            elif api_requests == "cached":
-                existing_data = {}
-                if os.path.exists(cached_file):
-                    with open(cached_file, 'r', encoding='utf-8') as f:
-                        existing_data = json.load(f)
-                else:
-                    existing_data = {"boards": {}, "board_map": {}}
-                existing_data["boards"][board_id] = board_data
-                existing_data["board_map"] = fresh_board_map
-                with open(cached_file, 'w', encoding='utf-8') as f:
-                    json.dump(existing_data, f)
-            stripped_boards = strip_images(existing_data["boards"])
-            cached_usernames = get_cached_usernames()
-            if api_requests == "cached":
-                if username not in cached_usernames:
-                    cached_usernames.append(username)
+        operation = data.get('operation')
+        if operation not in ['username_changed', 'board_selected', 'remove_boards_cache', 'switch_to_cached', 'get_cached_usernames', 'load_cached_data', 'get_pinterest_pins']:
+            return None
             
-            return web.json_response({"data": stripped_boards, "board_map": fresh_board_map, "cached_usernames": cached_usernames})
-    elif operation == 'remove_boards_cache':
-        node_id = str(data.get('id'))
-        DN_pyPinNode.instance_caches.pop(node_id, None)
-        return web.json_response({"status": "ok"})
-    elif operation == 'switch_to_cached':
-        node_id = str(data.get('id'))
-        payload = data.get('payload', {})
-        username = payload.get('username')
-        if node_id in DN_pyPinNode.instance_caches and username:
+        node_id = str(data.get('id', 'unknown'))
+
+        if operation == 'username_changed':
+            # node_id = str(data.get('id', ''))
+            payload = data.get('payload', {})
+            username = payload.get('username', '')
+            max_images = round(payload.get('max_images'))
+
+            result = handle_username_data_fetch(username)
+            
+            return web.json_response({"data": result})
+
+        if operation == 'board_selected':
+            node_id = str(data.get('id'))
+            payload = data.get('payload', {})
+            username = payload.get('username')
+            board_name = payload.get('board_name')
+            max_images = round(payload.get('max_images'))
+            api_requests = payload.get('api_requests')
+
+            if not check_user_exists(username):
+                return web.json_response({"error": "User not found"}, status=400)
+
+            cred_root = constants.BASE_DIR + "/.cred_root"
+            with suppress_specific_output():
+                pinterest = Pinterest(username=username, cred_root=cred_root)
+            boards = pinterest.boards(username=username, page_size=1000)
+
+            fresh_board_map = {board['name']: board['id'] for board in boards}
+
             os.makedirs(CACHE_DIR, exist_ok=True)
             cached_file = os.path.join(CACHE_DIR, f"{username}_boards.json")
-            with open(cached_file, 'w', encoding='utf-8') as f:
-                json.dump(DN_pyPinNode.instance_caches[node_id], f)
-            del DN_pyPinNode.instance_caches[node_id]
-        return web.json_response({"status": "ok", "cached_usernames": get_cached_usernames()})
-    elif operation == 'get_cached_usernames':
-        return web.json_response({"cached_usernames": get_cached_usernames()})
-    elif operation == 'load_cached_data':
-        payload = data.get('payload', {})
-        username = payload.get('username')
-        cache_path = os.path.join(CACHE_DIR, f"{username}_boards.json")
-        if os.path.exists(cache_path):
-            with open(cache_path, 'r') as f:
-                data = json.load(f)
-            boards = strip_images(data.get('boards', {}))
-            board_map = data.get('board_map', {})
-        else:
-            boards = {}
-            board_map = {}
-        return web.json_response({"data": boards, "board_map": board_map, "cached_usernames": get_cached_usernames()})
-    elif operation == 'get_pinterest_pins':
-        node_id = str(data.get('id'))
-        payload = data.get('payload', {})
-        username = payload.get('username')
-        board_name = payload.get('board_name')
-        section = payload.get('section')
-        api_requests = payload.get('api_requests')
-        
-        if not check_user_exists(username):
-            return web.json_response({"error": "User not found"}, status=400)
-        cred_root = constants.BASE_DIR + "/.cred_root"
-        with suppress_specific_output():
-            pinterest = Pinterest(username=username, cred_root=cred_root)
-        boards = pinterest.boards(username=username, page_size=1000)
-        
-        fresh_board_map = {}
-        for board in boards:
-            board_name_key = board["name"]
-            board_id = board["id"]
-            fresh_board_map[board_name_key] = board_id
-            
-        if api_requests == "live":
-            data = DN_pyPinNode.instance_caches.get(node_id, {"boards": {}, "board_map": {}})
-        elif api_requests == "cached":
+            if os.path.exists(cached_file):
+                print(f"Cache exists for {username}")
+            else:
+                print(f"Cache does not exist for {username}")
+
+            if not board_name or board_name == 'all':
+                all_boards_data = {}
+                for i, board in enumerate(boards):
+                    board_data = get_board_data(pinterest, board, max_images)
+                    all_boards_data[board['id']] = board_data
+                if api_requests == "live":
+                    DN_pyPinNode.instance_caches[node_id] = {"boards": all_boards_data, "board_map": fresh_board_map}
+                elif api_requests == "cached":
+                    cache_data = {
+                        "boards": all_boards_data,
+                        "board_map": fresh_board_map
+                    }
+                    
+                    with open(cached_file, 'w', encoding='utf-8') as f:
+                        json.dump(cache_data, f)
+                    
+                # Strip images for frontend
+                stripped_boards = strip_images(all_boards_data)
+                cached_usernames = get_cached_usernames()
+                if api_requests == "cached":
+                    if username not in cached_usernames:
+                        cached_usernames.append(username)
+                return web.json_response({"data": stripped_boards, "board_map": fresh_board_map, "cached_usernames": cached_usernames})
+            else:
+                board_id = fresh_board_map.get(board_name)
+                if not board_id:
+                    return web.json_response({"error": "Board not found"}, status=400)
+
+                board = next((b for b in boards if b['id'] == board_id), None)
+                if not board:
+                    return web.json_response({"error": "Board not found"}, status=400)
+
+                board_data = get_board_data(pinterest, board, max_images)
+
+                # Load existing data and merge
+                if api_requests == "live":
+
+                    existing_data = DN_pyPinNode.instance_caches.get(node_id, {"boards": {}, "board_map": {}})
+                    existing_data["boards"][board_id] = board_data
+                    existing_data["board_map"] = fresh_board_map
+                    DN_pyPinNode.instance_caches[node_id] = existing_data
+                elif api_requests == "cached":
+                    existing_data = {}
+                    if os.path.exists(cached_file):
+                        with open(cached_file, 'r', encoding='utf-8') as f:
+                            existing_data = json.load(f)
+                    else:
+                        existing_data = {"boards": {}, "board_map": {}}
+                    existing_data["boards"][board_id] = board_data
+                    existing_data["board_map"] = fresh_board_map
+                    with open(cached_file, 'w', encoding='utf-8') as f:
+                        json.dump(existing_data, f)
+
+                # Use the existing_data that was already loaded and updated
+                # Strip images for frontend from the complete dataset
+                stripped_boards = strip_images(existing_data["boards"])
+                cached_usernames = get_cached_usernames()
+                # Only add to cached usernames if we're in cached mode
+                if api_requests == "cached":
+                    if username not in cached_usernames:
+                        cached_usernames.append(username)
+                
+                return web.json_response({"data": stripped_boards, "board_map": fresh_board_map, "cached_usernames": cached_usernames})
+
+        elif operation == 'remove_boards_cache':
+            node_id = str(data.get('id'))
+            DN_pyPinNode.instance_caches.pop(node_id, None)
+            return web.json_response({"status": "ok"})
+
+        elif operation == 'switch_to_cached':
+            node_id = str(data.get('id'))
+            payload = data.get('payload', {})
+            username = payload.get('username')
+            if node_id in DN_pyPinNode.instance_caches and username:
+                os.makedirs(CACHE_DIR, exist_ok=True)
+                cached_file = os.path.join(CACHE_DIR, f"{username}_boards.json")
+                with open(cached_file, 'w', encoding='utf-8') as f:
+                    json.dump(DN_pyPinNode.instance_caches[node_id], f)
+                del DN_pyPinNode.instance_caches[node_id]
+            return web.json_response({"status": "ok", "cached_usernames": get_cached_usernames()})
+
+        elif operation == 'get_cached_usernames':
+            return web.json_response({"cached_usernames": get_cached_usernames()})
+
+        elif operation == 'load_cached_data':
+            payload = data.get('payload', {})
+            username = payload.get('username')
             cache_path = os.path.join(CACHE_DIR, f"{username}_boards.json")
             if os.path.exists(cache_path):
-                with open(cache_path, 'r', encoding='utf-8') as f:
+                with open(cache_path, 'r') as f:
                     data = json.load(f)
+                boards = strip_images(data.get('boards', {}))
+                board_map = data.get('board_map', {})
             else:
-                data = {"boards": {}, "board_map": {}}
-        
-        boards_data = data.get("boards", {})
-        
-        pin_urls = []
-        if board_name == "all":
-            for board in boards_data.values():
-                pin_urls.extend(board.get("images", []))
-                for sec_data in board.get("sections", {}).values():
-                    pin_urls.extend(sec_data.get("images", []))
-        else:
-            board_id = fresh_board_map.get(board_name)
+                boards = {}
+                board_map = {}
+            return web.json_response({"data": boards, "board_map": board_map, "cached_usernames": get_cached_usernames()})
+
+        elif operation == 'get_pinterest_pins':
+            node_id = str(data.get('id'))
+            payload = data.get('payload', {})
+            username = payload.get('username')
+            board_name = payload.get('board_name')
+            section = payload.get('section')
+            api_requests = payload.get('api_requests')
+
+            if not check_user_exists(username):
+                return web.json_response({"error": "User not found"}, status=400)
+
+            cred_root = constants.BASE_DIR + "/.cred_root"
+            with suppress_specific_output():
+                pinterest = Pinterest(username=username, cred_root=cred_root)
+            boards = pinterest.boards(username=username, page_size=1000)
             
-            if not board_id:
-                return web.json_response({"error": "Board not found"}, status=400)
-            
-            board_data = boards_data.get(board_id)
-            
-            if not board_data:
-                return web.json_response({"error": "Board data not found"}, status=400)
-                
-            if section == "included":
-                pin_urls.extend(board_data.get("images", []))
-                for sec_data in board_data.get("sections", {}).values():
-                    pin_urls.extend(sec_data.get("images", []))
-            elif section == "excluded":
-                pin_urls.extend(board_data.get("images", []))
+            # Build the board map explicitly to handle apostrophes and special characters
+            fresh_board_map = {}
+            for board in boards:
+                # Use the actual board name as key
+                board_name_key = board["name"]
+                board_id = board["id"]
+                fresh_board_map[board_name_key] = board_id
+
+            # Get data from cache or live based on api_requests
+            if api_requests == "live":
+                data = DN_pyPinNode.instance_caches.get(node_id, {"boards": {}, "board_map": {}})
+            elif api_requests == "cached":
+                cache_path = os.path.join(CACHE_DIR, f"{username}_boards.json")
+                if os.path.exists(cache_path):
+                    with open(cache_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                else:
+                    data = {"boards": {}, "board_map": {}}
+
+            # Extract boards data
+            boards_data = data.get("boards", {})
+
+            # Prepare the array of pin urls based on board and section
+            pin_urls = []
+
+            if board_name == "all":
+                # Include all pins from all boards and sections
+                for board in boards_data.values():
+                    pin_urls.extend(board.get("images", []))
+                    for sec_data in board.get("sections", {}).values():
+                        pin_urls.extend(sec_data.get("images", []))
             else:
-                sections_map = board_data.get("sections_map", {})
+                # Find the specific board
+                board_id = fresh_board_map.get(board_name)
+                if not board_id:
+                    return web.json_response({"error": "Board not found"}, status=400)
                 
-                if section in sections_map:
-                    sec_id = sections_map[section]
-                    if sec_id in board_data.get("sections", {}):
-                        pin_urls.extend(board_data["sections"][sec_id].get("images", []))
-        
-        return web.json_response({"pin_urls": pin_urls})
-    return web.json_response({"error": "Invalid operation"}, status=400)
+                board_data = boards_data.get(board_id)
+                if not board_data:
+                    return web.json_response({"error": "Board data not found"}, status=400)
+
+                if section == "included":
+                    # Include board pins and all section pins
+                    pin_urls.extend(board_data.get("images", []))
+                    for sec_data in board_data.get("sections", {}).values():
+                        pin_urls.extend(sec_data.get("images", []))
+                elif section == "excluded":
+                    # Include only board pins
+                    pin_urls.extend(board_data.get("images", []))
+                else:
+                    # Include only the specific section (if it exists)
+                    sections_map = board_data.get("sections_map", {})
+                    if section in sections_map:
+                        sec_id = sections_map[section]
+                        if sec_id in board_data.get("sections", {}):
+                            pin_urls.extend(board_data["sections"][sec_id].get("images", []))
+
+            return web.json_response({"pin_urls": pin_urls})
+
+        return web.json_response({"error": "Invalid operation"}, status=400)
+
+    except Exception as e:
+        print(f"ERROR: Exception: {str(e)}")
+        print(f"ERROR: Exception type: {type(e)}")
+        print(f"ERROR: Traceback: {traceback.format_exc()}")
+        return web.json_response({"error": str(e)}, status=500)

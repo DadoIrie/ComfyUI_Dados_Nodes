@@ -19,19 +19,17 @@ app.registerExtension({
       
     });  */
     /* not being triggered app.graph, 'onExecuted' */
-    chainCallback(app.graph, 'onExecuted', async function (node) {
+/*     chainCallback(app.graph, 'onExecuted', async function (node) {
       console.log("(Dados.EventListeners) Node Executed :", node.type, node.id);
-    });
+    }); */
 
   }
 });
 
 /* api.addEventListener("executing", ({ detail }) => {
   console.log("Node start executing:", detail);
-}); */
-
-/* api.addEventListener("executed", ({ detail }) => {
-  console.log("Node executed:", detail);
 });
 
- */
+api.addEventListener("executed", ({ detail }) => {
+  console.log("Node executed:", detail);
+}); */

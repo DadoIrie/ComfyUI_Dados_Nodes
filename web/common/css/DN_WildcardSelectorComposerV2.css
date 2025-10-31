@@ -23,7 +23,7 @@
 
 #wildcard-selector-composer-v2-modal {
     width: 80vw;
-    height: 85vh;
+    height: 80vh;
     z-index: calc(var(--wc-modal-z-index) + 1);
     display: flex;
     overflow: hidden;

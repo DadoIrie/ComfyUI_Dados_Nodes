@@ -90,13 +90,22 @@ class DN_PixAITaggerNode:
     _shared_model = None
 
     @classmethod
-    def _get_shared_model(cls, model_path, device):
-        if cls._shared_model is None:
+    def _get_shared_model(cls, model_path, target_device):
+        if cls._shared_model is None or (cls._shared_model is not None and next(cls._shared_model.parameters()).device != target_device):
+            if cls._shared_model is not None:
+                print(f"Unloading PixAI Tagger model from {next(cls._shared_model.parameters()).device}...")
+                cls._shared_model.cpu()
+                del cls._shared_model
+                torch.cuda.empty_cache()
+                cls._shared_model = None
+            
+            print(f"Loading PixAI Tagger model to {target_device}...")
             cls._shared_model = get_model()
-            states_dict = torch.load(Path(model_path) / "model_v0.9.pth", map_location=device, weights_only=True)
+            states_dict = torch.load(Path(model_path) / "model_v0.9.pth", map_location=target_device, weights_only=True)
             cls._shared_model.load_state_dict(states_dict)
-            cls._shared_model.to(device)
+            cls._shared_model.to(target_device)
             cls._shared_model.eval()
+            print(f"PixAI Tagger model loaded successfully on {target_device}")
         return cls._shared_model
 
     def __init__(self):
@@ -106,7 +115,7 @@ class DN_PixAITaggerNode:
         self.character_ip_mapping = None
         self.gen_tag_count = 0
         self.character_tag_count = 0
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.current_device = None  # Track the currently loaded device
         self.transform = transforms.Compose(
             [
                 transforms.Resize((448, 448)),
@@ -155,6 +164,8 @@ class DN_PixAITaggerNode:
                     "default": False,
                     "tooltip": "If true, only use the top 1 character tag and its associated IP tags."
                 }),
+                "use_cpu": ("BOOLEAN", {"default": False, "tooltip": "If true, unload the model from GPU and use CPU instead."}),
+                "keep_loaded": ("BOOLEAN", {"default": False, "tooltip": "If false, unload the model from memory after use."}),
             },
         }
 
@@ -185,11 +196,14 @@ class DN_PixAITaggerNode:
             if tag_name not in self.tags_to_exclude:
                 target_list.append((tag_name, probs[idx].item()))
 
-    def generate_tags(self, image, threshold_general, threshold_character, tags_count, exclude_tags, underscore_separated, single_char_ip):
+    def generate_tags(self, image, threshold_general, threshold_character, tags_count, exclude_tags, underscore_separated, single_char_ip, use_cpu, keep_loaded):
         model_path = download_pixaitagger()
         
-        if self.model is None or self.tag_map is None or self.character_ip_mapping is None:
-            self.model = DN_PixAITaggerNode._get_shared_model(model_path, self.device)
+        target_device = "cpu" if use_cpu else ("cuda" if torch.cuda.is_available() else "cpu")
+
+        if self.model is None or self.tag_map is None or self.character_ip_mapping is None or self.current_device != target_device:
+            self.model = DN_PixAITaggerNode._get_shared_model(model_path, target_device)
+            self.current_device = target_device
             
             tags_file = Path(model_path) / 'tags_v0.9_13k.json'
             mapping_file = Path(model_path) / 'char_ip_map.json'
@@ -207,10 +221,10 @@ class DN_PixAITaggerNode:
         pil_image = Image.fromarray((image[0].cpu().numpy() * 255).astype('uint8'))
         
         pil_image = pil_to_rgb(pil_image)
-        image_tensor = self.transform(pil_image).unsqueeze(0).to(self.device)
+        image_tensor = self.transform(pil_image).unsqueeze(0).to(target_device)
         
         with torch.no_grad():
-            with torch.amp.autocast_mode.autocast(self.device, enabled=True):
+            with torch.amp.autocast_mode.autocast(target_device, enabled=True):
                 probs = self.model.forward(image_tensor)[0]
             general_mask = probs[: self.gen_tag_count] > threshold_general
             character_mask = probs[self.gen_tag_count:] > threshold_character
@@ -277,4 +291,19 @@ class DN_PixAITaggerNode:
             for tag, score in unified_tags_data:
                 print(f"  {tag}: {score}")
 
-            return (result_unified_tags,)
+            result = (result_unified_tags,)
+
+            if not keep_loaded:
+                print(f"Unloading PixAI Tagger model from {self.current_device} after use.")
+                if self.model is not None:
+                    self.model.cpu()
+                    del self.model
+                    self.model = None
+                self.tag_map = None
+                self.index_to_tag_map = None
+                self.character_ip_mapping = None
+                self.current_device = None
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            
+            return result
