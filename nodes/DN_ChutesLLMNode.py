@@ -10,16 +10,14 @@ from .utils.utils import get_setting
 from aiohttp import web
 
 _CHUTES_MODELS = [
+    "moonshotai/Kimi-K2-Thinking",
+    "MiniMaxAI/MiniMax-M2",
     "Qwen/Qwen2.5-VL-32B-Instruct",
-    "Qwen/Qwen2.5-72B-Instruct",
     "Qwen/Qwen2.5-VL-72B-Instruct",
     "Qwen/Qwen3-VL-235B-A22B-Instruct",
     "Qwen/Qwen3-VL-235B-A22B-Thinking",
-    "Qwen/Qwen3-30B-A3B-Thinking-2507",
-    "zai-org/GLM-4.5-Air",
-    "zai-org/GLM-4.5-FP8",
-    "zai-org/GLM-4.5-turbo",
-    "zai-org/GLM-4.6-FP8",
+    "zai-org/GLM-4.5",
+    "zai-org/GLM-4.6",
     "zai-org/GLM-4.6-turbo",
     "chutesai/Ling-1T-FP8",
     "meta-llama/Llama-3.3-70B-Instruct",

@@ -19,7 +19,8 @@ class DN_ChutesSDxlNode:
     def INPUT_TYPES(cls):
         model_options = [
             "stabilityai/stable-diffusion-xl-base-1.0",  # Base SDXL
-            "JuggernautXL",  # Juggernaut model
+            "JuggernautXL",
+            "JuggernautXL-Ragnarok",    # Juggernaut model
             "Lykon/dreamshaper-xl-1-0"  # Dreamshaper
         ]
 

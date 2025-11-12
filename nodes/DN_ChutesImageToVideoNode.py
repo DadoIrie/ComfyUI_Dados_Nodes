@@ -77,7 +77,7 @@ class DN_ChutesImageToVideoNode:
             "https://chutes-wan-2-2-i2v-14b-fast.chutes.ai/generate",
             headers=headers,
             json=body,
-            stream=True,
+            stream=False,
             timeout=3600
         )
 
