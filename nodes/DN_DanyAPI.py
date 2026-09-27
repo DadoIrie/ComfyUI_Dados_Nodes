@@ -42,6 +42,7 @@ def _kill_danyapi_server():
     except OSError:
         pass
 
+
 atexit.register(_kill_danyapi_server)
 
 def interrupt_processing(value=True):
@@ -76,9 +77,7 @@ class DN_DanyAPI(io.ComfyNode):
                     "model",
                     default="deepseek-v4-vision",
                     options=[
-                        "deepseek-v4-flash",
-                        "deepseek-v4-pro",
-                        "deepseek-v4-vision",
+                        "deepseek-v4.1-flash",
                         "qwen3.8-max",
                         "qwen3.7-max",
                         "qwen3.7-plus",
