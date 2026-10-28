@@ -11,7 +11,6 @@ import torch.nn.functional as F
 from comfy_api.latest import io
 from PIL import Image
 import numpy as np
-
 from py3pin.Pinterest import Pinterest
 from .. import constants
 from .utils.api_routes import register_operation_handler
@@ -436,6 +435,9 @@ class DN_pyPinNode(io.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
+        configs = json.loads(kwargs.get('node_configs') or '{}')
+        if configs.get('image_output') == 'fixed' and configs.get('last_image'):
+            return configs['last_image'] + '|' + str(configs.get('board')) + '|' + str(configs.get('section'))
         return random.random()
 
 @register_operation_handler
