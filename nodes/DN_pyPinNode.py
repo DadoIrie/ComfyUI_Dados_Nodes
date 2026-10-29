@@ -16,7 +16,7 @@ from .. import constants
 from .utils.api_routes import register_operation_handler
 from aiohttp import web
 
-CACHE_DIR = os.path.join(constants.USER_DATA_DIR, "pypin_cache")
+DN_PYPIN_CACHE_DIR = os.path.join(constants.USER_DATA_DIR, "pypin_cache")
 
 @contextlib.contextmanager
 def suppress_specific_output():
@@ -179,9 +179,9 @@ def strip_images(data):
         return data
 
 def get_cached_usernames():
-    if not os.path.exists(CACHE_DIR):
+    if not os.path.exists(DN_PYPIN_CACHE_DIR):
         return ["none"]
-    files = glob.glob(os.path.join(CACHE_DIR, "*_boards.json"))
+    files = glob.glob(os.path.join(DN_PYPIN_CACHE_DIR, "*_boards.json"))
     usernames = ["none"]
     for f in files:
         basename = os.path.basename(f)
@@ -365,7 +365,7 @@ class DN_pyPinNode(io.ComfyNode):
         if api_requests == "live":
             data = cls.instance_caches.get(unique_id)
         elif api_requests == "cached":
-            cache_path = os.path.join(CACHE_DIR, f"{username}_boards.json")
+            cache_path = os.path.join(DN_PYPIN_CACHE_DIR, f"{username}_boards.json")
             with open(cache_path, 'r') as f:
                 data = json.load(f)
 
@@ -435,10 +435,8 @@ class DN_pyPinNode(io.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        configs = json.loads(kwargs.get('node_configs') or '{}')
-        if configs.get('image_output') == 'fixed' and configs.get('last_image'):
-            return configs['last_image'] + '|' + str(configs.get('board')) + '|' + str(configs.get('section'))
-        return random.random()
+        configs = json.loads(kwargs['node_configs'])
+        return None if configs.get('image_output') == 'fixed' else random.random()
 
 @register_operation_handler
 async def handle_username_changed(request):
@@ -473,8 +471,8 @@ async def handle_username_changed(request):
             pinterest = Pinterest(username=username, cred_root=cred_root)
         boards = pinterest.boards(username=username, page_size=1000)
         fresh_board_map = {board['name']: board['id'] for board in boards}
-        os.makedirs(CACHE_DIR, exist_ok=True)
-        cached_file = os.path.join(CACHE_DIR, f"{username}_boards.json")
+        os.makedirs(DN_PYPIN_CACHE_DIR, exist_ok=True)
+        cached_file = os.path.join(DN_PYPIN_CACHE_DIR, f"{username}_boards.json")
         if not board_name or board_name == 'all':
             all_boards_data = {}
             for i, board in enumerate(boards):
@@ -538,8 +536,8 @@ async def handle_username_changed(request):
         payload = data.get('payload', {})
         username = payload.get('username')
         if node_id in DN_pyPinNode.instance_caches and username:
-            os.makedirs(CACHE_DIR, exist_ok=True)
-            cached_file = os.path.join(CACHE_DIR, f"{username}_boards.json")
+            os.makedirs(DN_PYPIN_CACHE_DIR, exist_ok=True)
+            cached_file = os.path.join(DN_PYPIN_CACHE_DIR, f"{username}_boards.json")
             with open(cached_file, 'w', encoding='utf-8') as f:
                 json.dump(DN_pyPinNode.instance_caches[node_id], f)
             del DN_pyPinNode.instance_caches[node_id]
@@ -549,7 +547,7 @@ async def handle_username_changed(request):
     elif operation == 'load_cached_data':
         payload = data.get('payload', {})
         username = payload.get('username')
-        cache_path = os.path.join(CACHE_DIR, f"{username}_boards.json")
+        cache_path = os.path.join(DN_PYPIN_CACHE_DIR, f"{username}_boards.json")
         if os.path.exists(cache_path):
             with open(cache_path, 'r') as f:
                 data = json.load(f)
@@ -583,7 +581,7 @@ async def handle_username_changed(request):
         if api_requests == "live":
             data = DN_pyPinNode.instance_caches.get(node_id, {"boards": {}, "board_map": {}})
         elif api_requests == "cached":
-            cache_path = os.path.join(CACHE_DIR, f"{username}_boards.json")
+            cache_path = os.path.join(DN_PYPIN_CACHE_DIR, f"{username}_boards.json")
             if os.path.exists(cache_path):
                 with open(cache_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
