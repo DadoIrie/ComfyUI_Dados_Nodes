@@ -11,42 +11,53 @@ from aiohttp import web
 from dynamicprompts.generators import RandomPromptGenerator
 from .utils.api_routes import register_operation_handler
 from .wildcardselector.structure_utils import WildcardStructureCreation
+from comfy_api.latest import io
 
-class DN_WildcardSelectorComposerV2:
+
+class DN_WildcardSelectorComposerV2(io.ComfyNode):
     node_state: ClassVar[Dict[str, Dict[str, Any]]] = {}
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "optional": {
-                "wildcards_prompt": ("STRING", {"multiline": True}),
-                "wildcards_structure_data": ("STRING", {"multiline": True}),
-                "seed": ("INT", {"forceInput": True}),
-            },
-            "hidden": {
-                "unique_id": "UNIQUE_ID",
-            }
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="DN_WildcardSelectorComposerV2",
+            display_name="Wildcard Selector/Composer V2",
+            category="Dado's Nodes/Text & Prompt",
+            description="Processes and catalogs sections and wildcards, mapping their structure and relationships for UI representation.",
+            inputs=[
+                io.String.Input("wildcards_prompt", default="", multiline=True, optional=True),
+                io.String.Input("wildcards_structure_data", default="", multiline=True, optional=True),
+                io.Int.Input("seed", force_input=True, optional=True),
+            ],
+            outputs=[
+                io.String.Output(display_name="clean_prompt"),
+                io.String.Output(display_name="marked_prompt"),
+                io.String.Output(display_name="processed_prompt"),
+            ],
+            hidden=[
+                io.Hidden.unique_id,
+            ],
+        )
 
-    RETURN_TYPES = ("STRING",) * 3
-    RETURN_NAMES = ("clean_prompt", "marked_prompt", "processed_prompt")
-    FUNCTION = "process_prompt"
-    CATEGORY = "Dado's Nodes/Text & Prompt"
-
-    def process_prompt(self, unique_id, seed=None, wildcards_prompt="", wildcards_structure_data=""):
+    @classmethod
+    def execute(cls, wildcards_prompt="", wildcards_structure_data="", seed=None):
         marked_prompt = ""
         processed_prompt = ""
 
-        process_wildcards = self.node_state.get(unique_id, {}).get("process_wildcards", False)
+        unique_id = cls.hidden.unique_id
+
+        process_wildcards = cls.node_state.get(unique_id, {}).get("process_wildcards", False)
 
         if process_wildcards and wildcards_prompt:
             generator = RandomPromptGenerator()
             processed_prompt = generator.generate(wildcards_prompt)[0]
 
-        return (wildcards_prompt, marked_prompt, processed_prompt)
+        return io.NodeOutput(wildcards_prompt, marked_prompt, processed_prompt)
     
-    # ! IS_CHANGED is missing with a random number generator in order to call this node again even if the input prompt is the same 
-    
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed")
+
     @classmethod
     def update_wildcards_prompt(cls, node_id: str, content: str, old_structure_json: str = "") -> str:
         cls.node_state[node_id]['wildcards_prompt'] = content

@@ -39,6 +39,8 @@ from .nodes.DN_MultilineString import DN_MultilineString
 from .nodes.DN_WildcardsProcessor import DN_WildcardsProcessor
 from .nodes.DN_ImageBase64 import DN_ImageToBase64Node, DN_Base64ToImageNode
 from .nodes.DN_PythonCode import DN_PythonCode
+from .nodes.DN_WildcardSelectorComposerV2 import DN_WildcardSelectorComposerV2
+from .nodes.DN_WildcardPromptEditorNode import DN_WildcardPromptEditorNode
 
 # Function to create a dynamic node class for a specific model
 def create_replicate_node(model_identifier):
@@ -67,7 +69,9 @@ registered_nodes = [
         DN_WildcardsProcessor,
         DN_PythonCode,
         DN_ImageToBase64Node,
-        DN_Base64ToImageNode
+        DN_Base64ToImageNode,
+        DN_WildcardSelectorComposerV2,
+        DN_WildcardPromptEditorNode
     ]
 registered_replicate_models = []
 
@@ -112,9 +116,6 @@ register_routes()
     #"inactivePinterestImageNode": "Pinterest Node (WIP - broken)",
     "DN_TextConcatenateNode": "Dynamic Text Concatenate",
     "DN_TextDropDownNode": "Text DropDown",
-    "DN_WildcardPromptEditorNode": "Wildcard Prompt Editor (deprecation pending)",
-    "DN_WildcardSelectorComposerV2": "Wildcard Selector/Composer",
-    "DN_PromptSectionsExtractor": "Prompt Sections Extractor",
     "DN_SmolVLMNode": "SmolVLM Image Describer",
     # "PinterestNode": "Pinterest Node",
     "DN_JoyTaggerNode": "JoyTagger",

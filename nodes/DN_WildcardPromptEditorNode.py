@@ -4,27 +4,41 @@ import random
 from typing import Dict, Any, ClassVar, Optional, Tuple
 from aiohttp import web
 from .utils.api_routes import register_operation_handler
+from comfy_api.latest import io
 
-class DN_WildcardPromptEditorNode:
+class DN_WildcardPromptEditorNode(io.ComfyNode):
     file_cache: ClassVar[Dict[str, str]] = {}
     node_state: ClassVar[Dict[str, Dict[str, Any]]] = {}
     
     @classmethod
-    def INPUT_TYPES(cls):
-        return {            
-            "optional": {
-                "wildcards_prompt": ("STRING",),
-                "wildcards_selections": ("STRING",),
-            },
-            "hidden": {
-                "unique_id": "UNIQUE_ID",
-            }
-        }
-    
-    RETURN_TYPES = ("STRING",) * 2
-    RETURN_NAMES = ("clean_prompt", "marked_prompt")
-    FUNCTION = "process_prompt"
-    CATEGORY = "Dado's Nodes/Text & Prompt"
+    def define_schema(cls):
+        return io.Schema(
+            node_id="DN_WildcardPromptEditorNode",
+            display_name="Wildcard Prompt Editor",
+            category="Dado's Nodes/Text & Prompt",
+            inputs=[
+                io.String.Input("wildcards_prompt", default="", optional=True),
+                io.String.Input("wildcards_selections", default="", optional=True),
+            ],
+            outputs=[
+                io.String.Output(display_name="clean_prompt"),
+                io.String.Output(display_name="marked_prompt"),
+            ],
+            hidden=[
+                io.Hidden.unique_id,
+            ],
+        )
+
+    @classmethod
+    def execute(cls, wildcards_prompt="", wildcards_selections=""):
+        unique_id = cls.hidden.unique_id
+        node = cls()
+        clean_prompt, marked_prompt = node.process_prompt(wildcards_prompt, wildcards_selections, unique_id)
+        return io.NodeOutput(clean_prompt, marked_prompt)
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return random.random()
     
     def parse_wildcards(self, clean_prompt: str) -> list:
         return self._parse_wildcards_recursive(clean_prompt, "")

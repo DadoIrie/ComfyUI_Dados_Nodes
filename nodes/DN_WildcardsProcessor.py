@@ -1,6 +1,5 @@
 from pathlib import Path
 from dynamicprompts.generators import RandomPromptGenerator
-from dynamicprompts.generators.attentiongenerator import AttentionGenerator
 from dynamicprompts.wildcards import WildcardManager
 from comfy_api.latest import io
 
@@ -28,44 +27,33 @@ class DN_WildcardsProcessor(io.ComfyNode):
                     max=0xFFFFFFFFFFFFFFFF,
                     tooltip="Seed for wildcard randomization",
                 ),
-                io.Boolean.Input(
-                    "use_attention",
-                    default=False,
-                    tooltip="Use attention generator for emphasis",
+                io.Int.Input(
+                    "prompts",
+                    default=1,
+                    min=1,
+                    max=0xFFFFFFFFFFFFFFFF,
+                    tooltip="Number of prompts to generate",
                 ),
             ],
             outputs=[
-                io.String.Output(display_name="processed_text"),
+                io.String.Output(display_name="processed_text", is_output_list=True),
                 io.Int.Output(display_name="seed"),
             ],
         )
 
     @classmethod
-    def execute(cls, text, seed, use_attention):
+    def execute(cls, text, seed, prompts):
         if not text:
-            return (text, seed)
+            return io.NodeOutput([text], seed)
 
         wildcard_dir = Path(constants.USER_DATA_DIR) / "DN_Wildcards"
         wildcard_dir.mkdir(parents=True, exist_ok=True)
         wildcard_manager = WildcardManager(wildcard_dir)
 
-        generator = RandomPromptGenerator(wildcard_manager)
+        generator = RandomPromptGenerator(wildcard_manager, seed=seed)
 
-        if use_attention:
-            attention_generator = AttentionGenerator(generator)
-            prompts = attention_generator.generate(text, num_prompts=1, seeds=seed)
-
-            fixed_prompts = []
-            for prompt in prompts:
-                import re
-
-                fixed_prompt = re.sub(r"\((,\s*)", r"\1(", prompt)
-                fixed_prompts.append(fixed_prompt)
-
-            processed_text = fixed_prompts[0] if fixed_prompts else text
-        else:
-            prompts = generator.generate(text, num_images=1, seeds=seed)
-            processed_text = list(prompts)[0] if prompts else text
+        generated = generator.generate(text, num_images=prompts)
+        processed_text = list(generated) if generated else [text]
 
         return io.NodeOutput(processed_text, seed)
 

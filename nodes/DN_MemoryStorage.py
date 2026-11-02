@@ -42,36 +42,45 @@ class DN_MemoryStorage(io.ComfyNode):
             inputs=[
                 io.Combo.Input("mode", default="get", options=["set", "get"]),
                 io.String.Input("key", default=""),
-                io.String.Input("input", force_input=True, optional=True),
+                io.AnyType.Input("input", optional=True),
             ],
             outputs=[
-                io.String.Output(display_name="output"),
+                io.AnyType.Output(display_name="output", is_output_list=True),
             ],
             is_output_node=True,
+            is_input_list=True,
         )
 
     @classmethod
-    def execute(cls, mode, key, input=None):
+    def execute(cls, mode, key, **kwargs):
+        stored_value = kwargs.get("input")
+        if isinstance(mode, list):
+            mode = mode[0] if mode else "get"
+        if isinstance(key, list):
+            key = key[0] if key else ""
         key = (key or "").strip()
         if not key:
             raise ValueError("key must not be empty")
 
+        if isinstance(stored_value, list) and len(stored_value) == 1:
+            stored_value = stored_value[0]
+
         if mode == "set":
-            has_value = input is not None and input.strip() != ""
+            has_value = stored_value is not None and (not isinstance(stored_value, str) or stored_value.strip() != "")
             if has_value:
                 data = cls._read_store()
-                data[key] = input
+                data[key] = stored_value
                 cls._write_store(data)
-                return io.NodeOutput(input)
+                return io.NodeOutput(stored_value if isinstance(stored_value, list) else [stored_value])
             data = cls._read_store()
             if key not in data:
                 raise ValueError(f"no value stored for key '{key}'")
-            return io.NodeOutput(data[key])
+            return io.NodeOutput(data[key] if isinstance(data[key], list) else [data[key]])
 
         data = cls._read_store()
         if key not in data:
-            raise ValueError(f"no value stored for key '{key}'")
-        return io.NodeOutput(data[key])
+            return io.NodeOutput([""])
+        return io.NodeOutput(data[key] if isinstance(data[key], list) else [data[key]])
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
