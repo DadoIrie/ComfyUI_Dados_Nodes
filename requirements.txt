@@ -3,3 +3,4 @@ num2words
 aiohttp
 timm
 replicate
+datasets
