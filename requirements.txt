@@ -4,3 +4,5 @@ aiohttp
 timm
 replicate
 datasets
+gensim>=4.4.0
+nltk

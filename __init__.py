@@ -41,6 +41,7 @@ from .nodes.DN_ImageBase64 import DN_ImageToBase64Node, DN_Base64ToImageNode
 from .nodes.DN_PythonCode import DN_PythonCode
 from .nodes.DN_WildcardSelectorComposerV2 import DN_WildcardSelectorComposerV2
 from .nodes.DN_WildcardPromptEditorNode import DN_WildcardPromptEditorNode
+from .nodes.DN_AbstractCollisionNode import DN_AbstractCollisionNode
 from .nodes.DN_PoetryClusteringNode import DN_PoetryClusteringNode
 
 # Function to create a dynamic node class for a specific model
@@ -73,7 +74,8 @@ registered_nodes = [
         DN_Base64ToImageNode,
         DN_WildcardSelectorComposerV2,
         DN_WildcardPromptEditorNode,
-        DN_PoetryClusteringNode
+        DN_PoetryClusteringNode,
+        DN_AbstractCollisionNode
     ]
 registered_replicate_models = []
 
