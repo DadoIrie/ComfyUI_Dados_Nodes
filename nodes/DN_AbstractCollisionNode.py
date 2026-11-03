@@ -7,11 +7,12 @@ from comfy_api.latest import io
 from .. import constants
 
 
-class DN_AbstractCollisionNode(io.ComfyNode):
-    # Lazy caches, filled on first run
-    _kv = None
-    _pools = {}
+# Lazy caches, filled on first run (module-level: V3 locks class attributes)
+_ABSTRACT_COLLISION_KV = None
+_ABSTRACT_COLLISION_POOLS = {}
 
+
+class DN_AbstractCollisionNode(io.ComfyNode):
     @classmethod
     def define_schema(cls):
         return io.Schema(
@@ -82,7 +83,8 @@ class DN_AbstractCollisionNode(io.ComfyNode):
 
     @classmethod
     def _load_vectors(cls):
-        if cls._kv is None:
+        global _ABSTRACT_COLLISION_KV
+        if _ABSTRACT_COLLISION_KV is None:
             from gensim.models import KeyedVectors
 
             model_dir = Path(constants.BASE_DIR) / "embedding_models" / "glove-wiki-gigaword-100"
@@ -96,13 +98,14 @@ class DN_AbstractCollisionNode(io.ComfyNode):
                 local_dir=str(model_dir),
                 repo_type="model",
             )
-            cls._kv = KeyedVectors.load(str(Path(local) / model_file))
-        return cls._kv
+            _ABSTRACT_COLLISION_KV = KeyedVectors.load(str(Path(local) / model_file))
+        return _ABSTRACT_COLLISION_KV
 
     @classmethod
     def _word_pool(cls, kv, start, end, nouns_only):
+        global _ABSTRACT_COLLISION_POOLS
         key = (start, end, nouns_only)
-        if key not in cls._pools:
+        if key not in _ABSTRACT_COLLISION_POOLS:
             words = [w for w in kv.index_to_key[start:end] if w.isalpha() and len(w) > 3]
             if nouns_only:
                 try:
@@ -117,8 +120,8 @@ class DN_AbstractCollisionNode(io.ComfyNode):
                     words = [w for w in words if wn.synsets(w, pos="n")]
                 except Exception:
                     pass  # no nltk/wordnet: keep the unfiltered pool
-            cls._pools[key] = words
-        return cls._pools[key]
+            _ABSTRACT_COLLISION_POOLS[key] = words
+        return _ABSTRACT_COLLISION_POOLS[key]
 
     @classmethod
     def execute(cls, theme, banned_words, max_similarity,
